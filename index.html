@@ -88,7 +88,7 @@
     </div>
 
     <script>
-        // CONFIG: Replace with your Web API Key from Firebase Project Settings
+        // 1. YOUR FIREBASE PROJECT CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
             authDomain: "brothers-egy-portal.firebaseapp.com",
@@ -97,96 +97,54 @@
             messagingSenderId: "673531280760",
             appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
         };
-
+    
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-
-        async function attemptLogin() {
-            const u = document.getElementById('user-field').value.toLowerCase();
-            const p = document.getElementById('pass-field').value;
-            const doc = await db.collection("users").doc(u).get();
-            if (doc.exists && doc.data().password === p) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-portal').style.display = 'flex';
-                loadData();
-            } else { alert("Unauthorized"); }
+    
+        // 2. THE DATA LOADER
+        async function loadExecutiveData() {
+            console.log("📡 Connecting to Firestore...");
+            try {
+                const fleetSnap = await db.collection("fleet").get();
+                const bookingSnap = await db.collection("bookings").get();
+    
+                if (fleetSnap.empty) {
+                    console.warn("⚠️ Database is still empty. Run your pumper again!");
+                    return;
+                }
+    
+                renderDashboard(fleetSnap, bookingSnap);
+                updateExecutiveMetrics(fleetSnap, bookingSnap);
+                
+            } catch (error) {
+                console.error("❌ Handshake Error:", error);
+                alert("Connection Error. Check Firestore Rules (Step 1).");
+            }
         }
-
-        async function loadData() {
-            const fleetSnap = await db.collection("fleet").get();
-            const bookingSnap = await db.collection("bookings").get();
-            
-            renderRadar(fleetSnap, bookingSnap);
-            updateMetrics(fleetSnap, bookingSnap);
-        }
-
-        function renderRadar(fleet, bookings) {
+    
+        function renderDashboard(fleet, bookings) {
             const grid = document.getElementById('gantt-grid');
-            grid.innerHTML = "";
-            const today = new Date();
-
+            grid.innerHTML = ""; // Clear "Blank" screen
+            
             fleet.forEach(doc => {
                 const car = doc.data();
                 const row = document.createElement('div');
                 row.className = 'car-row';
-                row.innerHTML = `<div class="car-label">#${doc.id} ${car.model || 'Vehicle'}</div><div class="car-track" id="track-${doc.id}"></div>`;
+                row.innerHTML = `<div class="car-label">#${doc.id} ${car.model}</div><div class="car-track" id="track-${doc.id}"></div>`;
                 grid.appendChild(row);
-
+    
+                // Match Bookings to Car for the Radar Bars
                 bookings.forEach(bDoc => {
                     const b = bDoc.data();
                     if (b.carId == doc.id) {
-                        const s = new Date(b.start);
-                        const e = new Date(b.end);
-                        if (!isNaN(s)) {
-                            const startPos = (s.getDate() / 31) * 100;
-                            const width = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
-                            const bar = document.createElement('div');
-                            bar.className = 'booking-bar';
-                            bar.style.left = startPos + "%";
-                            bar.style.width = Math.max(width, 2) + "%";
-                            document.getElementById(`track-${doc.id}`).appendChild(bar);
-                        }
+                        drawRadarBar(doc.id, b.start, b.end);
                     }
                 });
             });
         }
-
-        async function showOwnerSettlements(btn) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            const grid = document.getElementById('gantt-grid');
-            grid.innerHTML = "<h3>💰 Owner Settlement Logic (CJ, CK, CL)</h3><div id='settle-list'></div>";
-            
-            const fleetSnap = await db.collection("fleet").get();
-            fleetSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.basePayment) {
-                    // MATH: Amount (CJ) - (Amount * Pct (CL))
-                    const net = data.basePayment - (data.basePayment * (data.commissionPct / 100));
-                    const item = document.createElement('div');
-                    item.style.padding = "15px";
-                    item.style.borderBottom = "1px solid #333";
-                    item.innerHTML = `
-                        <b>Car #${doc.id}</b> | Net Payout: <span style="color:var(--success)">${net.toLocaleString()} EGP</span> 
-                        <br><small>Cycle: Every ${data.cycleDays} Days | Base: ${data.basePayment} | Deduct: ${data.commissionPct}%</small>
-                    `;
-                    document.getElementById('settle-list').appendChild(item);
-                }
-            });
-        }
-
-        function loadFrame(url, btn) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('home-content').style.display = 'none';
-            const f = document.getElementById('content-frame');
-            f.style.display = 'block'; f.src = url;
-        }
-
-        function showHome() {
-            location.reload(); // Simplest way to reset the radar view
-        }
+        
+        // Call the loader after login
+        // loadExecutiveData(); 
     </script>
 </body>
 </html>
