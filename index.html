@@ -1,20 +1,192 @@
-// Add this logic to your index.html script
-async function loadExecutiveRadar() {
-    const fleetSnap = await db.collection("fleet").get();
-    const bookingSnap = await db.collection("bookings").get();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brothers EGY - Executive ERP 3.0</title>
     
-    // 1. Update Metrics
-    document.getElementById('m-active').innerText = bookingSnap.size;
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
     
-    // 2. Handle Owner Payments (CJ, CK, CL logic)
-    fleetSnap.forEach(doc => {
-        const car = doc.data();
-        if(car.basePayment > 0) {
-            // Formula: Amount - (Amount * Pct)
-            const net = car.basePayment - (car.basePayment * (car.commissionPct / 100));
-            console.log(`Car ${doc.id} payout: ${net} EGP every ${car.cycleDays} days`);
-            
-            renderOwnerCard(doc.id, car.model, net, car.cycleDays);
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; --accent: #e67e22; }
+        body, html { margin: 0; padding: 0; background: #000; color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
+        
+        /* Video Background */
+        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle, #1a1a1a, #000); }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
+
+        /* Navigation */
+        .navbar { position: fixed; top: 0; width: 100%; height: 70px; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 100; }
+        .nav-tabs { display: flex; gap: 8px; }
+        .tab-btn { background: rgba(255,255,255,0.05); color: #aaa; border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.3s; }
+        .tab-btn.active { border-color: var(--success); color: var(--success); background: rgba(80, 250, 123, 0.1); }
+
+        /* Content Areas */
+        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
+        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
+        .metric-card { background: rgba(255,255,255,0.03); border: 1px solid #333; border-radius: 12px; padding: 15px; }
+        .metric-card label { font-size: 9px; color: #888; text-transform: uppercase; }
+        .metric-card .val { font-size: 22px; font-weight: 800; color: var(--success); }
+
+        .content-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
+        
+        /* Gantt Radar */
+        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
+        .car-label { width: 220px; font-size: 10px; color: #ccc; }
+        .car-track { flex-grow: 1; height: 18px; background: #111; border-radius: 4px; position: relative; }
+        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
+
+        /* Login */
+        #login-overlay { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
+        input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
+        
+        #content-frame { display: none; width: 100%; height: calc(100vh - 70px); border: none; }
+    </style>
+</head>
+<body>
+    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
+            <input type="text" id="user-field" placeholder="Username">
+            <input type="password" id="pass-field" placeholder="Password">
+            <button onclick="attemptLogin()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">ACCESS PORTAL</button>
+        </div>
+    </div>
+
+    <div id="main-portal">
+        <nav class="navbar">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px; cursor:pointer;" onclick="showHome()">
+            <div class="nav-tabs">
+                <button class="tab-btn" onclick="showOwnerSettlements(this)">Owner Settlements</button>
+                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Proposal</button>
+                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
+                <button class="tab-btn active" id="home-tab" onclick="showHome()">Fleet Radar</button>
+            </div>
+            <button onclick="location.reload()" style="background:none; border:none; color:white;"><i class="fa-solid fa-power-off"></i></button>
+        </nav>
+
+        <div id="home-content">
+            <div class="metrics-bar">
+                <div class="metric-card"><label>Active Rentals</label><div class="val" id="m-active">0</div></div>
+                <div class="metric-card"><label>Total Fleet</label><div class="val" id="m-total">0</div></div>
+                <div class="metric-card"><label>Due Today</label><div class="val" id="m-due" style="color:var(--accent)">0</div></div>
+                <div class="metric-card"><label>EGP Liquidity</label><div class="val" id="m-cash">0</div></div>
+            </div>
+            <div class="content-container">
+                <h4 style="margin:0 0 15px; font-size:11px; color:#888;">🗓️ LIVE FLEET GANTT CHART (3-YEAR HISTORY)</h4>
+                <div id="gantt-grid"></div>
+            </div>
+        </div>
+        <iframe id="content-frame"></iframe>
+    </div>
+
+    <script>
+        // CONFIG: Replace with your Web API Key from Firebase Project Settings
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+            authDomain: "brothers-egy-portal.firebaseapp.com",
+            projectId: "brothers-egy-portal",
+            storageBucket: "brothers-egy-portal.appspot.com",
+            messagingSenderId: "673531280760",
+            appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        async function attemptLogin() {
+            const u = document.getElementById('user-field').value.toLowerCase();
+            const p = document.getElementById('pass-field').value;
+            const doc = await db.collection("users").doc(u).get();
+            if (doc.exists && doc.data().password === p) {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('main-portal').style.display = 'flex';
+                loadData();
+            } else { alert("Unauthorized"); }
         }
-    });
-}
+
+        async function loadData() {
+            const fleetSnap = await db.collection("fleet").get();
+            const bookingSnap = await db.collection("bookings").get();
+            
+            renderRadar(fleetSnap, bookingSnap);
+            updateMetrics(fleetSnap, bookingSnap);
+        }
+
+        function renderRadar(fleet, bookings) {
+            const grid = document.getElementById('gantt-grid');
+            grid.innerHTML = "";
+            const today = new Date();
+
+            fleet.forEach(doc => {
+                const car = doc.data();
+                const row = document.createElement('div');
+                row.className = 'car-row';
+                row.innerHTML = `<div class="car-label">#${doc.id} ${car.model || 'Vehicle'}</div><div class="car-track" id="track-${doc.id}"></div>`;
+                grid.appendChild(row);
+
+                bookings.forEach(bDoc => {
+                    const b = bDoc.data();
+                    if (b.carId == doc.id) {
+                        const s = new Date(b.start);
+                        const e = new Date(b.end);
+                        if (!isNaN(s)) {
+                            const startPos = (s.getDate() / 31) * 100;
+                            const width = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
+                            const bar = document.createElement('div');
+                            bar.className = 'booking-bar';
+                            bar.style.left = startPos + "%";
+                            bar.style.width = Math.max(width, 2) + "%";
+                            document.getElementById(`track-${doc.id}`).appendChild(bar);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function showOwnerSettlements(btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const grid = document.getElementById('gantt-grid');
+            grid.innerHTML = "<h3>💰 Owner Settlement Logic (CJ, CK, CL)</h3><div id='settle-list'></div>";
+            
+            const fleetSnap = await db.collection("fleet").get();
+            fleetSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.basePayment) {
+                    // MATH: Amount (CJ) - (Amount * Pct (CL))
+                    const net = data.basePayment - (data.basePayment * (data.commissionPct / 100));
+                    const item = document.createElement('div');
+                    item.style.padding = "15px";
+                    item.style.borderBottom = "1px solid #333";
+                    item.innerHTML = `
+                        <b>Car #${doc.id}</b> | Net Payout: <span style="color:var(--success)">${net.toLocaleString()} EGP</span> 
+                        <br><small>Cycle: Every ${data.cycleDays} Days | Base: ${data.basePayment} | Deduct: ${data.commissionPct}%</small>
+                    `;
+                    document.getElementById('settle-list').appendChild(item);
+                }
+            });
+        }
+
+        function loadFrame(url, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('home-content').style.display = 'none';
+            const f = document.getElementById('content-frame');
+            f.style.display = 'block'; f.src = url;
+        }
+
+        function showHome() {
+            location.reload(); // Simplest way to reset the radar view
+        }
+    </script>
+</body>
+</html>
