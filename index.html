@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive Portal</title>
+    <title>Brothers EGY - Executive ERP 3.0</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -11,36 +11,37 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; }
-        body, html { margin: 0; padding: 0; background-color: #000; color: white; font-family: 'Inter', sans-serif; height: 100%; overflow: hidden; }
+        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; --glass: rgba(255,255,255,0.05); }
+        body, html { margin: 0; padding: 0; background-color: #000; color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
         
-        /* Background Video */
-        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.2); }
+        .video-wrapper { position: fixed; inset: 0; z-index: -1; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.25); }
 
-        /* Login Overlay */
-        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
-        .login-box input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
-        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
+        button.login-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-        /* Portal Layout */
         #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
-        .navbar { position: fixed; top: 0; width: 100%; background: rgba(0,0,0,0.9); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; box-sizing: border-box; z-index: 100; }
-        .tab-btn { background: transparent; color: #aaa; border: none; padding: 10px 15px; cursor: pointer; font-size: 13px; font-weight: 600; }
-        .tab-btn.active { color: var(--success); border-bottom: 2px solid var(--success); }
+        .navbar { position: fixed; top: 0; width: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; box-sizing: border-box; z-index: 100; }
+        
+        .nav-tabs { display: flex; gap: 5px; }
+        .tab-btn { background: var(--glass); color: #aaa; border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.3s; }
+        .tab-btn:hover { background: white; color: black; }
+        .tab-btn.active { border-color: var(--success); color: var(--success); }
 
-        /* Dashboard Content */
         .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
         .metric-card { background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 12px; padding: 15px; }
-        .metric-card label { font-size: 10px; color: #888; text-transform: uppercase; }
-        .metric-card div { font-size: 24px; font-weight: 800; color: var(--success); }
+        .metric-card label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .metric-card div { font-size: 22px; font-weight: 800; color: var(--success); }
 
         .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
         .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
-        .car-label { width: 220px; font-size: 11px; color: #ccc; }
-        .car-track { flex-grow: 1; height: 24px; background: #111; border-radius: 4px; position: relative; }
-        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
+        .car-label { width: 220px; font-size: 10px; color: #ccc; font-weight: 600; }
+        .car-track { flex-grow: 1; height: 22px; background: #111; border-radius: 4px; position: relative; }
+        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.85; box-shadow: 0 0 10px rgba(255,75,75,0.3); }
+
+        #content-frame { display: none; width: 100%; height: calc(100vh - 70px); border: none; background: white; }
     </style>
 </head>
 <body>
@@ -51,36 +52,39 @@
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
             <input type="text" id="user-field" placeholder="Username">
             <input type="password" id="pass-field" placeholder="Password">
-            <button onclick="attemptLogin()">AUTHORIZE ACCESS</button>
+            <button class="login-btn" onclick="attemptLogin()">AUTHORIZE ACCESS</button>
         </div>
     </div>
 
     <div id="main-portal">
         <nav class="navbar">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px;">
-            <div>
-                <button class="tab-btn" onclick="window.open('receipt.html','_self')">Digital Receipt</button>
-                <button class="tab-btn active">Fleet Control Tower</button>
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px; cursor:pointer;" onclick="showHome()">
+            <div class="nav-tabs">
+                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
+                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">English Contract</button>
+                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">Arabic Contract</button>
+                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
+                <button class="tab-btn active" id="fleet-tab" onclick="showHome()">Fleet Radar</button>
             </div>
             <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
         </nav>
 
-        <div class="metrics-bar">
-            <div class="metric-card"><label>Active Rentals</label><div id="m-active">0</div></div>
-            <div class="metric-card"><label>Available Now</label><div id="m-ready">0</div></div>
-            <div class="metric-card"><label>Today Out</label><div id="m-out" style="color:#e67e22">0</div></div>
-            <div class="metric-card"><label>Today In</label><div id="m-in" style="color:#42a5f5">0</div></div>
+        <div id="home-content">
+            <div class="metrics-bar">
+                <div class="metric-card"><label>Active Rentals</label><div id="m-active">0</div></div>
+                <div class="metric-card"><label>Available Now</label><div id="m-ready">0</div></div>
+                <div class="metric-card"><label>Today Out</label><div id="m-out" style="color:#e67e22">0</div></div>
+                <div class="metric-card"><label>Today In</label><div id="m-in" style="color:#42a5f5">0</div></div>
+            </div>
+            <div class="timeline-container">
+                <h4 id="status-msg" style="margin:0 0 15px; font-size: 12px; color:#888; text-transform: uppercase;">🗓️ Live Fleet Radar (3 Year History)</h4>
+                <div id="gantt-grid"></div>
+            </div>
         </div>
-
-        <div class="timeline-container">
-            <h4 id="status-msg" style="margin:0 0 15px; color:#888;">🗓️ Fleet Gantt Chart (Current Month)</h4>
-            <div id="gantt-grid"></div>
-        </div>
+        <iframe id="content-frame" src=""></iframe>
     </div>
 
     <script>
-        // CONFIG - Replace only this key
-        const GOOGLE_KEY = "AIzaSyA1dKYFgW45oXnEZmxX9yfbgkos5AbpzSk"; 
         const FLEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
         const ORDER_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
 
@@ -99,46 +103,43 @@
         }
 
         async function fetchSheets() {
-            document.getElementById('status-msg').innerText = "📡 SYNCING WITH GOOGLE SHEETS...";
+            document.getElementById('status-msg').innerText = "📡 Syncing Cloud Data...";
             try {
-                const fleetUrl = `https://docs.google.com/spreadsheets/d/${FLEET_ID}/gviz/tq?tqx=out:json`;
-                const orderUrl = `https://docs.google.com/spreadsheets/d/${ORDER_ID}/gviz/tq?tqx=out:json`;
+                // Using a proxy to avoid CONNECTION ERROR
+                const fleetUrl = `https://opensheet.elk.sh/${FLEET_ID}/صفحة الإدخالات لقاعدة البيانات`;
+                const orderUrl = `https://opensheet.elk.sh/${ORDER_ID}/صفحة الإدخالات للإيجارات`;
 
                 const [fRes, oRes] = await Promise.all([fetch(fleetUrl), fetch(orderUrl)]);
-                const fTxt = await fRes.text();
-                const oTxt = await oRes.text();
-
-                const fleet = JSON.parse(fTxt.substring(47, fTxt.length - 2)).table.rows;
-                const orders = JSON.parse(oTxt.substring(47, oTxt.length - 2)).table.rows;
+                const fleet = await fRes.json();
+                const orders = await oRes.json();
 
                 render(fleet, orders);
                 document.getElementById('status-msg').innerText = "🗓️ Fleet Gantt Chart (Current Month)";
             } catch (e) {
-                document.getElementById('status-msg').innerText = "❌ CONNECTION ERROR";
-                console.error(e);
+                document.getElementById('status-msg').innerText = "❌ DATA SYNC ERROR - CHECK PERMISSIONS";
             }
         }
 
         function render(fleet, orders) {
             const grid = document.getElementById('gantt-grid');
             grid.innerHTML = "";
-            let active = 0;
-            const today = new Date();
+            let active = 0; const today = new Date();
 
-            fleet.slice(1).forEach(row => {
-                const id = row.c[0]?.v;
-                if (!id) return;
+            fleet.forEach(car => {
+                const id = car["No."] || car["ID"];
+                if (!id || id === "No.") return;
                 
-                const name = `${row.c[1]?.v || ''} ${row.c[4]?.v || ''} (${row.c[7]?.v || ''})`;
-                const div = document.createElement('div');
-                div.className = 'car-row';
-                div.innerHTML = `<div class="car-label">#${id} ${name}</div><div class="car-track" id="track-${id}"></div>`;
-                grid.appendChild(div);
+                const name = `${car["النوع"] || ''} ${car["الطراز"] || ''} (${car["سنة الصنع"] || ''})`;
+                const row = document.createElement('div');
+                row.className = 'car-row';
+                row.innerHTML = `<div class="car-label">#${id} ${name}</div><div class="car-track" id="track-${id}"></div>`;
+                grid.appendChild(row);
 
                 orders.forEach(ord => {
-                    if (ord.c[3]?.v != id) return;
-                    const s = new Date(ord.c[11]?.f || ord.c[11]?.v);
-                    const e = new Date(ord.c[19]?.f || ord.c[19]?.v);
+                    if (ord["كود السيارة"] != id) return;
+                    // Logic to extract dates from your specific columns
+                    const s = new Date(ord["بداية التعاقد"]);
+                    const e = new Date(ord["نهاية التعاقد"]);
 
                     if (!isNaN(s) && !isNaN(e)) {
                         if (s <= today && e >= today) active++;
@@ -152,9 +153,23 @@
                     }
                 });
             });
-
             document.getElementById('m-active').innerText = active;
-            document.getElementById('m-ready').innerText = (fleet.length - 1) - active;
+            document.getElementById('m-ready').innerText = fleet.length - active;
+        }
+
+        function loadFrame(url, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('home-content').style.display = 'none';
+            const f = document.getElementById('content-frame');
+            f.style.display = 'block'; f.src = url;
+        }
+
+        function showHome() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('fleet-tab').classList.add('active');
+            document.getElementById('content-frame').style.display = 'none';
+            document.getElementById('home-content').style.display = 'block';
         }
     </script>
 </body>
