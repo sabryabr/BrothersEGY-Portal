@@ -74,24 +74,21 @@
     </div>
 
     <script>
-        // Replace this with your actual Streamlit App URL once deployed
-        const STREAMLIT_URL = "https://your-app-name.streamlit.app/?embed=true";
+        // Replace this with your EXACT public Streamlit URL
+        const STREAMLIT_URL = "https://sabryabr-brothersegy-portal-app.streamlit.app/?embed=true";
         
         window.onload = () => {
             const frame = document.getElementById('content-frame');
             frame.src = STREAMLIT_URL;
         };
-
-        function loadFrame(url, btn) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('content-frame').src = url;
-        }
-
+    
         function showHome() {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('home-tab').classList.add('active');
-            document.getElementById('content-frame').src = STREAMLIT_URL;
+            const frame = document.getElementById('content-frame');
+            frame.style.display = 'block';
+            frame.src = STREAMLIT_URL; // Reloads the Live Dashboard
+            document.getElementById('home-content').style.display = 'none';
         }
     </script>
 </body>
