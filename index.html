@@ -4,43 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brothers EGY - Executive ERP 3.0</title>
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; }
-        body, html { margin: 0; padding: 0; background: #0a0a0a; color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
+        :root { --primary: #04509D; --accent: #e67e22; --success: #50fa7b; }
+        body, html { margin: 0; padding: 0; background: #000; color: white; font-family: 'Inter', 'Cairo', sans-serif; height: 100vh; overflow: hidden; }
         
-        /* Video & Fallback Background */
-        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        /* Premium Background Video */
+        .video-wrapper { position: fixed; inset: 0; z-index: -1; }
         #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
 
-        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
-        input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
+        /* Portal Layout */
+        #main-portal { display: flex; flex-direction: column; height: 100vh; }
         
-        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
-        .navbar { position: fixed; top: 0; width: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; box-sizing: border-box; z-index: 100; }
+        .navbar { 
+            position: fixed; top: 0; width: 100%; height: 70px;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 0 30px; box-sizing: border-box; z-index: 100; 
+        }
         
         .nav-tabs { display: flex; gap: 8px; }
-        .tab-btn { background: rgba(255,255,255,0.05); color: #aaa; border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; }
+        .tab-btn { 
+            background: rgba(255,255,255,0.05); color: #aaa; border: 1px solid rgba(255,255,255,0.1); 
+            padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.3s; 
+        }
+        .tab-btn:hover { background: white; color: black; }
         .tab-btn.active { border-color: var(--success); color: var(--success); background: rgba(80, 250, 123, 0.1); }
 
-        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
-        .metric-card { background: rgba(255,255,255,0.03); border: 1px solid #333; border-radius: 12px; padding: 15px; }
-        .metric-card label { font-size: 9px; color: #888; text-transform: uppercase; }
-        .metric-card div { font-size: 22px; font-weight: 800; color: var(--success); }
+        /* The Dashboard Container */
+        #content-frame { 
+            margin-top: 70px; width: 100%; height: calc(100vh - 70px); 
+            border: none; background: transparent; 
+        }
 
-        .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
-        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
-        .car-label { width: 220px; font-size: 10px; color: #ccc; font-weight: 600; }
-        .car-track { flex-grow: 1; height: 20px; background: #111; border-radius: 4px; position: relative; }
-        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
-
-        #content-frame { display: none; width: 100%; height: calc(100vh - 70px); border: none; background: white; }
+        .logo-box { display: flex; align-items: center; cursor: pointer; }
+        .logo-box img { height: 35px; }
     </style>
 </head>
 <body>
@@ -50,131 +51,47 @@
         </video>
     </div>
 
-    <div id="login-overlay">
-        <div class="login-box">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
-            <input type="text" id="user-field" placeholder="Username">
-            <input type="password" id="pass-field" placeholder="Password">
-            <button onclick="attemptLogin()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">ACCESS HUB</button>
-        </div>
-    </div>
-
     <div id="main-portal">
         <nav class="navbar">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px; cursor:pointer;" onclick="showHome()">
+            <div class="logo-box" onclick="showHome()">
+                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png">
+            </div>
+            
             <div class="nav-tabs">
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">English Contract</button>
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">Arabic Contract</button>
                 <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
-                <button class="tab-btn active" id="fleet-tab" onclick="showHome()">Fleet Radar</button>
+                <button class="tab-btn active" id="home-tab" onclick="showHome()">Live Dashboard</button>
             </div>
-            <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+
+            <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer; font-size:18px;">
+                <i class="fa-solid fa-power-off"></i>
+            </button>
         </nav>
 
-        <div id="home-content">
-            <div class="metrics-bar">
-                <div class="metric-card"><label>Active Rentals</label><div id="m-active">0</div></div>
-                <div class="metric-card"><label>Available Now</label><div id="m-ready">0</div></div>
-                <div class="metric-card"><label>Out Today</label><div id="m-out" style="color:#e67e22">0</div></div>
-                <div class="metric-card"><label>In Today</label><div id="m-in" style="color:#42a5f5">0</div></div>
-            </div>
-            <div class="timeline-container">
-                <h4 id="status-msg" style="margin:0 0 15px; font-size: 11px; color:#888; text-transform: uppercase;">🗓️ Fleet Gantt Chart</h4>
-                <div id="gantt-grid"></div>
-            </div>
-        </div>
-        <iframe id="content-frame"></iframe>
+        <iframe id="content-frame" src="YOUR_STREAMLIT_URL_HERE"></iframe>
     </div>
 
     <script>
-        // SHEET IDs from your screenshots
-        const FLEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
-        const ORDER_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
-
-        firebase.initializeApp({ apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal" });
-        const db = firebase.firestore();
-
-        async function attemptLogin() {
-            const u = document.getElementById('user-field').value.toLowerCase();
-            const p = document.getElementById('pass-field').value;
-            const doc = await db.collection("users").doc(u).get();
-            if (doc.exists && doc.data().password === p) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-portal').style.display = 'flex';
-                fetchData();
-            } else { alert("Login Error"); }
-        }
-
-        async function fetchData() {
-            document.getElementById('status-msg').innerText = "📡 Connecting to Live Sheets...";
-            try {
-                // Using a more direct JSON fetch method
-                const fUrl = `https://opensheet.elk.sh/${FLEET_ID}/1`; 
-                const oUrl = `https://opensheet.elk.sh/${ORDER_ID}/1`;
-
-                const [fRes, oRes] = await Promise.all([fetch(fUrl), fetch(oUrl)]);
-                const fleet = await fRes.json();
-                const orders = await oRes.json();
-
-                render(fleet, orders);
-                document.getElementById('status-msg').innerText = "🗓️ LIVE FLEET RADAR";
-            } catch (e) {
-                document.getElementById('status-msg').innerText = "❌ SYNC ERROR: Ensure Sheets are Published to Web";
-            }
-        }
-
-        function render(fleet, orders) {
-            const grid = document.getElementById('gantt-grid');
-            grid.innerHTML = "";
-            let active = 0; const today = new Date();
-
-            fleet.forEach(car => {
-                const id = car["No."] || car["ID"] || Object.values(car)[0];
-                if (!id || id === "No.") return;
-
-                const name = `${car["النوع"] || ''} ${car["الطراز"] || ''}`;
-                const row = document.createElement('div');
-                row.className = 'car-row';
-                row.innerHTML = `<div class="car-label">#${id} ${name}</div><div class="car-track" id="track-${id}"></div>`;
-                grid.appendChild(row);
-
-                orders.forEach(ord => {
-                    const carCode = ord["كود السيارة"] || ord["كود المركبة"];
-                    if (carCode != id) return;
-
-                    const s = new Date(ord["بداية التعاقد"]);
-                    const e = new Date(ord["نهاية التعاقد"]);
-
-                    if (!isNaN(s) && !isNaN(e)) {
-                        if (s <= today && e >= today) active++;
-                        const start = (s.getDate() / 31) * 100;
-                        const width = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
-                        const bar = document.createElement('div');
-                        bar.className = 'booking-bar';
-                        bar.style.left = start + "%";
-                        bar.style.width = Math.max(width, 3) + "%";
-                        document.getElementById(`track-${id}`).appendChild(bar);
-                    }
-                });
-            });
-            document.getElementById('m-active').innerText = active;
-            document.getElementById('m-ready').innerText = fleet.length - active;
-        }
+        // Replace this with your actual Streamlit App URL once deployed
+        const STREAMLIT_URL = "https://your-app-name.streamlit.app/?embed=true";
+        
+        window.onload = () => {
+            const frame = document.getElementById('content-frame');
+            frame.src = STREAMLIT_URL;
+        };
 
         function loadFrame(url, btn) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById('home-content').style.display = 'none';
-            const f = document.getElementById('content-frame');
-            f.style.display = 'block'; f.src = url;
+            document.getElementById('content-frame').src = url;
         }
 
         function showHome() {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('fleet-tab').classList.add('active');
-            document.getElementById('content-frame').style.display = 'none';
-            document.getElementById('home-content').style.display = 'block';
+            document.getElementById('home-tab').classList.add('active');
+            document.getElementById('content-frame').src = STREAMLIT_URL;
         }
     </script>
 </body>
