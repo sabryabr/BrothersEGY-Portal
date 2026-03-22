@@ -1,95 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive ERP 3.0</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+// Add this to your main script to calculate the payment
+async function calculateOwnerPayout(carId) {
+    const doc = await db.collection('fleet').doc(carId).get();
+    const data = doc.data();
     
-    <style>
-        :root { --primary: #04509D; --accent: #e67e22; --success: #50fa7b; }
-        body, html { margin: 0; padding: 0; background: #000; color: white; font-family: 'Inter', 'Cairo', sans-serif; height: 100vh; overflow: hidden; }
-        
-        /* Premium Background Video */
-        .video-wrapper { position: fixed; inset: 0; z-index: -1; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
-
-        /* Portal Layout */
-        #main-portal { display: flex; flex-direction: column; height: 100vh; }
-        
-        .navbar { 
-            position: fixed; top: 0; width: 100%; height: 70px;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); 
-            border-bottom: 1px solid rgba(255,255,255,0.1); 
-            display: flex; align-items: center; justify-content: space-between; 
-            padding: 0 30px; box-sizing: border-box; z-index: 100; 
-        }
-        
-        .nav-tabs { display: flex; gap: 8px; }
-        .tab-btn { 
-            background: rgba(255,255,255,0.05); color: #aaa; border: 1px solid rgba(255,255,255,0.1); 
-            padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.3s; 
-        }
-        .tab-btn:hover { background: white; color: black; }
-        .tab-btn.active { border-color: var(--success); color: var(--success); background: rgba(80, 250, 123, 0.1); }
-
-        /* The Dashboard Container */
-        #content-frame { 
-            margin-top: 70px; width: 100%; height: calc(100vh - 70px); 
-            border: none; background: transparent; 
-        }
-
-        .logo-box { display: flex; align-items: center; cursor: pointer; }
-        .logo-box img { height: 35px; }
-    </style>
-</head>
-<body>
-    <div class="video-wrapper">
-        <video autoplay muted loop playsinline id="bg-video">
-            <source src="background.mp4" type="video/mp4">
-        </video>
-    </div>
-
-    <div id="main-portal">
-        <nav class="navbar">
-            <div class="logo-box" onclick="showHome()">
-                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png">
-            </div>
-            
-            <div class="nav-tabs">
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">English Contract</button>
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">Arabic Contract</button>
-                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
-                <button class="tab-btn active" id="home-tab" onclick="showHome()">Live Dashboard</button>
-            </div>
-
-            <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer; font-size:18px;">
-                <i class="fa-solid fa-power-off"></i>
-            </button>
-        </nav>
-
-        <iframe id="content-frame" src="YOUR_STREAMLIT_URL_HERE"></iframe>
-    </div>
-
-    <script>
-        // Replace this with your EXACT public Streamlit URL
-        const STREAMLIT_URL = "https://sabryabr-brothersegy-portal-app.streamlit.app/?embed=true";
-        
-        window.onload = () => {
-            const frame = document.getElementById('content-frame');
-            frame.src = STREAMLIT_URL;
-        };
+    // Math: Amount (CJ) - (Amount * Pct (CL))
+    const net = data.basePayment - (data.basePayment * (data.commissionPct / 100));
     
-        function showHome() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('home-tab').classList.add('active');
-            const frame = document.getElementById('content-frame');
-            frame.style.display = 'block';
-            frame.src = STREAMLIT_URL; // Reloads the Live Dashboard
-            document.getElementById('home-content').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
+    return {
+        amount: net,
+        nextDate: data.cycleDays // Days from CK
+    };
+}
