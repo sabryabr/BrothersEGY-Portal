@@ -1,13 +1,20 @@
-// Add this to your main script to calculate the payment
-async function calculateOwnerPayout(carId) {
-    const doc = await db.collection('fleet').doc(carId).get();
-    const data = doc.data();
+// Add this logic to your index.html script
+async function loadExecutiveRadar() {
+    const fleetSnap = await db.collection("fleet").get();
+    const bookingSnap = await db.collection("bookings").get();
     
-    // Math: Amount (CJ) - (Amount * Pct (CL))
-    const net = data.basePayment - (data.basePayment * (data.commissionPct / 100));
+    // 1. Update Metrics
+    document.getElementById('m-active').innerText = bookingSnap.size;
     
-    return {
-        amount: net,
-        nextDate: data.cycleDays // Days from CK
-    };
+    // 2. Handle Owner Payments (CJ, CK, CL logic)
+    fleetSnap.forEach(doc => {
+        const car = doc.data();
+        if(car.basePayment > 0) {
+            // Formula: Amount - (Amount * Pct)
+            const net = car.basePayment - (car.basePayment * (car.commissionPct / 100));
+            console.log(`Car ${doc.id} payout: ${net} EGP every ${car.cycleDays} days`);
+            
+            renderOwnerCard(doc.id, car.model, net, car.cycleDays);
+        }
+    });
 }
