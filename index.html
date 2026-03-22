@@ -14,7 +14,7 @@
         :root { 
             --primary: #04509D; --accent: #e67e22; 
             --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
-            --rented: #27ae60; --available: #7f8c8d; --alert: #e67e22;
+            --rented: #27ae60; --available: #7f8c8d;
         }
         
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', sans-serif; background-color: transparent; color: white; overflow: hidden; }
@@ -37,15 +37,21 @@
         .dashboard-center { text-align: center; width: 90%; max-width: 1200px; }
         .dashboard-center h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 5px; }
 
-        /* Fleet Control Tower Layout */
-        #fleet-status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 30px; height: 60vh; overflow-y: auto; padding: 20px; }
-        .car-status-card { background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; text-align: left; transition: 0.3s; }
-        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
-        .dot-rented { background: var(--rented); box-shadow: 0 0 10px var(--rented); }
+        #fleet-status-grid { 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 15px; margin-top: 30px; height: 60vh; overflow-y: auto; padding: 20px; 
+        }
+        .car-status-card { 
+            background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); 
+            border: 1px solid var(--glass-border); border-radius: 12px; 
+            padding: 18px; text-align: left; transition: 0.3s;
+        }
+        .status-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; }
+        .dot-rented { background: var(--rented); box-shadow: 0 0 12px var(--rented); }
         .dot-available { background: var(--available); }
-        .car-id { font-size: 10px; font-weight: 800; opacity: 0.5; display: block; margin-bottom: 4px; }
-        .car-model { font-size: 14px; font-weight: 700; margin: 0; }
-        .car-plate { font-size: 11px; opacity: 0.8; margin-top: 4px; }
+        .car-id { font-size: 10px; font-weight: 800; color: var(--accent); display: block; margin-bottom: 6px; }
+        .car-model { font-size: 15px; font-weight: 700; margin: 0; display: flex; align-items: center; }
+        .car-plate { font-size: 11px; opacity: 0.7; margin-top: 6px; font-weight: 600; }
 
         .ctrl-btn { background: white; color: var(--primary); border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         #content-frame { width: 100%; height: calc(100% - 60px); margin-top: 60px; border: none; background: white; display: none; }
@@ -58,7 +64,7 @@
         <div class="login-box">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Logo">
             <h2>EXECUTIVE HUB</h2>
-            <p id="login-status" style="font-size: 10px; opacity: 0.5;">SECURED ACCESS V3.0</p>
+            <p id="login-status" style="font-size: 10px; opacity: 0.5;">SECURED ACCESS V3.1</p>
             <input type="text" id="user-field" placeholder="Username">
             <input type="password" id="pass-field" placeholder="Password">
             <button onclick="attemptLogin()">AUTHORIZE ACCESS</button>
@@ -86,9 +92,8 @@
 
         <div id="home-content" class="dashboard-center">
             <h1>Fleet Control Tower</h1>
-            <p style="font-size: 12px; opacity: 0.7;">REAL-TIME AVAILABILITY & STATUS</p>
-            <div id="fleet-status-grid">
-                </div>
+            <p id="radar-status" style="font-size: 12px; opacity: 0.7;">SYNCING WITH CLOUD DATABASE...</p>
+            <div id="fleet-status-grid"></div>
         </div>
         <iframe id="content-frame" src=""></iframe>
     </div>
@@ -115,7 +120,7 @@
                     applyPermissions(data.access);
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('main-portal').style.display = 'flex';
-                    syncFleet(); // Start Real-Time Fleet Sync
+                    syncFleet(); 
                 }
             } catch (err) { alert("Access Denied"); }
         }
@@ -128,21 +133,32 @@
             if (accessArray.includes(5)) document.querySelectorAll('.access-fleet').forEach(el => el.style.display = 'block');
         }
 
-        // --- REAL-TIME FLEET SYNC LOGIC ---
         function syncFleet() {
-            db.collection("fleet").orderBy("id").onSnapshot((snapshot) => {
+            // Updated to sort by Document ID directly
+            db.collection("fleet").onSnapshot((snapshot) => {
                 const grid = document.getElementById('fleet-status-grid');
+                const statusText = document.getElementById('radar-status');
                 grid.innerHTML = "";
-                snapshot.forEach((doc) => {
+                
+                if (snapshot.empty) {
+                    statusText.innerText = "NO CARS FOUND IN DATABASE";
+                    return;
+                }
+
+                // Sorting manually to ensure numerical order (33, 34, 35...)
+                const sortedDocs = snapshot.docs.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+
+                sortedDocs.forEach((doc) => {
                     const car = doc.data();
                     const statusClass = car.status === 'rented' ? 'dot-rented' : 'dot-available';
                     grid.innerHTML += `
                         <div class="car-status-card">
-                            <span class="car-id">CODE: ${doc.id}</span>
+                            <span class="car-id">ASSET #${doc.id}</span>
                             <p class="car-model"><span class="status-dot ${statusClass}"></span>${car.model}</p>
                             <p class="car-plate">${car.plate}</p>
                         </div>`;
                 });
+                statusText.innerText = "REAL-TIME AVAILABILITY & STATUS";
             });
         }
 
