@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>Brothers EGY - Complete Fleet Importer</h1>
+    <button onclick="startImport()" style="padding:15px; font-weight:bold; cursor:pointer;">START FULL BULK IMPORT (15 CARS)</button>
+    <div id="status" style="margin-top:20px; font-family:sans-serif;"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+            authDomain: "brothers-egy-portal.firebaseapp.com",
+            projectId: "brothers-egy-portal",
+            storageBucket: "brothers-egy-portal.firebasestorage.app",
+            messagingSenderId: "673531280760",
+            appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // FULL LIST of 15 cars from your official records
+        const fullFleetData = [
+            {id: "33", model: "Haval Jolion", year: "2022", plate: "2 6 4 9 | ن ا ب", status: "rented"},
+            {id: "38", model: "Chevrolet Aveo", year: "2020", plate: "8 2 6 3 | ب د ع", status: "available"},
+            {id: "47", model: "Hyundai Tucson", year: "2022", plate: "4 2 6 3 | ب س ه", status: "rented"},
+            {id: "48", model: "Jetour X90 Plus", year: "2026", plate: "2 9 1 5 | ب ص ف", status: "rented"},
+            {id: "34", model: "MG ZS", year: "2025", plate: "5 3 6 5 | س ه ق", status: "rented"},
+            {id: "35", model: "MG ZS", year: "2022", plate: "5 8 5 4 | س ن و", status: "available"},
+            {id: "36", model: "MG ZS", year: "2022", plate: "1 6 8 9 | ب ج م", status: "available"},
+            {id: "37", model: "MG ZS", year: "2023", plate: "1 4 9 5 | ي ص ر", status: "available"},
+            {id: "42", model: "MG 5", year: "2026", plate: "7 3 7 8 | س م ه", status: "available"},
+            {id: "44", model: "MG ZS", year: "2025", plate: "9 4 1 3 | ل و ع", status: "rented"},
+            {id: "46", model: "MG 5", year: "2026", plate: "9 5 6 8 | ب ص ف", status: "available"},
+            {id: "40", model: "Nissan Sunny", year: "2023", plate: "7 3 5 1 | ب ه ل", status: "rented"},
+            {id: "41", model: "Nissan Sunny", year: "2023", plate: "5 7 3 9 | ل ج ق", status: "rented"},
+            {id: "49", model: "Nissan Sunny", year: "2026", plate: "3 5 2 1 | ل س ص", status: "available"},
+            {id: "43", model: "Renualt Duster", year: "2025", plate: "5 9 4 9 | ص ع د", status: "available"}
+        ];
+
+        async function startImport() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = "<b>Starting Import...</b>";
+
+            for (const car of fullFleetData) {
+                try {
+                    await db.collection("fleet").doc(car.id).set({
+                        model: car.model,
+                        year: car.year,
+                        plate: car.plate,
+                        status: car.status,
+                        last_updated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    statusDiv.innerHTML += `<p style="color:green">✔ [${car.id}] ${car.model} (${car.plate})</p>`;
+                } catch (error) {
+                    statusDiv.innerHTML += `<p style="color:red">✘ Error on ID ${car.id}: ${error.message}</p>`;
+                }
+            }
+            statusDiv.innerHTML += "<h2>FULL FLEET IMPORTED SUCCESSFULLY</h2>";
+        }
+    </script>
+</body>
+</html>
