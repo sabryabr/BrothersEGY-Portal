@@ -2,61 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive ERP 3.0</title>
-    
+    <title>Brothers EGY - Executive Portal 3.0</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
-    
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; --accent: #e67e22; }
-        body, html { margin: 0; padding: 0; background: #000; color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
+        :root { --primary: #04509D; --success: #50fa7b; --rented: #ff4b4b; }
+        body, html { margin: 0; padding: 0; background: #000; color: white; font-family: sans-serif; height: 100vh; overflow: hidden; }
         
-        /* Video Background */
-        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle, #1a1a1a, #000); }
+        /* Video Background - Always visible behind login */
+        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: #0a0a0a; }
         #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
 
-        /* Navigation */
-        .navbar { position: fixed; top: 0; width: 100%; height: 70px; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 100; }
-        .nav-tabs { display: flex; gap: 8px; }
-        .tab-btn { background: rgba(255,255,255,0.05); color: #aaa; border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.3s; }
-        .tab-btn.active { border-color: var(--success); color: var(--success); background: rgba(80, 250, 123, 0.1); }
-
-        /* Content Areas */
-        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
-        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
-        .metric-card { background: rgba(255,255,255,0.03); border: 1px solid #333; border-radius: 12px; padding: 15px; }
-        .metric-card label { font-size: 9px; color: #888; text-transform: uppercase; }
-        .metric-card .val { font-size: 22px; font-weight: 800; color: var(--success); }
-
-        .content-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
-        
-        /* Gantt Radar */
-        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
-        .car-label { width: 220px; font-size: 10px; color: #ccc; }
-        .car-track { flex-grow: 1; height: 18px; background: #111; border-radius: 4px; position: relative; }
-        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
-
-        /* Login */
-        #login-overlay { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
+        /* Login Box */
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 300px; }
         input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
-        
-        #content-frame { display: none; width: 100%; height: calc(100vh - 70px); border: none; }
+        button.login-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        /* Navigation & Tabs */
+        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
+        .navbar { position: fixed; top: 0; width: 100%; height: 70px; background: rgba(0,0,0,0.9); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 100; }
+        .nav-tabs { display: flex; gap: 10px; }
+        .tab-btn { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid transparent; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .tab-btn.active { border-color: var(--success); color: var(--success); }
+
+        /* Dashboard */
+        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
+        .metric-card { background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 12px; padding: 15px; }
+        .val { font-size: 22px; font-weight: bold; color: var(--success); }
+
+        .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
+        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
+        .car-label { width: 200px; font-size: 11px; color: #aaa; }
+        .car-track { flex-grow: 1; height: 20px; background: #111; border-radius: 4px; position: relative; }
+        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; }
+
+        iframe { display: none; width: 100%; height: calc(100vh - 70px); border: none; }
     </style>
 </head>
 <body>
-    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
+    <div class="video-wrapper">
+        <video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video>
+    </div>
 
     <div id="login-overlay">
         <div class="login-box">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:40px; margin-bottom:20px;">
             <input type="text" id="user-field" placeholder="Username">
             <input type="password" id="pass-field" placeholder="Password">
-            <button onclick="attemptLogin()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">ACCESS PORTAL</button>
+            <button class="login-btn" onclick="attemptLogin()">ENTER PORTAL</button>
         </div>
     </div>
 
@@ -64,23 +60,22 @@
         <nav class="navbar">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px; cursor:pointer;" onclick="showHome()">
             <div class="nav-tabs">
-                <button class="tab-btn" onclick="showOwnerSettlements(this)">Owner Settlements</button>
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Proposal</button>
-                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
+                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Receipt</button>
                 <button class="tab-btn active" id="home-tab" onclick="showHome()">Fleet Radar</button>
             </div>
-            <button onclick="location.reload()" style="background:none; border:none; color:white;"><i class="fa-solid fa-power-off"></i></button>
+            <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
         </nav>
 
         <div id="home-content">
             <div class="metrics-bar">
                 <div class="metric-card"><label>Active Rentals</label><div class="val" id="m-active">0</div></div>
                 <div class="metric-card"><label>Total Fleet</label><div class="val" id="m-total">0</div></div>
-                <div class="metric-card"><label>Due Today</label><div class="val" id="m-due" style="color:var(--accent)">0</div></div>
-                <div class="metric-card"><label>EGP Liquidity</label><div class="val" id="m-cash">0</div></div>
+                <div class="metric-card"><label>Cash Flow</label><div class="val" id="m-cash">0</div></div>
+                <div class="metric-card"><label>Risk Alerts</label><div class="val" id="m-risk" style="color:orange">0</div></div>
             </div>
-            <div class="content-container">
-                <h4 style="margin:0 0 15px; font-size:11px; color:#888;">🗓️ LIVE FLEET GANTT CHART (3-YEAR HISTORY)</h4>
+            <div class="timeline-container">
+                <h4 id="status-msg">🗓️ FLEET RADAR</h4>
                 <div id="gantt-grid"></div>
             </div>
         </div>
@@ -88,53 +83,72 @@
     </div>
 
     <script>
-        // 1. WEB CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
-            authDomain: "brothers-egy-portal.firebaseapp.com",
             projectId: "brothers-egy-portal",
-            storageBucket: "brothers-egy-portal.appspot.com",
-            messagingSenderId: "673531280760",
             appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
         };
-    
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-    
+
         async function attemptLogin() {
-            const userField = document.getElementById('user-field').value.toLowerCase().trim();
-            const passField = document.getElementById('pass-field').value;
-            const btn = document.querySelector('.login-btn') || document.querySelector('button');
-    
-            btn.innerText = "🔄 AUTHENTICATING...";
-    
+            const u = document.getElementById('user-field').value.toLowerCase().trim();
+            const p = document.getElementById('pass-field').value;
+            
             try {
-                // Check if user exists in your "users" collection
-                const userDoc = await db.collection("users").doc(userField).get();
-    
-                if (userDoc.exists && userDoc.data().password === passField) {
-                    console.log("✅ Success!");
+                // If this fails, it means your 'users' collection doesn't have the document
+                const doc = await db.collection("users").doc(u).get();
+                if (doc.exists && doc.data().password === p) {
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('main-portal').style.display = 'flex';
-                    loadExecutiveDashboard(); // This loads your pumped data
-                } else {
-                    alert("❌ ACCESS DENIED: Check Username/Password");
-                    btn.innerText = "ACCESS PORTAL";
-                }
-            } catch (error) {
-                console.error("Login Error:", error);
-                alert("❌ CONNECTION ERROR: Ensure Firestore Rules are Published.");
-                btn.innerText = "ACCESS PORTAL";
-            }
+                    loadData();
+                } else { alert("Access Denied"); }
+            } catch (e) { alert("Connection Error: Check Firestore Rules"); }
         }
-    
-        async function loadExecutiveDashboard() {
-            // Load the data you pumped from your terminal
+
+        async function loadData() {
             const fleetSnap = await db.collection("fleet").get();
-            const bookingSnap = await db.collection("bookings").get();
+            const bookingsSnap = await db.collection("bookings").get();
             
-            console.log(`📡 Loaded ${fleetSnap.size} cars and ${bookingSnap.size} bookings.`);
-            renderGanttRadar(fleetSnap, bookingSnap);
+            document.getElementById('m-total').innerText = fleetSnap.size;
+            document.getElementById('m-active').innerText = bookingsSnap.size;
+
+            const grid = document.getElementById('gantt-grid');
+            grid.innerHTML = "";
+
+            fleetSnap.forEach(doc => {
+                const car = doc.data();
+                const row = document.createElement('div');
+                row.className = 'car-row';
+                row.innerHTML = `<div class="car-label">#${doc.id} ${car.model || ''}</div><div class="car-track" id="track-${doc.id}"></div>`;
+                grid.appendChild(row);
+
+                bookingsSnap.forEach(bDoc => {
+                    const b = bDoc.data();
+                    if(b.carId == doc.id) {
+                        const bar = document.createElement('div');
+                        bar.className = 'booking-bar';
+                        bar.style.left = "10%"; // Placeholder for date logic
+                        bar.style.width = "30%";
+                        document.getElementById(`track-${doc.id}`).appendChild(bar);
+                    }
+                });
+            });
+        }
+
+        function loadFrame(url, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('home-content').style.display = 'none';
+            const f = document.getElementById('content-frame');
+            f.style.display = 'block'; f.src = url;
+        }
+
+        function showHome() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('home-tab').classList.add('active');
+            document.getElementById('content-frame').style.display = 'none';
+            document.getElementById('home-content').style.display = 'block';
         }
     </script>
 </body>
