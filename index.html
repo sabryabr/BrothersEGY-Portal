@@ -88,7 +88,7 @@
     </div>
 
     <script>
-        // 1. YOUR FIREBASE PROJECT CONFIG
+        // 1. WEB CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
             authDomain: "brothers-egy-portal.firebaseapp.com",
@@ -101,50 +101,41 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
     
-        // 2. THE DATA LOADER
-        async function loadExecutiveData() {
-            console.log("📡 Connecting to Firestore...");
+        async function attemptLogin() {
+            const userField = document.getElementById('user-field').value.toLowerCase().trim();
+            const passField = document.getElementById('pass-field').value;
+            const btn = document.querySelector('.login-btn') || document.querySelector('button');
+    
+            btn.innerText = "🔄 AUTHENTICATING...";
+    
             try {
-                const fleetSnap = await db.collection("fleet").get();
-                const bookingSnap = await db.collection("bookings").get();
+                // Check if user exists in your "users" collection
+                const userDoc = await db.collection("users").doc(userField).get();
     
-                if (fleetSnap.empty) {
-                    console.warn("⚠️ Database is still empty. Run your pumper again!");
-                    return;
+                if (userDoc.exists && userDoc.data().password === passField) {
+                    console.log("✅ Success!");
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('main-portal').style.display = 'flex';
+                    loadExecutiveDashboard(); // This loads your pumped data
+                } else {
+                    alert("❌ ACCESS DENIED: Check Username/Password");
+                    btn.innerText = "ACCESS PORTAL";
                 }
-    
-                renderDashboard(fleetSnap, bookingSnap);
-                updateExecutiveMetrics(fleetSnap, bookingSnap);
-                
             } catch (error) {
-                console.error("❌ Handshake Error:", error);
-                alert("Connection Error. Check Firestore Rules (Step 1).");
+                console.error("Login Error:", error);
+                alert("❌ CONNECTION ERROR: Ensure Firestore Rules are Published.");
+                btn.innerText = "ACCESS PORTAL";
             }
         }
     
-        function renderDashboard(fleet, bookings) {
-            const grid = document.getElementById('gantt-grid');
-            grid.innerHTML = ""; // Clear "Blank" screen
+        async function loadExecutiveDashboard() {
+            // Load the data you pumped from your terminal
+            const fleetSnap = await db.collection("fleet").get();
+            const bookingSnap = await db.collection("bookings").get();
             
-            fleet.forEach(doc => {
-                const car = doc.data();
-                const row = document.createElement('div');
-                row.className = 'car-row';
-                row.innerHTML = `<div class="car-label">#${doc.id} ${car.model}</div><div class="car-track" id="track-${doc.id}"></div>`;
-                grid.appendChild(row);
-    
-                // Match Bookings to Car for the Radar Bars
-                bookings.forEach(bDoc => {
-                    const b = bDoc.data();
-                    if (b.carId == doc.id) {
-                        drawRadarBar(doc.id, b.start, b.end);
-                    }
-                });
-            });
+            console.log(`📡 Loaded ${fleetSnap.size} cars and ${bookingSnap.size} bookings.`);
+            renderGanttRadar(fleetSnap, bookingSnap);
         }
-        
-        // Call the loader after login
-        // loadExecutiveData(); 
     </script>
 </body>
 </html>
