@@ -5,99 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brothers EGY - Executive Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
             --primary: #04509D; 
             --accent: #e67e22; 
-            --glass: rgba(255, 255, 255, 0.05); 
-            --blur: blur(25px); 
+            --glass: rgba(255, 255, 255, 0.08); 
+            --blur: blur(15px); 
         }
         
-        /* FIX: Ensure body is transparent to reveal video underneath */
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            font-family: 'Inter', sans-serif; 
-            background: transparent; 
-            color: white; 
-            overflow: hidden; 
-        }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #000; color: white; overflow: hidden; }
 
-        /* Video Background Container */
+        /* Video Background */
         .video-background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -2; /* Set behind everything */
-            background: #000; /* Fallback black */
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000;
+        }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.5); }
+
+        /* Subtle Dark Overlay for contrast */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.4) 80%);
+            z-index: -1;
         }
 
-        #bg-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: brightness(0.45);
-        }
-
-        /* Login Overlay matched to */
+        /* Login Overlay */
         #login-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.5); /* Semi-transparent */
-            backdrop-filter: var(--blur);
+            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(25px);
             display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
         .login-box {
-            background: rgba(20, 20, 20, 0.5); padding: 50px 40px; border-radius: 24px;
+            background: var(--glass); padding: 50px 40px; border-radius: 30px;
             border: 1px solid rgba(255, 255, 255, 0.1); text-align: center;
             max-width: 380px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.5);
         }
-        .login-box img { height: 70px; margin-bottom: 25px; }
-        .login-box h2 { font-weight: 900; letter-spacing: -1px; margin: 0 0 10px; font-size: 1.8rem; }
-        .login-box p { opacity: 0.6; font-size: 0.85rem; margin-bottom: 30px; }
-        
-        .login-box input {
-            width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 10px; border: none;
-            background: #e1e1e1; font-size: 1rem; text-align: center; box-sizing: border-box; color: #111;
-        }
-        .login-box button {
-            width: 100%; padding: 15px; border-radius: 10px; border: none;
-            background: var(--primary); color: white; font-weight: 700; cursor: pointer; transition: 0.3s;
-            text-transform: uppercase; letter-spacing: 1px;
-        }
+        .login-box img { height: 70px; margin-bottom: 25px; filter: drop-shadow(0 0 10px rgba(4, 80, 157, 0.5)); }
 
-        /* Dashboard matched to */
-        #main-portal { display: none; height: 100%; }
-
+        /* Navigation Bar - Fixed Transparency */
         .navbar { 
-            position: fixed; top: 0; width: 100%; background: rgba(4, 80, 157, 0.8); 
-            backdrop-filter: blur(10px); display: flex; align-items: center; 
-            padding: 10px 25px; z-index: 100; box-sizing: border-box;
+            position: fixed; top: 0; width: 100%; 
+            background: rgba(4, 80, 157, 0.15); /* Very light blue */
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; align-items: center; 
+            padding: 12px 30px; z-index: 100; box-sizing: border-box;
         }
-        .nav-brand { display: flex; align-items: center; gap: 15px; color: white; text-decoration: none; font-weight: 900; margin-right: 40px; }
-        .nav-tabs { display: flex; gap: 12px; flex-grow: 1; }
+        .nav-brand { display: flex; align-items: center; gap: 15px; color: white; text-decoration: none; font-weight: 800; font-size: 1.2rem; }
+        .nav-logo { height: 35px; filter: brightness(1.2) contrast(1.1); } /* Logo transparency fix */
+        
+        .nav-tabs { display: flex; gap: 15px; flex-grow: 1; margin-left: 40px; }
         .tab-btn { 
-            background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); 
-            padding: 8px 18px; border-radius: 8px; cursor: pointer; transition: 0.3s;
-            font-size: 14px; display: flex; align-items: center; gap: 8px; font-weight: 500;
+            background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1); 
+            padding: 8px 20px; border-radius: 12px; cursor: pointer; transition: 0.4s;
+            font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px;
         }
-        .tab-btn:hover, .tab-btn.active { background: white; color: var(--primary); }
+        .tab-btn:hover, .tab-btn.active { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 15px rgba(4, 80, 157, 0.4); }
 
+        .nav-controls { display: flex; gap: 15px; }
+        .ctrl-btn { background: white; color: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: 0.3s; }
+        .ctrl-btn:hover { background: var(--accent); color: white; transform: rotate(360deg); }
+        .logout-btn { background: #e74c3c; color: white; }
+
+        /* Main Dashboard Content */
         .home-screen { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        .home-screen h1 { font-size: 4rem; font-weight: 900; margin: 0; letter-spacing: -2px; }
+        .home-screen h1 { font-size: 4.5rem; font-weight: 800; margin: 0; letter-spacing: -3px; text-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .home-screen p { font-size: 1.2rem; opacity: 0.8; margin-top: 10px; letter-spacing: 1px; text-transform: uppercase; }
 
-        .menu-grid { display: flex; justify-content: center; gap: 25px; margin-top: 50px; flex-wrap: wrap; }
+        .menu-grid { display: flex; justify-content: center; gap: 30px; margin-top: 60px; flex-wrap: wrap; }
         .menu-card { 
-            background: rgba(20, 20, 20, 0.4); backdrop-filter: var(--blur); padding: 45px 30px; 
-            border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.08); transition: 0.4s; cursor: pointer;
-            width: 240px; box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); padding: 50px 30px; 
+            border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.1); transition: 0.5s; cursor: pointer;
+            width: 260px; box-sizing: border-box; position: relative; overflow: hidden;
         }
-        .menu-card:hover { transform: translateY(-15px); border-color: var(--accent); }
+        .menu-card::before { content: ""; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); transition: 0.5s; }
+        .menu-card:hover::before { left: 100%; }
+        
+        .menu-card:hover { 
+            transform: translateY(-20px) scale(1.05); 
+            border-color: var(--accent); 
+            box-shadow: 0 20px 40px rgba(230, 126, 34, 0.25);
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .menu-card i { font-size: 3.5rem; color: var(--accent); margin-bottom: 25px; display: block; filter: drop-shadow(0 0 10px rgba(230, 126, 34, 0.3)); }
+        .menu-card h4 { margin: 0; font-size: 1.4rem; font-weight: 700; }
 
-        #content-frame { width: 100%; height: calc(100% - 58px); margin-top: 58px; border: none; background: white; display: none; }
+        #content-frame { width: 100%; height: calc(100% - 65px); margin-top: 65px; border: none; background: white; display: none; }
+        
+        /* Entrance Animation */
+        .fade-in { animation: fadeInUp 1s ease forwards; opacity: 0; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -106,46 +103,51 @@
         <video autoplay muted loop playsinline id="bg-video">
             <source src="background.mp4" type="video/mp4">
         </video>
+        <div class="overlay"></div>
     </div>
 
     <div id="login-overlay">
-        <div class="login-box">
+        <div class="login-box fade-in">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Brothers Logo">
-            <h2>Executive Hub</h2>
-            <p>Fleet Management System v2.0</p>
-            <input type="password" id="pass-field" placeholder="Enter Team Code" onkeypress="handleKey(event)">
-            <button onclick="checkPassword()">Authorize Access</button>
-            <p id="error-msg" style="color: #ff4d4d; margin-top: 15px; display: none; font-weight: bold;">Unauthorized.</p>
+            <h2 style="font-weight: 800; letter-spacing: -1px;">EXECUTIVE HUB</h2>
+            <p>FLEET MANAGEMENT SYSTEM V2.0</p>
+            <input type="password" id="pass-field" placeholder="••••••••" style="text-align: center; letter-spacing: 5px;" onkeypress="handleKey(event)">
+            <button onclick="checkPassword()" style="font-family: 'Inter', sans-serif; font-weight: 800;">AUTHORIZE ACCESS</button>
+            <p id="error-msg" style="color: #ff4d4d; margin-top: 15px; display: none; font-weight: bold; opacity: 1;">ACCESS DENIED</p>
         </div>
     </div>
 
     <div id="main-portal">
         <nav class="navbar">
             <a href="#" class="nav-brand" onclick="showHome()">
-                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="30">
-                <span>Brothers EGY</span>
+                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" class="nav-logo">
+                <span style="margin-left: 5px;">BROTHERS EGY</span>
             </a>
             <div class="nav-tabs">
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)"><i class="fa-solid fa-calculator"></i> Price Proposal</button>
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)"><i class="fa-solid fa-file-contract"></i> Contract (EN)</button>
                 <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)"><i class="fa-solid fa-file-signature"></i> Contract (AR)</button>
             </div>
+            <div class="nav-controls">
+                <button class="ctrl-btn" title="Home" onclick="showHome()"><i class="fa-solid fa-house"></i></button>
+                <button class="ctrl-btn logout-btn" title="Logout" onclick="logout()"><i class="fa-solid fa-power-off"></i></button>
+            </div>
         </nav>
 
         <div id="home" class="home-screen">
-            <h1>Executive Dashboard</h1>
-            <p>Professional Fleet & Management Solutions</p>
-            <div class="menu-grid">
+            <h1 class="fade-in">Executive Dashboard</h1>
+            <p class="fade-in" style="animation-delay: 0.2s;">Professional Fleet & Management Solutions</p>
+            <div class="menu-grid fade-in" style="animation-delay: 0.4s;">
                 <div class="menu-card" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/')">
-                    <i class="fa-solid fa-file-invoice-dollar" style="font-size: 3rem; color: var(--accent); margin-bottom: 20px;"></i>
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
                     <h4>Price Proposal</h4>
                 </div>
                 <div class="menu-card" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/')">
-                    <i class="fa-solid fa-shield-halved" style="font-size: 3rem; color: var(--accent); margin-bottom: 20px;"></i>
+                    <i class="fa-solid fa-shield-halved"></i>
                     <h4>Contract (EN)</h4>
                 </div>
                 <div class="menu-card" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/')">
-                    <i class="fa-solid fa-earth-africa" style="font-size: 3rem; color: var(--accent); margin-bottom: 20px;"></i>
+                    <i class="fa-solid fa-earth-africa"></i>
                     <h4>Contract (AR)</h4>
                 </div>
             </div>
@@ -184,11 +186,12 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         }
 
-        // AUTO-PLAY RECOVERY: Some browsers need a second kick
+        function logout() { location.reload(); }
+        
         window.addEventListener('load', () => {
             const video = document.getElementById('bg-video');
             video.play().catch(() => {
-                console.log("Waiting for user interaction to play video.");
+                console.log("Autoplay interaction required.");
             });
         });
     </script>
