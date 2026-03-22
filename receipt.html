@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brothers EGY - Digital Receipt Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ================= SCREEN UI ================= */
+        :root {
+            --primary: #04509D;
+            --secondary: #333;
+            --bg: #eef2f5;
+            --accent: #e67e22;
+            --success: #27ae60;
+            --danger: #c0392b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 10px 20px;
+            color: #333;
+        }
+
+        .floating-header {
+            max-width: 800px; margin: 10px auto 20px auto; background: white;
+            border: 3px solid var(--primary); border-radius: 50px; padding: 10px 30px;
+            display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .rate-group { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+        .badge-live { background: #27ae60; color: white; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: bold; text-transform: uppercase; }
+        .live-clock { font-family: monospace; font-weight: bold; font-size: 13px; color: var(--primary); }
+        .rate-input { width: 70px !important; font-weight: bold; color: #000; text-align: center; border: 1px solid #ccc !important; height: 26px !important; border-radius: 4px; font-size: 12px !important; }
+
+        .control-panel { max-width: 800px; margin: 0 auto 40px auto; background: transparent; }
+        .cp-body { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08); }
+
+        .section-head { font-size: 14px; font-weight: 800; color: var(--secondary); text-transform: uppercase; margin: 25px 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid #eee; display: flex; align-items: center; gap: 8px; }
+        .section-head:first-child { margin-top: 0; }
+
+        label { display: block; font-size: 10px; font-weight: 700; color: #555; margin-bottom: 4px; text-transform: uppercase; }
+        input, select { width: 100%; box-sizing: border-box; padding: 0 12px; height: 40px; font-size: 13px; border: 1px solid #ccc; border-radius: 5px; transition: 0.2s; }
+        select { cursor: pointer; }
+        input:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(4, 80, 157, 0.1); }
+
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 12px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 12px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 12px; }
+
+        .btn-gen {
+            background: var(--primary); color: white; border: none; padding: 18px; width: 100%;
+            font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px;
+            display: flex; justify-content: center; align-items: center; gap: 10px; transition: 0.3s; text-transform: uppercase;
+        }
+        .btn-gen:hover { background: #033a75; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); }
+
+        .btn-final-print {
+            background: var(--success); color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; margin: 0 auto 20px auto; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width:100%; max-width: 800px;
+        }
+        .btn-final-print:hover { background: #219653; transform: scale(1.01); }
+
+        /* ================= A4 PAGE PREVIEW & PRINT STYLES ================= */
+        #contractOutput { display: none; margin-top: 20px; }
+
+        .a4-page {
+            width: 210mm; height: 296mm; padding: 10mm 15mm; margin: 0 auto 30px auto;
+            background: white; position: relative; box-sizing: border-box; overflow: hidden;
+            font-family: 'Helvetica', 'Arial', sans-serif; font-size: 9.5pt; line-height: 1.35; color: #000;
+            display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15); page-break-after: always;
+        }
+        .page-content { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
+
+        /* Receipts */
+        .receipt-half { height: 48%; border: 2px solid #000; padding: 15px; display: flex; flex-direction: column; position: relative; box-sizing: border-box; background: white; margin-bottom: 0; }
+        .rec-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .rec-logo { height: 45px; }
+        .rec-title { font-size: 16pt; font-weight: bold; text-transform: uppercase; color: var(--primary); }
+        .rec-body-grid { display: flex; gap: 20px; font-size: 9pt; line-height: 1.6; border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
+        .rec-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .rec-row { display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; }
+        .rec-label { font-weight: bold; color: #555; text-transform: uppercase; font-size: 8.5pt; }
+        .rec-val { font-weight: bold; color: #000; text-align: right; }
+        .rec-amount-box { border: 1px solid #ccc; background: #fbfbfb; padding: 10px 15px; margin-bottom: 5px; }
+        .rec-amount-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .rec-amount-lbl { font-weight: bold; color: #555; font-size: 10pt; text-transform: uppercase; }
+        .rec-amount-val { font-size: 18pt; font-weight: bold; color: #000; }
+        .rec-sig-line { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 9pt; font-weight: bold; position: relative; }
+
+        /* Auto-Signature Font */
+        .digital-sig {
+            position: absolute;
+            top: -28px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-family: 'Brush Script MT', 'Cedarville Cursive', cursive;
+            font-size: 26px;
+            color: #04509D;
+            transform: rotate(-3deg);
+            pointer-events: none;
+        }
+
+        /* STRICT PRINT PAGE ENFORCEMENT */
+        @media print {
+            body { background: white; padding: 0; margin: 0; visibility: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page { margin: 0; size: A4; }
+            .floating-header, .control-panel, .btn-print, .btn-final-print { display: none !important; }
+            #contractOutput { visibility: visible; display: block !important; position: absolute; left: 0; top: 0; width: 100%; margin: 0; }
+            #contractOutput * { visibility: visible; }
+            .a4-page { box-shadow: none !important; margin: 0 !important; border: none !important; page-break-after: always; page-break-inside: avoid; height: 296mm; width: 210mm; overflow: hidden; }
+            .a4-page:last-child { page-break-after: avoid; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="floating-header">
+        <div style="display:flex; align-items:center; gap:15px;">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:40px;" alt="Logo">
+            <h2 style="margin:0; color:var(--primary); font-size:18px;">Digital Receipt Generator</h2>
+        </div>
+        <div style="display:flex; gap:20px; align-items:center;">
+            <div class="rate-group">
+                <div style="font-size:10px; font-weight:bold; color:#555;">USD <span class="badge-live">LIVE</span></div>
+                <input type="number" id="ex_usd" class="rate-input" value="50.00" oninput="calc()">
+            </div>
+            <div class="rate-group">
+                <div style="font-size:10px; font-weight:bold; color:#555;">EUR <span class="badge-live">LIVE</span></div>
+                <input type="number" id="ex_eur" class="rate-input" value="54.00" oninput="calc()">
+            </div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="cp-body">
+
+            <div class="section-head"><i class="fa-solid fa-file-invoice"></i> 1. Document Info</div>
+            <div class="grid-3">
+                <div><label>Existing Contract No.</label><input type="text" id="con_no" placeholder="BR-HRG-1602-1533"></div>
+                <div><label>Receipt Date</label><input type="date" id="rec_date"></div>
+                <div><label>Receipt Title</label><input type="text" id="rec_title" value="RENTAL PAYMENT (Month 2)"></div>
+            </div>
+
+            <div class="section-head"><i class="fa-solid fa-user"></i> 2. Client & Vehicle</div>
+            <div class="grid-3">
+                <div><label>Client Name</label><input type="text" id="cl_name" placeholder="Full Name"></div>
+                <div><label>Passport / ID</label><input type="text" id="cl_pass"></div>
+                <div><label>Phone</label><input type="text" id="cl_phone" placeholder="+20 1XXXXXXXXX"></div>
+            </div>
+            <div class="grid-3">
+                <div><label>Select Fleet Vehicle</label>
+                    <select id="carSelect" onchange="loadCar()">
+                        <option value="">-- Custom Manual Input --</option>
+                    </select>
+                </div>
+                <div style="grid-column: span 2;"><label>Vehicle Text</label><input type="text" id="car_text" placeholder="MG ZS (2025) | Plate: 9413 | ل و ع"></div>
+            </div>
+            <div class="grid-2">
+                <div><label>Rental Period Start</label><input type="date" id="p_start"></div>
+                <div><label>Rental Period End</label><input type="date" id="p_end"></div>
+            </div>
+
+            <div class="section-head"><i class="fa-solid fa-money-bills"></i> 3. Payment & Balances</div>
+            
+            <div style="background:#f8f9fa; padding:15px; border-radius:6px; border: 1px solid #e0e0e0; margin-bottom:15px;">
+                <div style="font-weight:bold; font-size:11px; margin-bottom:10px; color:var(--primary);">AMOUNT RECEIVED NOW</div>
+                <div class="grid-4" style="margin:0;">
+                    <div><label>EGP</label><input type="number" id="pay_egp" placeholder="0" oninput="calc()"></div>
+                    <div><label>USD</label><input type="number" id="pay_usd" placeholder="0" oninput="calc()"></div>
+                    <div><label>EUR</label><input type="number" id="pay_eur" placeholder="0" oninput="calc()"></div>
+                    <div><label>Card (EGP)</label><input type="number" id="pay_card" placeholder="0" oninput="calc()"></div>
+                </div>
+                <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #ccc; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-weight:bold; font-size:12px;">TOTAL RECEIVED (CALCULATED):</div>
+                    <div id="display_total" style="font-size:20px; font-weight:bold; color:var(--success);">0 EGP</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <label style="color:var(--danger);">Outstanding / Pending Balance</label>
+                    <input type="number" id="pending_amt" placeholder="e.g. 164000" style="border-color:var(--danger); background:#fff5f5;">
+                </div>
+                <div style="display:flex; align-items:center; padding-top:15px;">
+                    <label style="font-size:13px; text-transform:none; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="auto_sign" checked style="width:20px; height:20px;"> 
+                        <strong>Digitally Auto-Sign Receipt</strong>
+                    </label>
+                </div>
+            </div>
+
+            <button id="btnGen" class="btn-gen" onclick="generatePreview()"><i class="fa-solid fa-receipt"></i> 1. GENERATE RECEIPT</button>
+        </div>
+    </div>
+
+    <button id="btnRealPrint" onclick="printReceipt()" class="btn-final-print"><i class="fa-solid fa-paper-plane"></i> 2. PRINT / SAVE PDF TO SEND</button>
+    <div id="contractOutput"></div>
+
+    <script>
+        // --- 1. FLEET DATA (Plates Flipped) ---
+        const fleet = [
+            {code:"33", model:"Haval Jolion", year:"2022", plate:"2 6 4 9 | ن ا ب"},
+            {code:"38", model:"Chevrolet Aveo", year:"2020", plate:"8 2 6 3 | ب د ع"},
+            {code:"47", model:"Hyundai Tucson", year:"2022", plate:"4 2 6 3 | ب س ه"},
+            {code:"48", model:"Jetour X90 Plus", year:"2026", plate:"2 9 1 5 | ب ص ف"},
+            {code:"34", model:"MG ZS", year:"2025", plate:"5 3 6 5 | س ه ق"},
+            {code:"35", model:"MG ZS", year:"2022", plate:"5 8 5 4 | س ن و"},
+            {code:"36", model:"MG ZS", year:"2022", plate:"1 6 8 9 | ب ج م"},
+            {code:"37", model:"MG ZS", year:"2023", plate:"1 4 9 5 | ي ص ر"},
+            {code:"42", model:"MG 5", year:"2026", plate:"7 3 7 8 | س م ه"},
+            {code:"44", model:"MG ZS", year:"2025", plate:"9 4 1 3 | ل و ع"},
+            {code:"46", model:"MG 5", year:"2026", plate:"9 5 6 8 | ب ص ف"},
+            {code:"40", model:"Nissan Sunny", year:"2023", plate:"7 3 5 1 | ب ه ل"},
+            {code:"41", model:"Nissan Sunny", year:"2023", plate:"5 7 3 9 | ل ج ق"},
+            {code:"49", model:"Nissan Sunny", year:"2026", plate:"3 5 2 1 | ل س ص"},
+            {code:"43", model:"Renualt Duster", year:"2025", plate:"5 9 4 9 | ص ع د"}
+        ];
+
+        // --- 2. INIT & FETCH RATES ---
+        window.onload = function () {
+            const sel = document.getElementById('carSelect');
+            fleet.forEach(c => {
+                let opt = document.createElement('option');
+                opt.value = c.code;
+                opt.text = `[${c.code}] ${c.model} (${c.year}) - ${c.plate}`;
+                sel.add(opt);
+            });
+
+            document.getElementById('rec_date').valueAsDate = new Date();
+
+            fetch('https://api.exchangerate-api.com/v4/latest/USD')
+                .then(r => r.json()).then(d => {
+                    if (d.rates.EGP) {
+                        document.getElementById('ex_usd').value = d.rates.EGP.toFixed(2);
+                        if (d.rates.EUR) document.getElementById('ex_eur').value = (d.rates.EGP / d.rates.EUR).toFixed(2);
+                        calc();
+                    }
+                }).catch(e => { calc(); });
+        };
+
+        function safeVal(id) { var el = document.getElementById(id); return el ? el.value : ""; }
+        function safeNum(id) { var el = document.getElementById(id); if (!el || el.value.trim() === "") return 0; return parseFloat(el.value) || 0; }
+
+        function loadCar() {
+            const c = fleet.find(x => x.code === safeVal('carSelect'));
+            if (c) { document.getElementById('car_text').value = `${c.model} (${c.year}) | Plate: ${c.plate}`; }
+        }
+
+        function calc() {
+            const usd = safeNum('ex_usd') || 50; 
+            const eur = safeNum('ex_eur') || 54;
+            
+            let egp = safeNum('pay_egp'), u = safeNum('pay_usd'), e = safeNum('pay_eur'), card = safeNum('pay_card');
+            let total = egp + (u * usd) + (e * eur) + card;
+            
+            document.getElementById('display_total').innerText = Math.round(total).toLocaleString() + " EGP";
+            return total;
+        }
+
+        // --- 4. GENERATE RECEIPT HTML ---
+        function generatePreview() {
+            const totalAmt = calc();
+            const usd = safeNum('ex_usd') || 50; 
+            const eur = safeNum('ex_eur') || 54;
+
+            // Build Payment String
+            let egp = safeNum('pay_egp'), u = safeNum('pay_usd'), e = safeNum('pay_eur'), card = safeNum('pay_card');
+            let parts = [];
+            if (egp > 0) parts.push(egp + " Cash (EGP)"); 
+            if (u > 0) parts.push(u + " USD (Rate: " + usd + ")"); 
+            if (e > 0) parts.push(e + " EUR (Rate: " + eur + ")"); 
+            if (card > 0) parts.push(card + " Card (EGP)");
+            let detailStr = parts.length > 0 ? `(${parts.join(' + ')})` : "";
+
+            const recTitle = safeVal('rec_title') || "RENTAL PAYMENT";
+            const isDeposit = recTitle.toUpperCase().includes("DEPOSIT");
+            const autoSign = document.getElementById('auto_sign').checked;
+            const pendingAmt = safeNum('pending_amt');
+            
+            // Format Dates
+            const rDateInput = document.getElementById('rec_date').value;
+            const recDateStr = rDateInput ? new Date(rDateInput).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
+            
+            let pStart = document.getElementById('p_start').value;
+            let pEnd = document.getElementById('p_end').value;
+            if(pStart) pStart = new Date(pStart).toLocaleDateString('en-GB');
+            if(pEnd) pEnd = new Date(pEnd).toLocaleDateString('en-GB');
+            const periodStr = (pStart && pEnd) ? `${pStart} to ${pEnd}` : "-";
+
+            const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png";
+
+            const singleRecHtml = (copyType) => `
+                <div class="receipt-half">
+                    <div class="rec-header">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td width="20%"><img src="${logoSrc}" style="height:45px; object-fit:contain;"></td>
+                                <td width="60%" align="center">
+                                    <div class="rec-title">OFFICIAL RECEIPT</div>
+                                    <div style="font-size:9pt;">${copyType}</div>
+                                </td>
+                                <td width="20%" align="right"><img src="https://api.qrserver.com/v1/create-qr-code/?data=https://brothersegy.com&size=80x80" style="height:45px;"></td>
+                            </tr>
+                        </table>
+                        <div style="text-align:right; font-size:9pt; margin-top:5px;">DATE: ${recDateStr}</div>
+                        <div style="text-align:right; font-weight:bold;">${recTitle}</div>
+                    </div>
+                    
+                    <div class="rec-body-grid">
+                        <div class="rec-col">
+                            <div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${safeVal('cl_name') || '-'}</span></div>
+                            <div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${safeVal('cl_pass') || '-'}</span></div>
+                            <div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${safeVal('cl_phone') || '-'}</span></div>
+                        </div>
+                        <div class="rec-col">
+                            <div class="rec-row"><span class="rec-label">CONTRACT NO</span><span class="rec-val">${safeVal('con_no') || '-'}</span></div>
+                            <div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:right;">${safeVal('car_text') || '-'}</span></div>
+                            ${isDeposit ? '' : `<div class="rec-row"><span class="rec-label">PERIOD</span><span class="rec-val" style="font-size:8pt;">${periodStr}</span></div>`}
+                        </div>
+                    </div>
+
+                    <div class="rec-amount-box">
+                        <div class="rec-amount-row">
+                            <span class="rec-amount-lbl">AMOUNT RECEIVED</span>
+                            <span class="rec-amount-val">${Math.round(totalAmt).toLocaleString()} EGP</span>
+                        </div>
+                        <div class="rec-amount-row" style="margin-bottom:0;">
+                            <span class="rec-amount-lbl" style="font-size:8pt;">PAYMENT DETAILS</span>
+                            <span class="rec-val" style="font-size:8pt; font-weight:normal;">${detailStr || "-"}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="font-size:7pt; color:#666; margin-top:5px;">
+                        ${isDeposit ? "<strong style='color:#c0392b;'>* Fully refundable if returned in same condition. Deductions apply for damages/fines.</strong><br>" : "<strong>Breakdown:</strong> Base Tariff + Added Services (Insurance, Delivery, Logistics).<br>"}
+                        ${!isDeposit && pendingAmt > 0 ? `<span style="color:#c0392b; font-weight:bold;">⚠ OUTSTANDING BALANCE: ${Math.round(pendingAmt).toLocaleString()} EGP</span>` : ''}
+                    </div>
+                    <div class="rec-footer" style="padding-top:10px;">
+                         <div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;">
+                            <div style="flex-grow:1;"></div>
+                            <div class="rec-sig-line">
+                                ${autoSign ? `<div class="digital-sig">Brothers EGY</div>` : ''}
+                                AUTHORIZED SIGNATURE
+                                <div style="font-size:8pt; margin-top:2px;">Date: ${recDateStr}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+
+            let html = `
+            <div class="a4-page">
+                <div class="page-content">
+                    ${singleRecHtml('CLIENT COPY')}
+                    <div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>
+                    ${singleRecHtml('COMPANY COPY')}
+                </div>
+            </div>`;
+
+            document.getElementById('contractOutput').innerHTML = html;
+            document.getElementById('contractOutput').style.display = "block";
+            document.getElementById('btnRealPrint').style.display = "block";
+            
+            setTimeout(() => {
+                document.getElementById('btnRealPrint').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+
+        // PRINT HANDLER
+        function printReceipt() {
+            const oldTitle = document.title;
+            const conNo = safeVal('con_no') || 'RECEIPT';
+            document.title = `Receipt-${conNo}`;
+            window.print();
+            document.title = oldTitle;
+        }
+    </script>
+</body>
+</html>
