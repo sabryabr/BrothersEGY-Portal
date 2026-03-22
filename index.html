@@ -85,8 +85,8 @@
         <iframe id="content-frame" style="display:none; width:100%; height:calc(100vh - 70px); border:none;" src=""></iframe>
     </div>
 
-    <script>
-        // CONFIG - Replace with your key!
+<script>
+        // CONFIG - Using your live API Key and Sheet IDs
         const GOOGLE_API_KEY = "AIzaSyA1dKYFgW45oXnEZmxX9yfbgkos5AbpzSk"; 
         const ORDER_SHEET_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
         const FLEET_SHEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
@@ -97,6 +97,13 @@
             appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
         });
         const db = firebase.firestore();
+
+        // Helper to handle Google Sheets date strings
+        function parseDate(str) {
+            if(!str) return null;
+            const d = new Date(str);
+            return isNaN(d.getTime()) ? null : d;
+        }
 
         async function attemptLogin() {
             const user = document.getElementById('user-field').value.toLowerCase();
@@ -117,50 +124,60 @@
         }
 
         async function loadData() {
-            // Fetch All 3 Years of History
-            const orders = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: ORDER_SHEET_ID, range: "'صفحة الإدخالات للإيجارات'!A:ZZ" });
-            const fleet = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: FLEET_SHEET_ID, range: "'صفحة الإدخالات لقاعدة البيانات'!A:ZZ" });
-            renderTimeline(orders.result.values, fleet.result.values);
+            try {
+                const orders = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: ORDER_SHEET_ID, range: "'صفحة الإدخالات للإيجارات'!A:ZZ" });
+                const fleet = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: FLEET_SHEET_ID, range: "'صفحة الإدخالات لقاعدة البيانات'!A:ZZ" });
+                renderTimeline(orders.result.values, fleet.result.values);
+            } catch (e) { console.error("Data Load Error:", e); }
         }
 
         function renderTimeline(orders, fleet) {
             const grid = document.getElementById('gantt-grid');
             grid.innerHTML = "";
-            let active = 0, ready = 0;
+            let activeCount = 0;
             const today = new Date();
 
-            // Logic to draw bars based on Start (Col L) and End (Col T)
-            fleet.slice(1).forEach(car => {
-                const carId = car[0];
-                const carName = `${car[1]} ${car[4]} (${car[7]})`;
-                if (!carId) return;
+            // Skip header (row 1)
+            const carRows = fleet.slice(1);
 
+            carRows.forEach(car => {
+                const carId = car[0]; // ID is in Column A
+                if (!carId || carId === "") return;
+
+                // Build label: Brand (B) + Model (E) + Year (H)
+                const label = `${car[1] || ''} ${car[4] || ''} (${car[7] || ''})`;
+                
                 const row = document.createElement('div');
                 row.className = 'car-row';
-                row.innerHTML = `<div class="car-label">#${carId} ${carName}</div><div class="car-track" id="track-${carId}"></div>`;
+                row.innerHTML = `<div class="car-label">#${carId} ${label}</div><div class="car-track" id="track-${carId}"></div>`;
                 grid.appendChild(row);
 
-                // Find all bookings for this car
-                orders.slice(2).filter(o => o[3] == carId).forEach(order => {
-                    const s = new Date(order[11]); // Col L
-                    const e = new Date(order[19]); // Col T
-                    if (isNaN(s) || isNaN(e)) return;
+                // Check bookings (Orders) for this car ID (o[3] is Column D)
+                orders.slice(2).forEach(order => {
+                    if (order[3] != carId) return;
 
-                    if (s <= today && e >= today) active++;
-                    
-                    // Simplified Gantt calc: width based on month percentage
-                    const startPos = (s.getDate() / 31) * 100;
-                    const duration = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
+                    const s = parseDate(order[11]); // Start: Column L
+                    const e = parseDate(order[19]); // End: Column T
 
-                    const bar = document.createElement('div');
-                    bar.className = 'booking-bar';
-                    bar.style.left = `${startPos}%`;
-                    bar.style.width = `${duration}%`;
-                    document.getElementById(`track-${carId}`).appendChild(bar);
+                    if (s && e) {
+                        // Check if car is out right now
+                        if (s <= today && e >= today) activeCount++;
+
+                        // Calculate visual position (percentage of current month)
+                        const startPos = (s.getDate() / 31) * 100;
+                        const duration = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
+
+                        const bar = document.createElement('div');
+                        bar.className = 'booking-bar';
+                        bar.style.left = startPos + "%";
+                        bar.style.width = Math.max(duration, 3) + "%"; // Min 3% for visibility
+                        document.getElementById(`track-${carId}`).appendChild(bar);
+                    }
                 });
             });
-            document.getElementById('count-active').innerText = active;
-            document.getElementById('count-ready').innerText = fleet.length - active;
+
+            document.getElementById('count-active').innerText = activeCount;
+            document.getElementById('count-ready').innerText = carRows.length - activeCount;
         }
 
         function loadFrame(url) {
