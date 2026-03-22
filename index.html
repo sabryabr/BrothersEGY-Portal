@@ -1,176 +1,102 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive ERP 3.0</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
-    
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script>
+    // These IDs are pulled directly from your "Publish" screenshots
+    const FLEET_SHEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
+    const ORDER_SHEET_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
 
-    <style>
-        :root { 
-            --primary: #04509D; --accent: #e67e22; 
-            --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
-            --rented: #ff4b4b; --available: #1a1f29; --success: #50fa7b;
+    firebase.initializeApp({
+        apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+        projectId: "brothers-egy-portal"
+    });
+    const db = firebase.firestore();
+
+    async function attemptLogin() {
+        const user = document.getElementById('user-field').value.toLowerCase();
+        const pass = document.getElementById('pass-field').value;
+        const doc = await db.collection("users").doc(user).get();
+        if (doc.exists && doc.data().password === pass) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('main-portal').style.display = 'flex';
+            fetchPublicData();
+        } else { alert("Login Failed"); }
+    }
+
+    async function fetchPublicData() {
+        const ganttContainer = document.getElementById('gantt-grid');
+        ganttContainer.innerHTML = "<p style='padding:20px; color:var(--accent)'>📡 Syncing with Google Sheets...</p>";
+
+        try {
+            // Fetching via the Visualization API (Fastest way for Published Sheets)
+            const fleetUrl = `https://docs.google.com/spreadsheets/d/${FLEET_SHEET_ID}/gviz/tq?tqx=out:json`;
+            const orderUrl = `https://docs.google.com/spreadsheets/d/${ORDER_SHEET_ID}/gviz/tq?tqx=out:json`;
+
+            const [fleetRes, orderRes] = await Promise.all([fetch(fleetUrl), fetch(orderUrl)]);
+            const fleetTxt = await fleetRes.text();
+            const orderTxt = await orderRes.text();
+
+            // Clean up Google's JSON wrapper
+            const fleetData = JSON.parse(fleetTxt.substring(47, fleetTxt.length - 2)).table.rows;
+            const orderData = JSON.parse(orderTxt.substring(47, orderTxt.length - 2)).table.rows;
+
+            renderGantt(orderData, fleetData);
+        } catch (e) {
+            ganttContainer.innerHTML = "<p style='color:red; padding:20px;'>❌ Connection Error. Check 'Publish to Web' settings.</p>";
+            console.error(e);
         }
-        
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', sans-serif; background-color: #000; color: white; overflow: hidden; }
-        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.2); }
+    }
 
-        #main-portal { display: none; height: 100vh; width: 100%; flex-direction: column; padding-top: 70px; }
-        .navbar { position: fixed; top: 0; left: 0; width: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; z-index: 100; box-sizing: border-box; }
-        .nav-logo { height: 30px; }
-        .nav-tabs { display: flex; gap: 5px; }
-        .tab-btn { background: transparent; color: #aaa; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
-        .tab-btn.active { color: var(--success); border-bottom: 2px solid var(--success); border-radius: 0; }
+    function renderGantt(orders, fleet) {
+        const grid = document.getElementById('gantt-grid');
+        grid.innerHTML = "";
+        let active = 0;
+        const today = new Date();
 
-        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
-        .metric-card { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px 20px; }
-        .metric-card label { font-size: 10px; color: #8f9bba; text-transform: uppercase; display: block; }
-        .metric-card .val { font-size: 24px; font-weight: 800; color: var(--success); }
+        fleet.forEach((row, index) => {
+            if (index === 0) return; // Skip headers
+            const carId = row.c[0]?.v; // Col A
+            if (!carId) return;
 
-        .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.7); border: 1px solid var(--glass-border); border-radius: 15px; overflow-y: auto; padding: 20px; }
-        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
-        .car-label { width: 220px; font-size: 11px; font-weight: 600; color: #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .car-track { flex-grow: 1; height: 24px; background: #151921; border-radius: 4px; position: relative; }
-        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
+            const carName = `${row.c[1]?.v || ''} ${row.c[4]?.v || ''} (${row.c[7]?.v || ''})`;
+            const carRow = document.createElement('div');
+            carRow.className = 'car-row';
+            carRow.innerHTML = `<div class="car-label">#${carId} ${carName}</div><div class="car-track" id="track-${carId}"></div>`;
+            grid.appendChild(carRow);
 
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; }
-        input { display: block; width: 250px; padding: 12px; margin: 10px auto; border-radius: 8px; border: 1px solid #333; background: #222; color: white; }
-    </style>
-</head>
-<body>
-    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
+            orders.forEach(ord => {
+                if (ord.c[3]?.v != carId) return; // Matches Col D in Orders
 
-    <div id="login-overlay">
-        <div class="login-box">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
-            <input type="text" id="user-field" placeholder="Username">
-            <input type="password" id="pass-field" placeholder="Password">
-            <button onclick="attemptLogin()" style="width:275px; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">AUTHORIZE ACCESS</button>
-        </div>
-    </div>
+                // Parse Dates from your Specific Columns (L and T)
+                const startStr = ord.c[11]?.f || ord.c[11]?.v;
+                const endStr = ord.c[19]?.f || ord.c[19]?.v;
+                const s = new Date(startStr);
+                const e = new Date(endStr);
 
-    <div id="main-portal">
-        <nav class="navbar">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" class="nav-logo">
-            <div class="nav-tabs">
-                <button class="tab-btn" onclick="loadFrame('receipt.html')">Digital Receipt</button>
-                <button class="tab-btn active" onclick="showHome()">Fleet Control Tower</button>
-            </div>
-            <button onclick="location.reload()" style="background:none; border:none; color:white;"><i class="fa-solid fa-power-off"></i></button>
-        </nav>
+                if (!isNaN(s) && !isNaN(e)) {
+                    if (s <= today && e >= today) active++;
 
-        <div id="home-content">
-            <div class="metrics-bar">
-                <div class="metric-card"><label>Active Rentals</label><span class="val" id="count-active">0</span></div>
-                <div class="metric-card"><label>Available Now</label><span class="val" id="count-ready">0</span></div>
-                <div class="metric-card"><label>Today Out</label><span class="val" id="count-out" style="color:var(--accent)">0</span></div>
-                <div class="metric-card"><label>Today In</label><span class="val" id="count-in" style="color:#42a5f5">0</span></div>
-            </div>
-            <div class="timeline-container">
-                <h4 style="margin-top:0; color:#8f9bba;">🗓️ Fleet Gantt Chart (Current Month)</h4>
-                <div id="gantt-grid"></div>
-            </div>
-        </div>
-        <iframe id="content-frame" style="display:none; width:100%; height:calc(100vh - 70px); border:none;" src=""></iframe>
-    </div>
+                    const startPos = (s.getDate() / 31) * 100;
+                    const duration = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
 
-    <script>
-        const ORDER_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT1FmYvA-3f9yS3vY3FmP7z_8H-y_4Z8-m9-2Fm-Pz-8H-y_4Z-M9-2Fm-Pz-8H-y_4Z-M9/pub?gid=0&output=csv"; // Temporary placeholders
-        
-        firebase.initializeApp({
-            apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
-            projectId: "brothers-egy-portal"
-        });
-        const db = firebase.firestore();
-
-        async function attemptLogin() {
-            const user = document.getElementById('user-field').value.toLowerCase();
-            const pass = document.getElementById('pass-field').value;
-            const doc = await db.collection("users").doc(user).get();
-            if (doc.exists && doc.data().password === pass) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-portal').style.display = 'flex';
-                fetchData();
-            } else { alert("Login Failed"); }
-        }
-
-        async function fetchData() {
-            // Using a simple fetch to read your public CSV data
-            const ordersRes = await fetch("https://docs.google.com/spreadsheets/d/1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM/gviz/tq?tqx=out:json");
-            const fleetRes = await fetch("https://docs.google.com/spreadsheets/d/1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk/gviz/tq?tqx=out:json");
-            
-            const ordersData = await ordersRes.text();
-            const fleetData = await fleetRes.text();
-
-            // Clean Google JSON Garbage
-            const orders = JSON.parse(ordersData.substring(47, ordersData.length - 2)).table.rows;
-            const fleet = JSON.parse(fleetData.substring(47, fleetData.length - 2)).table.rows;
-
-            renderGantt(orders, fleet);
-        }
-
-        function renderGantt(orders, fleet) {
-            const grid = document.getElementById('gantt-grid');
-            grid.innerHTML = "";
-            let active = 0;
-            const today = new Date();
-
-            fleet.forEach((row, index) => {
-                if(index === 0) return; // Skip Header
-                const carId = row.c[0]?.v;
-                if(!carId) return;
-
-                const carName = `${row.c[1]?.v} ${row.c[4]?.v} (${row.c[7]?.v})`;
-                const carRow = document.createElement('div');
-                carRow.className = 'car-row';
-                carRow.innerHTML = `<div class="car-label">#${carId} ${carName}</div><div class="car-track" id="track-${carId}"></div>`;
-                grid.appendChild(carRow);
-
-                // Check Bookings
-                orders.forEach(ord => {
-                    if(ord.c[3]?.v != carId) return;
-                    
-                    const startStr = ord.c[11]?.f || ord.c[11]?.v; // Col L
-                    const endStr = ord.c[19]?.f || ord.c[19]?.v;   // Col T
-                    
-                    const s = new Date(startStr);
-                    const e = new Date(endStr);
-
-                    if(!isNaN(s) && !isNaN(e)) {
-                        if(s <= today && e >= today) active++;
-
-                        const startPos = (s.getDate() / 31) * 100;
-                        const duration = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
-
-                        const bar = document.createElement('div');
-                        bar.className = 'booking-bar';
-                        bar.style.left = startPos + "%";
-                        bar.style.width = Math.max(duration, 3) + "%";
-                        document.getElementById(`track-${carId}`).appendChild(bar);
-                    }
-                });
+                    const bar = document.createElement('div');
+                    bar.className = 'booking-bar';
+                    bar.style.left = `${startPos}%`;
+                    bar.style.width = `${Math.max(duration, 3)}%`; // Guarantee visible bar
+                    document.getElementById(`track-${carId}`).appendChild(bar);
+                }
             });
-            document.getElementById('count-active').innerText = active;
-            document.getElementById('count-ready').innerText = fleet.length - 1 - active;
-        }
+        });
 
-        function loadFrame(url) {
-            document.getElementById('home-content').style.display = 'none';
-            const f = document.getElementById('content-frame');
-            f.style.display = 'block'; f.src = url;
-        }
+        document.getElementById('count-active').innerText = active;
+        document.getElementById('count-ready').innerText = (fleet.length - 1) - active;
+    }
 
-        function showHome() {
-            document.getElementById('content-frame').style.display = 'none';
-            document.getElementById('home-content').style.display = 'block';
-        }
-    </script>
-</body>
-</html>
+    function loadFrame(url) {
+        document.getElementById('home-content').style.display = 'none';
+        const f = document.getElementById('content-frame');
+        f.style.display = 'block'; f.src = url;
+    }
+
+    function showHome() {
+        document.getElementById('content-frame').style.display = 'none';
+        document.getElementById('home-content').style.display = 'block';
+    }
+</script>
