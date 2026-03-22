@@ -6,114 +6,74 @@
     <title>Brothers EGY - Executive Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
     <style>
         :root { 
-            --primary: #04509D; 
-            --accent: #e67e22; 
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary: #04509D; --accent: #e67e22; 
+            --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
         }
         
-        /* 1. Reset & Fix Transparency */
         body, html { 
-            margin: 0; padding: 0; height: 100%; width: 100%;
-            font-family: 'Inter', sans-serif; 
-            background-color: transparent; /* Allows video to show */
-            color: white; overflow: hidden; 
+            margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', sans-serif; 
+            background-color: #000; color: white; overflow: hidden; 
         }
 
-        /* 2. Background Video Fix */
-        .video-wrapper {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: -2; background: #000;
-        }
-        #bg-video { 
-            width: 100%; height: 100%; object-fit: cover; 
-            filter: brightness(0.4); 
-        }
+        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.4); }
 
-        /* 3. Login Gateway Fix */
+        /* Login Screen UI */
         #login-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.4); /* Less opaque to see video */
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px);
             display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
         .login-box {
-            background: rgba(15, 15, 15, 0.7); 
-            padding: 50px 40px; border-radius: 25px;
-            border: 1px solid var(--glass-border); text-align: center;
-            max-width: 400px; width: 85%;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            background: rgba(15, 15, 15, 0.8); padding: 50px 40px; border-radius: 25px;
+            border: 1px solid var(--glass-border); text-align: center; max-width: 400px; width: 85%;
         }
         .login-box img { height: 60px; margin-bottom: 20px; }
         .login-box input {
-            width: 100%; padding: 12px; margin: 15px 0; border-radius: 8px; border: none;
-            background: white; font-size: 16px; text-align: center; color: #333;
+            width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #444;
+            background: rgba(255,255,255,0.9); font-size: 14px; text-align: center; color: #333;
         }
         .login-box button {
-            width: 100%; padding: 12px; border-radius: 8px; border: none;
+            width: 100%; padding: 12px; margin-top: 15px; border-radius: 8px; border: none;
             background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s;
         }
-        .login-box button:hover { background: #0566c9; }
 
-        /* 4. Dashboard (Main Portal) */
-        #main-portal { 
-            display: none; height: 100vh; width: 100%;
-            background: transparent;
-            flex-direction: column; align-items: center; justify-content: center;
-        }
+        /* Dashboard Main UI */
+        #main-portal { display: none; height: 100vh; width: 100%; flex-direction: column; align-items: center; justify-content: center; }
 
-        /* Fixed Navigation */
         .navbar { 
-            position: fixed; top: 0; left: 0; width: 100%; 
-            background: rgba(4, 80, 157, 0.2); backdrop-filter: blur(20px); 
-            border-bottom: 1px solid var(--glass-border);
+            position: fixed; top: 0; left: 0; width: 100%; background: rgba(4, 80, 157, 0.2); 
+            backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border);
             display: flex; align-items: center; justify-content: space-between;
             padding: 10px 30px; z-index: 100; box-sizing: border-box;
         }
-        .nav-left { display: flex; align-items: center; gap: 12px; }
-        .nav-logo { height: 32px; filter: brightness(1.2); }
-        
+        .nav-logo { height: 32px; }
         .nav-tabs { display: flex; gap: 10px; }
         .tab-btn { 
             background: var(--glass-bg); color: white; border: 1px solid var(--glass-border); 
-            padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: 0.3s;
-            font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: none;
         }
         .tab-btn:hover { background: white; color: var(--primary); }
 
-        .nav-controls { display: flex; gap: 10px; }
-        .ctrl-btn { background: white; color: var(--primary); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
-        .logout-btn { background: #e74c3c; color: white; }
-
-        /* Central Content Fix */
-        .dashboard-center {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; animation: fadeInUp 0.8s ease forwards;
-        }
-        .dashboard-center h1 { font-size: 4rem; font-weight: 800; margin: 0; letter-spacing: -2px; }
-        .dashboard-center p { font-size: 1.1rem; opacity: 0.7; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* Grid Logic */
+        /* Module Center Layout */
+        .dashboard-center { text-align: center; animation: fadeInUp 0.8s ease; }
+        .dashboard-center h1 { font-size: 3.5rem; font-weight: 800; margin: 0; letter-spacing: -2px; }
         .menu-grid { display: flex; gap: 20px; margin-top: 45px; flex-wrap: wrap; justify-content: center; }
         .menu-card { 
             background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); padding: 40px 30px; 
             border-radius: 20px; border: 1px solid var(--glass-border); transition: 0.4s; cursor: pointer;
-            width: 240px; box-sizing: border-box;
+            width: 220px; box-sizing: border-box; display: none;
         }
-        .menu-card:hover { 
-            transform: translateY(-10px); 
-            background: rgba(255, 255, 255, 0.1); 
-            border-color: var(--accent);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
-        }
+        .menu-card:hover { transform: translateY(-10px); border-color: var(--accent); }
         .menu-card i { font-size: 2.5rem; color: var(--accent); margin-bottom: 20px; display: block; }
-        .menu-card h4 { margin: 0; font-size: 1.1rem; font-weight: 700; }
 
-        /* Iframe Logic */
         #content-frame { width: 100%; height: calc(100% - 60px); margin-top: 60px; border: none; background: white; display: none; }
-
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
@@ -129,102 +89,108 @@
         <div class="login-box">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Brothers Logo">
             <h2 style="margin:0; font-weight:800;">EXECUTIVE HUB</h2>
-            <p>FLEET MANAGEMENT SYSTEM V2.0</p>
-            <input type="password" id="pass-field" placeholder="••••••••" onkeypress="handleKey(event)">
-            <button onclick="checkPassword()">AUTHORIZE ACCESS</button>
-            <p id="error-msg" style="color: #ff4d4d; margin-top: 15px; display: none; font-size: 14px;">INVALID ACCESS CODE</p>
+            <p id="login-status" style="color:#aaa; font-size: 11px; margin-bottom: 20px;">FIREBASE SECURED ACCESS</p>
+            <input type="text" id="user-field" placeholder="Username">
+            <input type="password" id="pass-field" placeholder="Password">
+            <button id="login-btn" onclick="attemptLogin()">AUTHORIZE ACCESS</button>
         </div>
     </div>
 
     <div id="main-portal">
         <nav class="navbar">
-            <div class="nav-left" onclick="showHome()" style="cursor: pointer;">
+            <div onclick="showHome()" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
                 <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" class="nav-logo">
                 <span style="font-weight: 800; letter-spacing: 1px;">BROTHERS EGY</span>
             </div>
             <div class="nav-tabs">
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">Contract (EN)</button>
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">Contract (AR)</button>
+                <button class="tab-btn access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Proposal</button>
+                <button class="tab-btn access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">Contract</button>
+                <button class="tab-btn access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">إقرار المسؤولية</button>
             </div>
             <div class="nav-controls">
-                <button class="ctrl-btn" onclick="showHome()"><i class="fa-solid fa-house"></i></button>
-                <button class="ctrl-btn logout-btn" onclick="logout()"><i class="fa-solid fa-power-off"></i></button>
+                <button class="ctrl-btn" onclick="location.reload()" style="background:#e74c3c; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
             </div>
         </nav>
 
         <div id="home-content" class="dashboard-center">
             <h1>Executive Dashboard</h1>
-            <p>Professional Fleet & Management Solutions</p>
+            <p style="opacity: 0.7;">Role: <span id="display-role" style="color:var(--accent); font-weight:bold;">-</span></p>
             <div class="menu-grid">
-                <div class="menu-card" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/')">
+                <div class="menu-card access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/')">
                     <i class="fa-solid fa-file-invoice-dollar"></i>
                     <h4>Price Proposal</h4>
                 </div>
-                <div class="menu-card" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/')">
+                <div class="menu-card access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/')">
                     <i class="fa-solid fa-shield-halved"></i>
-                    <h4>Contract (EN)</h4>
+                    <h4>English Contract</h4>
                 </div>
-                <div class="menu-card" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/')">
-                    <i class="fa-solid fa-earth-africa"></i>
-                    <h4>Contract (AR)</h4>
+                <div class="menu-card access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/')">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <h4>Arabic (Liability)</h4>
                 </div>
             </div>
         </div>
-
         <iframe id="content-frame" src=""></iframe>
     </div>
 
     <script>
-        const PASS = "Brothers2026"; 
+        // 1. Initialize Firebase using your provided config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+            authDomain: "brothers-egy-portal.firebaseapp.com",
+            projectId: "brothers-egy-portal",
+            storageBucket: "brothers-egy-portal.firebasestorage.app",
+            messagingSenderId: "673531280760",
+            appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d",
+            measurementId: "G-YV2SHPQYT9"
+        };
 
-        function checkPassword() {
-            const input = document.getElementById('pass-field').value;
-            if(input === PASS) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-portal').style.display = 'flex';
-            } else {
-                document.getElementById('error-msg').style.display = 'block';
-                document.getElementById('pass-field').value = "";
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        async function attemptLogin() {
+            const user = document.getElementById('user-field').value.toLowerCase();
+            const pass = document.getElementById('pass-field').value;
+            const status = document.getElementById('login-status');
+
+            if(!user || !pass) return;
+
+            try {
+                // Fetch user permissions from Firestore
+                const userDoc = await db.collection("users").doc(user).get();
+                
+                if (userDoc.exists && userDoc.data().password === pass) {
+                    const data = userDoc.data();
+                    applyPermissions(data.access);
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('main-portal').style.display = 'flex';
+                    document.getElementById('display-role').innerText = data.role || "Employee";
+                } else {
+                    throw new Error("Invalid Credentials");
+                }
+            } catch (err) {
+                status.innerText = "ACCESS DENIED: " + err.message;
+                status.style.color = "#ff4d4d";
             }
         }
 
-        function handleKey(e) { if(e.key === "Enter") checkPassword(); }
+        function applyPermissions(accessArray) {
+            // Mapping: 1=Quote, 2=Contract EN, 3=Contract AR
+            if (accessArray.includes(1)) document.querySelectorAll('.access-quote').forEach(el => el.style.display = 'block');
+            if (accessArray.includes(2)) document.querySelectorAll('.access-en').forEach(el => el.style.display = 'block');
+            if (accessArray.includes(3)) document.querySelectorAll('.access-ar').forEach(el => el.style.display = 'block');
+        }
 
         function loadFrame(url, btn) {
             document.getElementById('home-content').style.display = 'none';
             const f = document.getElementById('content-frame');
-            f.style.display = 'block';
-            f.src = url;
-            
-            // UI Button states
-            document.querySelectorAll('.tab-btn').forEach(b => {
-                b.style.background = 'rgba(255, 255, 255, 0.05)';
-                b.style.color = 'white';
-            });
-            if(btn) {
-                btn.style.background = 'white';
-                btn.style.color = '#04509D';
-            }
+            f.style.display = 'block'; f.src = url;
         }
 
         function showHome() {
             document.getElementById('content-frame').style.display = 'none';
-            document.getElementById('content-frame').src = "";
-            document.getElementById('home-content').style.display = 'flex';
-            document.querySelectorAll('.tab-btn').forEach(b => {
-                b.style.background = 'rgba(255, 255, 255, 0.05)';
-                b.style.color = 'white';
-            });
+            document.getElementById('home-content').style.display = 'block';
         }
-
-        function logout() { location.reload(); }
-        
-        // Final autoplay kick for mobile browsers
-        window.addEventListener('touchstart', () => {
-            const video = document.getElementById('bg-video');
-            if (video.paused) video.play();
-        }, {once: true});
     </script>
 </body>
 </html>
