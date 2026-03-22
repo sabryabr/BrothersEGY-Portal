@@ -11,48 +11,51 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; --glass: rgba(255,255,255,0.05); }
-        body, html { margin: 0; padding: 0; background-color: #000; color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
+        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; }
+        body, html { margin: 0; padding: 0; background: #0a0a0a; color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
         
-        .video-wrapper { position: fixed; inset: 0; z-index: -1; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.25); }
+        /* Video & Fallback Background */
+        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
 
         #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
         input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
-        button.login-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-
+        
         #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
         .navbar { position: fixed; top: 0; width: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; box-sizing: border-box; z-index: 100; }
         
-        .nav-tabs { display: flex; gap: 5px; }
-        .tab-btn { background: var(--glass); color: #aaa; border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.3s; }
-        .tab-btn:hover { background: white; color: black; }
-        .tab-btn.active { border-color: var(--success); color: var(--success); }
+        .nav-tabs { display: flex; gap: 8px; }
+        .tab-btn { background: rgba(255,255,255,0.05); color: #aaa; border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; }
+        .tab-btn.active { border-color: var(--success); color: var(--success); background: rgba(80, 250, 123, 0.1); }
 
         .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
-        .metric-card { background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 12px; padding: 15px; }
-        .metric-card label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .metric-card { background: rgba(255,255,255,0.03); border: 1px solid #333; border-radius: 12px; padding: 15px; }
+        .metric-card label { font-size: 9px; color: #888; text-transform: uppercase; }
         .metric-card div { font-size: 22px; font-weight: 800; color: var(--success); }
 
         .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
         .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
         .car-label { width: 220px; font-size: 10px; color: #ccc; font-weight: 600; }
-        .car-track { flex-grow: 1; height: 22px; background: #111; border-radius: 4px; position: relative; }
-        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.85; box-shadow: 0 0 10px rgba(255,75,75,0.3); }
+        .car-track { flex-grow: 1; height: 20px; background: #111; border-radius: 4px; position: relative; }
+        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
 
         #content-frame { display: none; width: 100%; height: calc(100vh - 70px); border: none; background: white; }
     </style>
 </head>
 <body>
-    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
+    <div class="video-wrapper">
+        <video autoplay muted loop playsinline id="bg-video">
+            <source src="background.mp4" type="video/mp4">
+        </video>
+    </div>
 
     <div id="login-overlay">
         <div class="login-box">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
             <input type="text" id="user-field" placeholder="Username">
             <input type="password" id="pass-field" placeholder="Password">
-            <button class="login-btn" onclick="attemptLogin()">AUTHORIZE ACCESS</button>
+            <button onclick="attemptLogin()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">ACCESS HUB</button>
         </div>
     </div>
 
@@ -73,18 +76,19 @@
             <div class="metrics-bar">
                 <div class="metric-card"><label>Active Rentals</label><div id="m-active">0</div></div>
                 <div class="metric-card"><label>Available Now</label><div id="m-ready">0</div></div>
-                <div class="metric-card"><label>Today Out</label><div id="m-out" style="color:#e67e22">0</div></div>
-                <div class="metric-card"><label>Today In</label><div id="m-in" style="color:#42a5f5">0</div></div>
+                <div class="metric-card"><label>Out Today</label><div id="m-out" style="color:#e67e22">0</div></div>
+                <div class="metric-card"><label>In Today</label><div id="m-in" style="color:#42a5f5">0</div></div>
             </div>
             <div class="timeline-container">
-                <h4 id="status-msg" style="margin:0 0 15px; font-size: 12px; color:#888; text-transform: uppercase;">🗓️ Live Fleet Radar (3 Year History)</h4>
+                <h4 id="status-msg" style="margin:0 0 15px; font-size: 11px; color:#888; text-transform: uppercase;">🗓️ Fleet Gantt Chart</h4>
                 <div id="gantt-grid"></div>
             </div>
         </div>
-        <iframe id="content-frame" src=""></iframe>
+        <iframe id="content-frame"></iframe>
     </div>
 
     <script>
+        // SHEET IDs from your screenshots
         const FLEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
         const ORDER_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
 
@@ -98,25 +102,25 @@
             if (doc.exists && doc.data().password === p) {
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('main-portal').style.display = 'flex';
-                fetchSheets();
-            } else { alert("Access Denied"); }
+                fetchData();
+            } else { alert("Login Error"); }
         }
 
-        async function fetchSheets() {
-            document.getElementById('status-msg').innerText = "📡 Syncing Cloud Data...";
+        async function fetchData() {
+            document.getElementById('status-msg').innerText = "📡 Connecting to Live Sheets...";
             try {
-                // Using a proxy to avoid CONNECTION ERROR
-                const fleetUrl = `https://opensheet.elk.sh/${FLEET_ID}/صفحة الإدخالات لقاعدة البيانات`;
-                const orderUrl = `https://opensheet.elk.sh/${ORDER_ID}/صفحة الإدخالات للإيجارات`;
+                // Using a more direct JSON fetch method
+                const fUrl = `https://opensheet.elk.sh/${FLEET_ID}/1`; 
+                const oUrl = `https://opensheet.elk.sh/${ORDER_ID}/1`;
 
-                const [fRes, oRes] = await Promise.all([fetch(fleetUrl), fetch(orderUrl)]);
+                const [fRes, oRes] = await Promise.all([fetch(fUrl), fetch(oUrl)]);
                 const fleet = await fRes.json();
                 const orders = await oRes.json();
 
                 render(fleet, orders);
-                document.getElementById('status-msg').innerText = "🗓️ Fleet Gantt Chart (Current Month)";
+                document.getElementById('status-msg').innerText = "🗓️ LIVE FLEET RADAR";
             } catch (e) {
-                document.getElementById('status-msg').innerText = "❌ DATA SYNC ERROR - CHECK PERMISSIONS";
+                document.getElementById('status-msg').innerText = "❌ SYNC ERROR: Ensure Sheets are Published to Web";
             }
         }
 
@@ -126,18 +130,19 @@
             let active = 0; const today = new Date();
 
             fleet.forEach(car => {
-                const id = car["No."] || car["ID"];
+                const id = car["No."] || car["ID"] || Object.values(car)[0];
                 if (!id || id === "No.") return;
-                
-                const name = `${car["النوع"] || ''} ${car["الطراز"] || ''} (${car["سنة الصنع"] || ''})`;
+
+                const name = `${car["النوع"] || ''} ${car["الطراز"] || ''}`;
                 const row = document.createElement('div');
                 row.className = 'car-row';
                 row.innerHTML = `<div class="car-label">#${id} ${name}</div><div class="car-track" id="track-${id}"></div>`;
                 grid.appendChild(row);
 
                 orders.forEach(ord => {
-                    if (ord["كود السيارة"] != id) return;
-                    // Logic to extract dates from your specific columns
+                    const carCode = ord["كود السيارة"] || ord["كود المركبة"];
+                    if (carCode != id) return;
+
                     const s = new Date(ord["بداية التعاقد"]);
                     const e = new Date(ord["نهاية التعاقد"]);
 
@@ -148,7 +153,7 @@
                         const bar = document.createElement('div');
                         bar.className = 'booking-bar';
                         bar.style.left = start + "%";
-                        bar.style.width = Math.max(width, 2) + "%";
+                        bar.style.width = Math.max(width, 3) + "%";
                         document.getElementById(`track-${id}`).appendChild(bar);
                     }
                 });
