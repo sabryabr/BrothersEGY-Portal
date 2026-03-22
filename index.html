@@ -27,31 +27,39 @@
         .login-box input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #444; background: rgba(255,255,255,0.9); font-size: 14px; text-align: center; color: #333; }
         .login-box button { width: 100%; padding: 12px; margin-top: 15px; border-radius: 8px; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; }
 
-        #main-portal { display: none; height: 100vh; width: 100%; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10vh; }
+        #main-portal { display: none; height: 100vh; width: 100%; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 80px; }
         .navbar { position: fixed; top: 0; left: 0; width: 100%; background: rgba(4, 80, 157, 0.2); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; z-index: 100; box-sizing: border-box; }
         .nav-logo { height: 32px; }
         .nav-tabs { display: flex; gap: 8px; }
         .tab-btn { background: var(--glass-bg); color: white; border: 1px solid var(--glass-border); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; display: none; }
         .tab-btn:hover { background: white; color: var(--primary); }
 
-        .dashboard-center { text-align: center; width: 90%; max-width: 1200px; }
-        .dashboard-center h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 5px; }
+        .dashboard-center { text-align: center; width: 95%; max-width: 1400px; margin-top: 20px; }
+        .dashboard-center h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; letter-spacing: -1px; }
 
+        /* Fleet Dashboard List View */
         #fleet-status-grid { 
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
-            gap: 15px; margin-top: 30px; height: 60vh; overflow-y: auto; padding: 20px; 
+            display: flex; flex-direction: column; gap: 10px; 
+            margin-top: 20px; height: 70vh; overflow-y: auto; padding: 10px;
+            scrollbar-width: thin; scrollbar-color: var(--primary) transparent;
         }
-        .car-status-card { 
-            background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); 
-            border: 1px solid var(--glass-border); border-radius: 12px; 
-            padding: 18px; text-align: left; transition: 0.3s;
+        .car-status-row { 
+            display: grid; grid-template-columns: 80px 1.5fr 1fr 1fr 100px;
+            align-items: center; background: rgba(255,255,255,0.03); 
+            backdrop-filter: blur(5px); border: 1px solid var(--glass-border);
+            border-radius: 8px; padding: 12px 25px; transition: 0.2s;
         }
-        .status-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; }
-        .dot-rented { background: var(--rented); box-shadow: 0 0 12px var(--rented); }
+        .car-status-row:hover { background: rgba(255,255,255,0.08); border-color: var(--primary); }
+        
+        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 12px; }
+        .dot-rented { background: var(--rented); box-shadow: 0 0 10px var(--rented); }
         .dot-available { background: var(--available); }
-        .car-id { font-size: 10px; font-weight: 800; color: var(--accent); display: block; margin-bottom: 6px; }
-        .car-model { font-size: 15px; font-weight: 700; margin: 0; display: flex; align-items: center; }
-        .car-plate { font-size: 11px; opacity: 0.7; margin-top: 6px; font-weight: 600; }
+        
+        .asset-tag { font-size: 11px; font-weight: 800; color: var(--accent); opacity: 0.8; }
+        .model-text { font-size: 16px; font-weight: 700; color: white; }
+        .year-text { font-size: 14px; font-weight: 400; color: #aaa; margin-left: 8px; }
+        .plate-text { font-size: 14px; font-weight: 600; color: #ddd; letter-spacing: 1px; }
+        .status-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; text-align: right; }
 
         .ctrl-btn { background: white; color: var(--primary); border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         #content-frame { width: 100%; height: calc(100% - 60px); margin-top: 60px; border: none; background: white; display: none; }
@@ -64,7 +72,7 @@
         <div class="login-box">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Logo">
             <h2>EXECUTIVE HUB</h2>
-            <p id="login-status" style="font-size: 10px; opacity: 0.5;">SECURED ACCESS V3.1</p>
+            <p id="login-status" style="font-size: 10px; opacity: 0.5;">SECURED ACCESS V3.2</p>
             <input type="text" id="user-field" placeholder="Username">
             <input type="password" id="pass-field" placeholder="Password">
             <button onclick="attemptLogin()">AUTHORIZE ACCESS</button>
@@ -92,7 +100,6 @@
 
         <div id="home-content" class="dashboard-center">
             <h1>Fleet Control Tower</h1>
-            <p id="radar-status" style="font-size: 12px; opacity: 0.7;">SYNCING WITH CLOUD DATABASE...</p>
             <div id="fleet-status-grid"></div>
         </div>
         <iframe id="content-frame" src=""></iframe>
@@ -126,39 +133,34 @@
         }
 
         function applyPermissions(accessArray) {
-            if (accessArray.includes(1)) document.querySelectorAll('.access-quote').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(2)) document.querySelectorAll('.access-en').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(3)) document.querySelectorAll('.access-ar').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(4)) document.querySelectorAll('.access-rec').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(5)) document.querySelectorAll('.access-fleet').forEach(el => el.style.display = 'block');
+            const mappings = {1: '.access-quote', 2: '.access-en', 3: '.access-ar', 4: '.access-rec', 5: '.access-fleet'};
+            accessArray.forEach(id => { if(mappings[id]) document.querySelectorAll(mappings[id]).forEach(el => el.style.display = 'block'); });
         }
 
         function syncFleet() {
-            // Updated to sort by Document ID directly
             db.collection("fleet").onSnapshot((snapshot) => {
                 const grid = document.getElementById('fleet-status-grid');
-                const statusText = document.getElementById('radar-status');
                 grid.innerHTML = "";
-                
-                if (snapshot.empty) {
-                    statusText.innerText = "NO CARS FOUND IN DATABASE";
-                    return;
-                }
-
-                // Sorting manually to ensure numerical order (33, 34, 35...)
                 const sortedDocs = snapshot.docs.sort((a, b) => parseInt(a.id) - parseInt(b.id));
 
                 sortedDocs.forEach((doc) => {
                     const car = doc.data();
                     const statusClass = car.status === 'rented' ? 'dot-rented' : 'dot-available';
+                    const statusText = car.status === 'rented' ? 'In Use' : 'Ready';
+                    const statusColor = car.status === 'rented' ? 'var(--rented)' : 'var(--available)';
+                    
                     grid.innerHTML += `
-                        <div class="car-status-card">
-                            <span class="car-id">ASSET #${doc.id}</span>
-                            <p class="car-model"><span class="status-dot ${statusClass}"></span>${car.model}</p>
-                            <p class="car-plate">${car.plate}</p>
+                        <div class="car-status-row">
+                            <span class="asset-tag">#${doc.id}</span>
+                            <div class="model-text">
+                                <span class="status-dot ${statusClass}"></span>
+                                ${car.model} <span class="year-text">(${car.year || 'N/A'})</span>
+                            </div>
+                            <div class="plate-text">${car.plate}</div>
+                            <div style="opacity: 0.5; font-size: 11px;">Next Payment: ${car.owner_payment_cycle || 45} Days</div>
+                            <div class="status-label" style="color:${statusColor}">${statusText}</div>
                         </div>`;
                 });
-                statusText.innerText = "REAL-TIME AVAILABILITY & STATUS";
             });
         }
 
