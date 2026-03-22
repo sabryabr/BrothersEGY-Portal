@@ -1,102 +1,161 @@
-<script>
-    // These IDs are pulled directly from your "Publish" screenshots
-    const FLEET_SHEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
-    const ORDER_SHEET_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brothers EGY - Executive Portal</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-    firebase.initializeApp({
-        apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
-        projectId: "brothers-egy-portal"
-    });
-    const db = firebase.firestore();
+    <style>
+        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; }
+        body, html { margin: 0; padding: 0; background-color: #000; color: white; font-family: 'Inter', sans-serif; height: 100%; overflow: hidden; }
+        
+        /* Background Video */
+        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.2); }
 
-    async function attemptLogin() {
-        const user = document.getElementById('user-field').value.toLowerCase();
-        const pass = document.getElementById('pass-field').value;
-        const doc = await db.collection("users").doc(user).get();
-        if (doc.exists && doc.data().password === pass) {
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('main-portal').style.display = 'flex';
-            fetchPublicData();
-        } else { alert("Login Failed"); }
-    }
+        /* Login Overlay */
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
+        .login-box input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    async function fetchPublicData() {
-        const ganttContainer = document.getElementById('gantt-grid');
-        ganttContainer.innerHTML = "<p style='padding:20px; color:var(--accent)'>📡 Syncing with Google Sheets...</p>";
+        /* Portal Layout */
+        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
+        .navbar { position: fixed; top: 0; width: 100%; background: rgba(0,0,0,0.9); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; box-sizing: border-box; z-index: 100; }
+        .tab-btn { background: transparent; color: #aaa; border: none; padding: 10px 15px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .tab-btn.active { color: var(--success); border-bottom: 2px solid var(--success); }
 
-        try {
-            // Fetching via the Visualization API (Fastest way for Published Sheets)
-            const fleetUrl = `https://docs.google.com/spreadsheets/d/${FLEET_SHEET_ID}/gviz/tq?tqx=out:json`;
-            const orderUrl = `https://docs.google.com/spreadsheets/d/${ORDER_SHEET_ID}/gviz/tq?tqx=out:json`;
+        /* Dashboard Content */
+        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
+        .metric-card { background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 12px; padding: 15px; }
+        .metric-card label { font-size: 10px; color: #888; text-transform: uppercase; }
+        .metric-card div { font-size: 24px; font-weight: 800; color: var(--success); }
 
-            const [fleetRes, orderRes] = await Promise.all([fetch(fleetUrl), fetch(orderUrl)]);
-            const fleetTxt = await fleetRes.text();
-            const orderTxt = await orderRes.text();
+        .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
+        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
+        .car-label { width: 220px; font-size: 11px; color: #ccc; }
+        .car-track { flex-grow: 1; height: 24px; background: #111; border-radius: 4px; position: relative; }
+        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
 
-            // Clean up Google's JSON wrapper
-            const fleetData = JSON.parse(fleetTxt.substring(47, fleetTxt.length - 2)).table.rows;
-            const orderData = JSON.parse(orderTxt.substring(47, orderTxt.length - 2)).table.rows;
+    <div id="login-overlay">
+        <div class="login-box">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px; margin-bottom:20px;">
+            <input type="text" id="user-field" placeholder="Username">
+            <input type="password" id="pass-field" placeholder="Password">
+            <button onclick="attemptLogin()">AUTHORIZE ACCESS</button>
+        </div>
+    </div>
 
-            renderGantt(orderData, fleetData);
-        } catch (e) {
-            ganttContainer.innerHTML = "<p style='color:red; padding:20px;'>❌ Connection Error. Check 'Publish to Web' settings.</p>";
-            console.error(e);
+    <div id="main-portal">
+        <nav class="navbar">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px;">
+            <div>
+                <button class="tab-btn" onclick="window.open('receipt.html','_self')">Digital Receipt</button>
+                <button class="tab-btn active">Fleet Control Tower</button>
+            </div>
+            <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+        </nav>
+
+        <div class="metrics-bar">
+            <div class="metric-card"><label>Active Rentals</label><div id="m-active">0</div></div>
+            <div class="metric-card"><label>Available Now</label><div id="m-ready">0</div></div>
+            <div class="metric-card"><label>Today Out</label><div id="m-out" style="color:#e67e22">0</div></div>
+            <div class="metric-card"><label>Today In</label><div id="m-in" style="color:#42a5f5">0</div></div>
+        </div>
+
+        <div class="timeline-container">
+            <h4 id="status-msg" style="margin:0 0 15px; color:#888;">🗓️ Fleet Gantt Chart (Current Month)</h4>
+            <div id="gantt-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIG - Replace only this key
+        const GOOGLE_KEY = "AIzaSyA1dKYFgW45oXnEZmxX9yfbgkos5AbpzSk"; 
+        const FLEET_ID = "1tQVkPj7tCnrKsHEIs04a1WzzC04jpOWuLsXgXOkVMkk";
+        const ORDER_ID = "1T6j2xnRBTY31crQcJHioKurs4Rvaj-VlEQkm6joGxGM";
+
+        firebase.initializeApp({ apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal" });
+        const db = firebase.firestore();
+
+        async function attemptLogin() {
+            const u = document.getElementById('user-field').value.toLowerCase();
+            const p = document.getElementById('pass-field').value;
+            const doc = await db.collection("users").doc(u).get();
+            if (doc.exists && doc.data().password === p) {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('main-portal').style.display = 'flex';
+                fetchSheets();
+            } else { alert("Access Denied"); }
         }
-    }
 
-    function renderGantt(orders, fleet) {
-        const grid = document.getElementById('gantt-grid');
-        grid.innerHTML = "";
-        let active = 0;
-        const today = new Date();
+        async function fetchSheets() {
+            document.getElementById('status-msg').innerText = "📡 SYNCING WITH GOOGLE SHEETS...";
+            try {
+                const fleetUrl = `https://docs.google.com/spreadsheets/d/${FLEET_ID}/gviz/tq?tqx=out:json`;
+                const orderUrl = `https://docs.google.com/spreadsheets/d/${ORDER_ID}/gviz/tq?tqx=out:json`;
 
-        fleet.forEach((row, index) => {
-            if (index === 0) return; // Skip headers
-            const carId = row.c[0]?.v; // Col A
-            if (!carId) return;
+                const [fRes, oRes] = await Promise.all([fetch(fleetUrl), fetch(orderUrl)]);
+                const fTxt = await fRes.text();
+                const oTxt = await oRes.text();
 
-            const carName = `${row.c[1]?.v || ''} ${row.c[4]?.v || ''} (${row.c[7]?.v || ''})`;
-            const carRow = document.createElement('div');
-            carRow.className = 'car-row';
-            carRow.innerHTML = `<div class="car-label">#${carId} ${carName}</div><div class="car-track" id="track-${carId}"></div>`;
-            grid.appendChild(carRow);
+                const fleet = JSON.parse(fTxt.substring(47, fTxt.length - 2)).table.rows;
+                const orders = JSON.parse(oTxt.substring(47, oTxt.length - 2)).table.rows;
 
-            orders.forEach(ord => {
-                if (ord.c[3]?.v != carId) return; // Matches Col D in Orders
+                render(fleet, orders);
+                document.getElementById('status-msg').innerText = "🗓️ Fleet Gantt Chart (Current Month)";
+            } catch (e) {
+                document.getElementById('status-msg').innerText = "❌ CONNECTION ERROR";
+                console.error(e);
+            }
+        }
 
-                // Parse Dates from your Specific Columns (L and T)
-                const startStr = ord.c[11]?.f || ord.c[11]?.v;
-                const endStr = ord.c[19]?.f || ord.c[19]?.v;
-                const s = new Date(startStr);
-                const e = new Date(endStr);
+        function render(fleet, orders) {
+            const grid = document.getElementById('gantt-grid');
+            grid.innerHTML = "";
+            let active = 0;
+            const today = new Date();
 
-                if (!isNaN(s) && !isNaN(e)) {
-                    if (s <= today && e >= today) active++;
+            fleet.slice(1).forEach(row => {
+                const id = row.c[0]?.v;
+                if (!id) return;
+                
+                const name = `${row.c[1]?.v || ''} ${row.c[4]?.v || ''} (${row.c[7]?.v || ''})`;
+                const div = document.createElement('div');
+                div.className = 'car-row';
+                div.innerHTML = `<div class="car-label">#${id} ${name}</div><div class="car-track" id="track-${id}"></div>`;
+                grid.appendChild(div);
 
-                    const startPos = (s.getDate() / 31) * 100;
-                    const duration = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
+                orders.forEach(ord => {
+                    if (ord.c[3]?.v != id) return;
+                    const s = new Date(ord.c[11]?.f || ord.c[11]?.v);
+                    const e = new Date(ord.c[19]?.f || ord.c[19]?.v);
 
-                    const bar = document.createElement('div');
-                    bar.className = 'booking-bar';
-                    bar.style.left = `${startPos}%`;
-                    bar.style.width = `${Math.max(duration, 3)}%`; // Guarantee visible bar
-                    document.getElementById(`track-${carId}`).appendChild(bar);
-                }
+                    if (!isNaN(s) && !isNaN(e)) {
+                        if (s <= today && e >= today) active++;
+                        const start = (s.getDate() / 31) * 100;
+                        const width = ((e - s) / (1000 * 60 * 60 * 24 * 31)) * 100;
+                        const bar = document.createElement('div');
+                        bar.className = 'booking-bar';
+                        bar.style.left = start + "%";
+                        bar.style.width = Math.max(width, 2) + "%";
+                        document.getElementById(`track-${id}`).appendChild(bar);
+                    }
+                });
             });
-        });
 
-        document.getElementById('count-active').innerText = active;
-        document.getElementById('count-ready').innerText = (fleet.length - 1) - active;
-    }
-
-    function loadFrame(url) {
-        document.getElementById('home-content').style.display = 'none';
-        const f = document.getElementById('content-frame');
-        f.style.display = 'block'; f.src = url;
-    }
-
-    function showHome() {
-        document.getElementById('content-frame').style.display = 'none';
-        document.getElementById('home-content').style.display = 'block';
-    }
-</script>
+            document.getElementById('m-active').innerText = active;
+            document.getElementById('m-ready').innerText = (fleet.length - 1) - active;
+        }
+    </script>
+</body>
+</html>
