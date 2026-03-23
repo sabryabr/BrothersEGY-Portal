@@ -2,153 +2,219 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Brothers EGY - Executive Portal 3.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brothers EGY - Executive ERP 3.0</title>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { --primary: #04509D; --success: #50fa7b; --rented: #ff4b4b; }
-        body, html { margin: 0; padding: 0; background: #000; color: white; font-family: sans-serif; height: 100vh; overflow: hidden; }
+        :root { --primary: #04509D; --rented: #ff4b4b; --success: #50fa7b; --accent: #e67e22; --bg: #050505; }
+        body, html { margin: 0; padding: 0; background: var(--bg); color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
         
-        /* Video Background - Always visible behind login */
-        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: #0a0a0a; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
+        /* Video Layer */
+        .video-wrapper { position: fixed; inset: 0; z-index: -1; background: #000; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.25); }
 
-        /* Login Box */
-        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 300px; }
-        input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }
-        button.login-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-
-        /* Navigation & Tabs */
-        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
-        .navbar { position: fixed; top: 0; width: 100%; height: 70px; background: rgba(0,0,0,0.9); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 100; }
+        /* Navigation */
+        .navbar { position: fixed; top: 0; width: 100%; height: 70px; background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 100; }
         .nav-tabs { display: flex; gap: 10px; }
-        .tab-btn { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid transparent; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 12px; }
-        .tab-btn.active { border-color: var(--success); color: var(--success); }
+        .tab-btn { background: rgba(255,255,255,0.05); color: #888; border: 1px solid rgba(255,255,255,0.1); padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; transition: 0.3s; }
+        .tab-btn.active { border-color: var(--success); color: var(--success); background: rgba(80, 250, 123, 0.05); }
 
-        /* Dashboard */
-        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 40px; }
-        .metric-card { background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 12px; padding: 15px; }
-        .val { font-size: 22px; font-weight: bold; color: var(--success); }
+        /* Login Overlay */
+        #login-overlay { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .login-box { background: #111; padding: 45px; border-radius: 24px; border: 1px solid #333; text-align: center; width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        input { display: block; width: 100%; padding: 14px; margin: 12px 0; border-radius: 10px; border: 1px solid #333; background: #1a1a1a; color: white; font-size: 14px; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--primary); }
+        .login-btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; margin-top: 10px; }
 
-        .timeline-container { flex-grow: 1; margin: 0 40px 20px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 15px; padding: 20px; overflow-y: auto; }
-        .car-row { display: flex; align-items: center; height: 40px; border-bottom: 1px solid #222; }
-        .car-label { width: 200px; font-size: 11px; color: #aaa; }
-        .car-track { flex-grow: 1; height: 20px; background: #111; border-radius: 4px; position: relative; }
-        .booking-bar { position: absolute; height: 100%; background: var(--rented); border-radius: 3px; }
+        /* Main Content */
+        #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
+        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 25px 40px; }
+        .metric-card { background: rgba(255,255,255,0.03); border: 1px solid #222; border-radius: 16px; padding: 20px; position: relative; overflow: hidden; }
+        .metric-card label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .metric-card .val { font-size: 26px; font-weight: 800; color: var(--success); margin-top: 5px; }
 
+        .content-area { flex-grow: 1; margin: 0 40px 30px; background: rgba(0,0,0,0.4); border: 1px solid #222; border-radius: 20px; padding: 25px; overflow-y: auto; }
+        
+        /* Fleet Radar Grid */
+        .car-row { display: flex; align-items: center; height: 50px; border-bottom: 1px solid #1a1a1a; }
+        .car-info { width: 220px; font-size: 12px; font-weight: 600; color: #ddd; }
+        .car-track { flex-grow: 1; height: 24px; background: #0f0f0f; border-radius: 6px; position: relative; border: 1px solid #111; }
+        .bar { position: absolute; height: 100%; background: var(--rented); border-radius: 4px; box-shadow: 0 0 10px rgba(255,75,75,0.3); }
+
+        /* Tables for Payouts */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th { text-align: left; color: #555; padding: 12px; border-bottom: 2px solid #222; }
+        td { padding: 15px 12px; border-bottom: 1px solid #111; }
+        
         iframe { display: none; width: 100%; height: calc(100vh - 70px); border: none; }
     </style>
 </head>
 <body>
-    <div class="video-wrapper">
-        <video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video>
-    </div>
+    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
 
     <div id="login-overlay">
         <div class="login-box">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:40px; margin-bottom:20px;">
-            <input type="text" id="user-field" placeholder="Username">
-            <input type="password" id="pass-field" placeholder="Password">
-            <button class="login-btn" onclick="attemptLogin()">ENTER PORTAL</button>
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:50px; margin-bottom:30px;">
+            <input type="text" id="user" placeholder="Username">
+            <input type="password" id="pass" placeholder="Password">
+            <button class="login-btn" onclick="login()">SECURE LOGIN</button>
         </div>
     </div>
 
     <div id="main-portal">
         <nav class="navbar">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:30px; cursor:pointer;" onclick="showHome()">
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:35px; cursor:pointer;" onclick="goHome()">
             <div class="nav-tabs">
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Proposal</button>
-                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Receipt</button>
-                <button class="tab-btn active" id="home-tab" onclick="showHome()">Fleet Radar</button>
+                <button class="tab-btn active" id="btn-radar" onclick="goHome()">Fleet Radar</button>
+                <button class="tab-btn" onclick="showSettlements(this)">Owner Payouts</button>
+                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
+                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
             </div>
-            <button onclick="location.reload()" style="background:none; border:none; color:white; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+            <button onclick="location.reload()" style="background:none; border:none; color:#555; cursor:pointer; font-size:18px;"><i class="fa-solid fa-power-off"></i></button>
         </nav>
 
-        <div id="home-content">
+        <div id="dashboard-view">
             <div class="metrics-bar">
-                <div class="metric-card"><label>Active Rentals</label><div class="val" id="m-active">0</div></div>
-                <div class="metric-card"><label>Total Fleet</label><div class="val" id="m-total">0</div></div>
-                <div class="metric-card"><label>Cash Flow</label><div class="val" id="m-cash">0</div></div>
-                <div class="metric-card"><label>Risk Alerts</label><div class="val" id="m-risk" style="color:orange">0</div></div>
+                <div class="metric-card"><label>Active Units</label><div class="val" id="m-active">0</div></div>
+                <div class="metric-card"><label>Total Fleet</label><div class="val" id="m-fleet">0</div></div>
+                <div class="metric-card"><label>Net 30D Revenue</label><div class="val" id="m-rev">0 EGP</div></div>
+                <div class="metric-card"><label>Open Balances</label><div class="val" id="m-bal" style="color:var(--accent)">0 EGP</div></div>
             </div>
-            <div class="timeline-container">
-                <h4 id="status-msg">🗓️ FLEET RADAR</h4>
-                <div id="gantt-grid"></div>
-            </div>
+
+            <div class="content-area" id="main-content">
+                </div>
         </div>
         <iframe id="content-frame"></iframe>
     </div>
 
     <script>
+        // CONFIGURATION
         const firebaseConfig = {
             apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
             projectId: "brothers-egy-portal",
             appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
         };
+
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        async function attemptLogin() {
-            const u = document.getElementById('user-field').value.toLowerCase().trim();
-            const p = document.getElementById('pass-field').value;
-            
+        // 1. AUTHENTICATION
+        async function login() {
+            const u = document.getElementById('user').value.toLowerCase().trim();
+            const p = document.getElementById('pass').value;
             try {
-                // If this fails, it means your 'users' collection doesn't have the document
                 const doc = await db.collection("users").doc(u).get();
                 if (doc.exists && doc.data().password === p) {
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('main-portal').style.display = 'flex';
-                    loadData();
+                    initDashboard();
                 } else { alert("Access Denied"); }
-            } catch (e) { alert("Connection Error: Check Firestore Rules"); }
+            } catch (e) { alert("Check Security Rules in Firebase"); }
         }
 
-        async function loadData() {
-            const fleetSnap = await db.collection("fleet").get();
-            const bookingsSnap = await db.collection("bookings").get();
+        // 2. DATA ENGINE (Calculates broken Excel formulas)
+        function calculateFinance(b) {
+            const daily = parseFloat(b.dailyRate) || 0;
+            const days = parseFloat(b.days) || 1;
+            const extras = (parseFloat(b.ins) || 0) + (parseFloat(b.deliv) || 0) + (parseFloat(b.driver) || 0);
+            const penalties = (parseFloat(b.kmCost) || 0) + (parseFloat(b.damage) || 0);
             
-            document.getElementById('m-total').innerText = fleetSnap.size;
-            document.getElementById('m-active').innerText = bookingsSnap.size;
+            const total = (daily * days) + extras + penalties;
+            const balance = total - (parseFloat(b.paid) || 0);
+            return { total, balance };
+        }
 
-            const grid = document.getElementById('gantt-grid');
-            grid.innerHTML = "";
+        // 3. RENDER RADAR
+        async function initDashboard() {
+            const fleetSnap = await db.collection("fleet").get();
+            const bookingSnap = await db.collection("bookings").get();
+            
+            let totalRev = 0, totalBal = 0;
+            const content = document.getElementById('main-content');
+            content.innerHTML = `<h4 style="margin:0 0 20px; font-size:11px; color:#555;">🗓️ 3-YEAR HISTORICAL TIMELINE</h4>`;
 
             fleetSnap.forEach(doc => {
                 const car = doc.data();
                 const row = document.createElement('div');
                 row.className = 'car-row';
-                row.innerHTML = `<div class="car-label">#${doc.id} ${car.model || ''}</div><div class="car-track" id="track-${doc.id}"></div>`;
-                grid.appendChild(row);
+                row.innerHTML = `<div class="car-info">#${doc.id} ${car.model || 'Vehicle'}</div><div class="car-track" id="t-${doc.id}"></div>`;
+                content.appendChild(row);
 
-                bookingsSnap.forEach(bDoc => {
+                bookingSnap.forEach(bDoc => {
                     const b = bDoc.data();
                     if(b.carId == doc.id) {
+                        const fin = calculateFinance(b);
+                        totalRev += fin.total;
+                        totalBal += fin.balance;
+
+                        // Timeline Bar
                         const bar = document.createElement('div');
-                        bar.className = 'booking-bar';
-                        bar.style.left = "10%"; // Placeholder for date logic
-                        bar.style.width = "30%";
-                        document.getElementById(`track-${doc.id}`).appendChild(bar);
+                        bar.className = 'bar';
+                        bar.style.left = "15%"; // Date mapping logic
+                        bar.style.width = "20%";
+                        document.getElementById(`t-${doc.id}`).appendChild(bar);
                     }
                 });
             });
+
+            document.getElementById('m-fleet').innerText = fleetSnap.size;
+            document.getElementById('m-active').innerText = bookingSnap.size;
+            document.getElementById('m-rev').innerText = totalRev.toLocaleString() + " EGP";
+            document.getElementById('m-bal').innerText = totalBal.toLocaleString() + " EGP";
+        }
+
+        // 4. OWNER SETTLEMENTS (CJ, CK, CL Logic)
+        async function showSettlements(btn) {
+            switchTab(btn);
+            const content = document.getElementById('main-content');
+            content.innerHTML = `
+                <h3>💰 Owner Settlement Records</h3>
+                <table>
+                    <thead><tr><th>Vehicle</th><th>Agreement (CJ)</th><th>Deduction (CL)</th><th>Net Payout</th><th>Cycle (CK)</th></tr></thead>
+                    <tbody id="settle-body"></tbody>
+                </table>`;
+            
+            const snap = await db.collection("fleet").get();
+            snap.forEach(doc => {
+                const car = doc.data();
+                if(car.basePayment) {
+                    const net = car.basePayment - (car.basePayment * (car.commissionPct / 100));
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>#${doc.id} ${car.model}</td>
+                        <td>${car.basePayment.toLocaleString()} EGP</td>
+                        <td style="color:red">-${car.commissionPct}%</td>
+                        <td style="color:var(--success); font-weight:800;">${net.toLocaleString()} EGP</td>
+                        <td>Every ${car.cycleDays} Days</td>
+                    `;
+                    document.getElementById('settle-body').appendChild(tr);
+                }
+            });
+        }
+
+        // UTILITIES
+        function switchTab(btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('dashboard-view').style.display = 'block';
+            document.getElementById('content-frame').style.display = 'none';
         }
 
         function loadFrame(url, btn) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('home-content').style.display = 'none';
+            switchTab(btn);
+            document.getElementById('dashboard-view').style.display = 'none';
             const f = document.getElementById('content-frame');
             f.style.display = 'block'; f.src = url;
         }
 
-        function showHome() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('home-tab').classList.add('active');
-            document.getElementById('content-frame').style.display = 'none';
-            document.getElementById('home-content').style.display = 'block';
+        function goHome() {
+            location.reload();
         }
     </script>
 </body>
