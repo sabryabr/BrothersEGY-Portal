@@ -25,7 +25,7 @@
 
         #login-overlay { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .login-box { background: #111; padding: 45px; border-radius: 24px; border: 1px solid #333; text-align: center; width: 340px; }
-        input { display: block; width: 100%; padding: 14px; margin: 12px 0; border-radius: 10px; border: 1px solid #333; background: #1a1a1a; color: white; outline: none; }
+        input { display: block; width: 100%; padding: 14px; margin: 12px 0; border-radius: 10px; border: 1px solid #333; background: #1a1a1a; color: white; outline: none; box-sizing: border-box; }
         .login-btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; }
 
         #main-portal { display: none; flex-direction: column; height: 100vh; padding-top: 70px; }
@@ -36,6 +36,9 @@
 
         .content-area { flex-grow: 1; margin: 0 40px 30px; background: rgba(0,0,0,0.4); border: 1px solid #222; border-radius: 20px; padding: 25px; overflow-y: auto; }
         
+        /* Uploader Styling */
+        .uploader-zone { background: rgba(4, 80, 157, 0.1); border: 2px dashed var(--primary); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; }
+
         .car-row { display: flex; align-items: center; height: 50px; border-bottom: 1px solid #1a1a1a; }
         .car-info { width: 220px; font-size: 12px; color: #ddd; }
         .car-track { flex-grow: 1; height: 24px; background: #0f0f0f; border-radius: 6px; position: relative; }
@@ -56,7 +59,7 @@
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:50px; margin-bottom:30px;">
             <input type="text" id="user" placeholder="Username">
             <input type="password" id="pass" placeholder="Password">
-            <button class="login-btn" onclick="login()">ENTER ERP</button>
+            <button class="login-btn" onclick="login()">SECURE LOGIN</button>
         </div>
     </div>
 
@@ -64,10 +67,9 @@
         <nav class="navbar">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:35px; cursor:pointer;" onclick="location.reload()">
             <div class="nav-tabs">
-                <button class="tab-btn active" id="btn-radar" onclick="showRadar(this)">Fleet Radar</button>
+                <button class="tab-btn active" onclick="showRadar(this)">Fleet Radar</button>
                 <button class="tab-btn" onclick="showSettlements(this)">Owner Payouts</button>
-                <button class="tab-btn" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Proposal</button>
-                <button class="tab-btn" onclick="loadFrame('receipt.html', this)">Receipt</button>
+                <button class="tab-btn" onclick="showUploader(this)">Bulk Import</button>
             </div>
             <button onclick="location.reload()" style="background:none; border:none; color:#555; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
         </nav>
@@ -76,8 +78,8 @@
             <div class="metrics-bar">
                 <div class="metric-card"><label>Active Units</label><div class="val" id="m-active">0</div></div>
                 <div class="metric-card"><label>Total Fleet</label><div class="val" id="m-fleet">0</div></div>
-                <div class="metric-card"><label>Total Rev (Calculated)</label><div class="val" id="m-rev">0 EGP</div></div>
-                <div class="metric-card"><label>Open Balances</label><div class="val" id="m-bal" style="color:var(--accent)">0 EGP</div></div>
+                <div class="metric-card"><label>Revenue (Calculated)</label><div class="val" id="m-rev">0 EGP</div></div>
+                <div class="metric-card"><label>Balances</label><div class="val" id="m-bal" style="color:var(--accent)">0 EGP</div></div>
             </div>
             <div class="content-area" id="main-content"></div>
         </div>
@@ -102,80 +104,98 @@
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('main-portal').style.display = 'flex';
                     initPortal();
-                } else { alert("Wrong Credentials"); }
-            } catch (e) { alert("Check Rules: Allow Read if true"); }
-        }
-
-        // AUTO-CALCULATION ENGINE (Handles broken Excel CSV values)
-        function calculateFinance(b) {
-            const daily = parseFloat(b['سعر السيارة اليومي']) || 0;
-            const days = parseFloat(b['مدة الخدمة']) || 1;
-            const extras = (parseFloat(b['إجمالي التأمين']) || 0) + (parseFloat(b['تكلفة الاستلام/التسليم']) || 0);
-            
-            const total = (daily * days) + extras;
-            const paid = parseFloat(b['المدفوع EGP']) || 0;
-            return { total, balance: total - paid };
+                } else { alert("Login Failed"); }
+            } catch (e) { alert("Check Firebase Firestore Rules"); }
         }
 
         async function initPortal() {
-            const fleetSnap = await db.collection("fleet").get();
-            const bookingSnap = await db.collection("bookings").get();
-            
-            window.fleetData = fleetSnap;
-            window.bookingData = bookingSnap;
-            
+            window.fleetSnap = await db.collection("fleet").get();
+            window.bookingSnap = await db.collection("bookings").get();
             renderRadar();
         }
 
         function renderRadar() {
-            let totalRev = 0, totalBal = 0;
             const content = document.getElementById('main-content');
-            content.innerHTML = `<h4 style="margin:0 0 15px; font-size:11px; color:#555;">🗓️ LIVE FLEET RADAR</h4>`;
+            content.innerHTML = `<h4 style="font-size:11px; color:#555;">🗓️ FLEET RADAR TIMELINE</h4>`;
+            
+            let rev = 0, bal = 0;
 
-            window.fleetData.forEach(doc => {
+            window.fleetSnap.forEach(doc => {
                 const car = doc.data();
                 const row = document.createElement('div');
                 row.className = 'car-row';
                 row.innerHTML = `<div class="car-info">#${doc.id} ${car.model || 'Unit'}</div><div class="car-track" id="tr-${doc.id}"></div>`;
                 content.appendChild(row);
 
-                window.bookingData.forEach(bDoc => {
+                window.bookingSnap.forEach(bDoc => {
                     const b = bDoc.data();
                     if(b.carId == doc.id) {
-                        const fin = calculateFinance(b);
-                        totalRev += fin.total;
-                        totalBal += fin.balance;
-                        
+                        rev += (parseFloat(b.dailyRate) * parseFloat(b.days)) || 0;
                         const bar = document.createElement('div');
                         bar.className = 'bar';
-                        bar.style.left = "20%"; // Simple placeholder for date positioning
-                        bar.style.width = "25%";
+                        bar.style.left = "10%"; bar.style.width = "20%";
                         document.getElementById(`tr-${doc.id}`).appendChild(bar);
                     }
                 });
             });
 
-            document.getElementById('m-fleet').innerText = window.fleetData.size;
-            document.getElementById('m-rev').innerText = totalRev.toLocaleString() + " EGP";
-            document.getElementById('m-bal').innerText = totalBal.toLocaleString() + " EGP";
+            document.getElementById('m-fleet').innerText = window.fleetSnap.size;
+            document.getElementById('m-rev').innerText = rev.toLocaleString() + " EGP";
         }
 
-        async function showSettlements(btn) {
+        function showUploader(btn) {
+            switchTab(btn);
+            document.getElementById('main-content').innerHTML = `
+                <div class="uploader-zone">
+                    <h3>Emergency CSV Importer</h3>
+                    <p>Select your 'تسجيل الطلبات' CSV file to update the database via phone.</p>
+                    <input type="file" id="csvFile" accept=".csv" style="margin:20px auto;">
+                    <button class="login-btn" onclick="processUpload()">START PUMPING</button>
+                    <div id="up-status" style="margin-top:15px; font-size:12px; color:var(--success)"></div>
+                </div>`;
+        }
+
+        async function processUpload() {
+            const fileInput = document.getElementById('csvFile');
+            if (!fileInput.files[0]) return alert("Select a file first");
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const lines = e.target.result.split('\n').slice(1);
+                const status = document.getElementById('up-status');
+                
+                for (let line of lines) {
+                    const cols = line.split(',');
+                    if (cols[0]) {
+                        status.innerText = `Importing Row #${cols[0]}...`;
+                        await db.collection('bookings').doc(cols[0]).set({
+                            carId: cols[3],
+                            client: cols[2],
+                            start: cols[11],
+                            end: cols[19],
+                            dailyRate: parseFloat(cols[23]) || 0,
+                            days: parseFloat(cols[24]) || 1
+                        }, { merge: true });
+                    }
+                }
+                alert("Bulk Import Complete!");
+                location.reload();
+            };
+            reader.readAsText(fileInput.files[0]);
+        }
+
+        function showSettlements(btn) {
             switchTab(btn);
             const content = document.getElementById('main-content');
-            content.innerHTML = `<h3>💰 Owner Payout Logic (CJ, CK, CL)</h3>
-                <table><thead><tr><th>Vehicle</th><th>Agreement (CJ)</th><th>Deduction (CL)</th><th>Net Payout</th><th>Cycle (CK)</th></tr></thead>
-                <tbody id="payout-body"></tbody></table>`;
+            content.innerHTML = `<h3>💰 Owner Payout Logic</h3><table><thead><tr><th>Vehicle</th><th>Monthly (CJ)</th><th>Net Payout</th></tr></thead><tbody id="p-list"></tbody></table>`;
             
-            window.fleetData.forEach(doc => {
+            window.fleetSnap.forEach(doc => {
                 const car = doc.data();
-                if(car.basePayment) {
+                if (car.basePayment) {
                     const net = car.basePayment - (car.basePayment * (car.commissionPct / 100));
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>#${doc.id} ${car.model}</td><td>${car.basePayment.toLocaleString()} EGP</td>
-                                    <td style="color:red">-${car.commissionPct}%</td><td style="color:var(--success); font-weight:800;">${net.toLocaleString()} EGP</td>
-                                    <td>Every ${car.cycleDays} Days</td>`;
-                    document.getElementById('payout-body').appendChild(tr);
+                    tr.innerHTML = `<td>#${doc.id} ${car.model}</td><td>${car.basePayment}</td><td style="color:var(--success)">${net.toLocaleString()} EGP</td>`;
+                    document.getElementById('p-list').appendChild(tr);
                 }
             });
         }
@@ -187,17 +207,7 @@
             document.getElementById('content-frame').style.display = 'none';
         }
 
-        function loadFrame(url, btn) {
-            switchTab(btn);
-            document.getElementById('dashboard-view').style.display = 'none';
-            const f = document.getElementById('content-frame');
-            f.style.display = 'block'; f.src = url;
-        }
-
-        function showRadar(btn) {
-            switchTab(btn);
-            renderRadar();
-        }
+        function showRadar(btn) { switchTab(btn); renderRadar(); }
     </script>
 </body>
 </html>
