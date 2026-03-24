@@ -138,33 +138,55 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const lines = e.target.result.split(/\r?\n/);
-                const headers = lines[0].split(',');
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
                 
-                // Index Mapping
-                const idxNo = headers.indexOf('No.');
-                const idxCar = headers.indexOf('كود السيارة');
-                const idxRate = headers.indexOf('سعر السيارة اليومي بالجنيه المصري');
-                const idxDays = headers.indexOf('مدة الخدمة يوم');
-
+                // SMART INDEX FINDER (Finds column even if names change slightly)
+                const findIdx = (keywords) => headers.findIndex(h => keywords.some(k => h.includes(k)));
+                
+                const idxNo = findIdx(['No', 'مسلسل', 'رقم']);
+                const idxCar = findIdx(['كود السيارة', 'Car ID', 'كود السياره']);
+                const idxRate = findIdx(['سعر السيارة اليومي', 'Rate', 'السعر']);
+                const idxDays = findIdx(['مدة الخدمة يوم', 'Days', 'المده']);
+                const idxPaid = findIdx(['المدفوع', 'Paid']);
+        
+                console.log("Indices found:", { idxNo, idxCar, idxRate, idxDays });
+        
+                if (idxNo === -1 || idxCar === -1) {
+                    return alert("Error: Could not find 'No.' or 'Car ID' columns. Check CSV headers.");
+                }
+        
                 let count = 0;
+                const status = document.getElementById('status');
+                
                 for (let i = 1; i < lines.length; i++) {
-                    const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    // This regex handles commas inside currency (e.g. "1,800.00")
+                    const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ''));
+                    
                     if (cols[idxNo]) {
-                        // Formula: Rate * Days (Ignoring Excel errors)
-                        const rate = parseFloat(cols[idxRate]?.replace(/[^\d.]/g, '')) || 0;
-                        const days = parseFloat(cols[idxDays]) || 1;
+                        // Clean the numbers (Remove £, commas, spaces)
+                        const cleanNum = (str) => parseFloat(str?.replace(/[^\d.]/g, '')) || 0;
+                        
+                        const rate = cleanNum(cols[idxRate]);
+                        const days = cleanNum(cols[idxDays]) || 1;
+                        const paid = cleanNum(cols[idxPaid]);
                         const total = rate * days;
-
-                        await db.collection('bookings').doc(cols[idxNo]).set({
-                            carId: cols[idxCar],
-                            total: total,
-                            timestamp: Date.now()
-                        }, { merge: true });
-                        count++;
-                        document.getElementById('status').innerText = `Syncing Row #${cols[idxNo]}...`;
+        
+                        try {
+                            await db.collection('bookings').doc(cols[idxNo]).set({
+                                carId: cols[idxCar],
+                                total: total,
+                                paid: paid,
+                                timestamp: Date.now()
+                            }, { merge: true });
+                            
+                            count++;
+                            status.innerText = `✅ Synced Row #${cols[idxNo]}... (${count} total)`;
+                        } catch (err) {
+                            console.error("Firestore Error:", err);
+                        }
                     }
                 }
-                alert("Database Refreshed!");
+                alert("Success! " + count + " rows synced to Brothers EGY Database.");
                 location.reload();
             };
             reader.readAsText(file, 'UTF-8');
