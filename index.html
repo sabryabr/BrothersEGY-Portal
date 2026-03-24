@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive Portal</title>
+    <title>Brothers EGY - Executive Hub 3.0</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     
@@ -11,151 +11,155 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { 
-            --primary: #04509D; --accent: #e67e22; 
-            --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
-        }
+        :root { --primary: #04509D; --accent: #e67e22; --success: #50fa7b; --glass: rgba(255, 255, 255, 0.05); }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #000; color: white; overflow: hidden; }
         
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', sans-serif; background-color: transparent; color: white; overflow: hidden; }
+        .video-wrapper { position: fixed; inset: 0; z-index: -2; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
 
-        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.4); }
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 350px; }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: white; color: #333; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: rgba(15, 15, 15, 0.8); padding: 50px 40px; border-radius: 25px; border: 1px solid var(--glass-border); text-align: center; max-width: 400px; width: 85%; }
-        .login-box img { height: 60px; margin-bottom: 20px; }
-        .login-box input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #444; background: rgba(255,255,255,0.9); font-size: 14px; text-align: center; color: #333; }
-        .login-box button { width: 100%; padding: 12px; margin-top: 15px; border-radius: 8px; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; }
+        #main-portal { display: none; height: 100vh; flex-direction: column; }
+        .navbar { height: 70px; background: rgba(4, 80, 157, 0.2); backdrop-filter: blur(20px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
+        .tab-btn { background: var(--glass); color: white; border: 1px solid #444; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-left: 10px; }
+        .tab-btn.active { background: white; color: var(--primary); }
 
-        #main-portal { display: none; height: 100vh; width: 100%; flex-direction: column; align-items: center; justify-content: center; }
-
-        .navbar { position: fixed; top: 0; left: 0; width: 100%; background: rgba(4, 80, 157, 0.2); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 10px 30px; z-index: 100; box-sizing: border-box; }
-        .nav-logo { height: 32px; }
-        .nav-tabs { display: flex; gap: 10px; }
-        .tab-btn { background: var(--glass-bg); color: white; border: 1px solid var(--glass-border); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: none; }
-        .tab-btn:hover { background: white; color: var(--primary); }
-
-        .dashboard-center { text-align: center; }
-        .dashboard-center h1 { font-size: 3.5rem; font-weight: 800; margin: 0; letter-spacing: -2px; }
-        .menu-grid { display: flex; gap: 20px; margin-top: 45px; flex-wrap: wrap; justify-content: center; }
-        .menu-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); padding: 40px 30px; border-radius: 20px; border: 1px solid var(--glass-border); transition: 0.4s; cursor: pointer; width: 200px; box-sizing: border-box; display: none; }
-        .menu-card:hover { transform: translateY(-10px); border-color: var(--accent); }
-        .menu-card i { font-size: 2.5rem; color: var(--accent); margin-bottom: 20px; display: block; }
-
-        #content-frame { width: 100%; height: calc(100% - 60px); margin-top: 60px; border: none; background: white; display: none; }
+        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        .migrator-card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 20px; width: 100%; max-width: 600px; text-align: center; }
+        
+        .log-window { background: #000; border: 1px solid #222; height: 200px; margin-top: 20px; overflow-y: auto; text-align: left; padding: 15px; font-family: monospace; font-size: 11px; color: var(--success); border-radius: 8px; width: 100%; box-sizing: border-box; }
+        select, input[type="file"] { width: 100%; padding: 12px; margin-top: 15px; background: #222; color: white; border: 1px solid #444; border-radius: 8px; }
+        .sync-btn { background: var(--accent); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 20px; width: 100%; }
+        .sync-btn:disabled { background: #444; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-    <div class="video-wrapper">
-        <video autoplay muted loop playsinline id="bg-video">
-            <source src="background.mp4" type="video/mp4">
-        </video>
-    </div>
+    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
 
     <div id="login-overlay">
         <div class="login-box">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Brothers Logo">
-            <h2 style="margin:0; font-weight:800;">EXECUTIVE HUB</h2>
-            <p id="login-status" style="color:#aaa; font-size: 11px; margin-bottom: 20px;">FIREBASE SECURED ACCESS</p>
-            <input type="text" id="user-field" placeholder="Username">
-            <input type="password" id="pass-field" placeholder="Password">
-            <button onclick="attemptLogin()">AUTHORIZE ACCESS</button>
+            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="50">
+            <h3>EXECUTIVE HUB</h3>
+            <input type="text" id="u" placeholder="Username">
+            <input type="password" id="p" placeholder="Password">
+            <button onclick="attemptLogin()">AUTHORIZE</button>
         </div>
     </div>
 
     <div id="main-portal">
         <nav class="navbar">
-            <div onclick="showHome()" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" class="nav-logo">
-                <span style="font-weight: 800; letter-spacing: 1px;">BROTHERS EGY</span>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="30">
+                <span style="font-weight:800;">BROTHERS EGY</span>
             </div>
-            <div class="nav-tabs">
-                <button class="tab-btn access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
-                <button class="tab-btn access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">English Contract</button>
-                <button class="tab-btn access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">Arabic Contract</button>
-                <button class="tab-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
-            </div>
-            <div class="nav-controls">
-                <button onclick="location.reload()" style="background:#e74c3c; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+            <div id="nav-tabs">
+                <button class="tab-btn active" onclick="showSection('migration')">Migration Center</button>
+                <button class="tab-btn" onclick="location.reload()"><i class="fa-solid fa-power-off"></i></button>
             </div>
         </nav>
 
-        <div id="home-content" class="dashboard-center">
-            <h1>Executive Dashboard</h1>
-            <p style="opacity: 0.7;">Role: <span id="display-role" style="color:var(--accent); font-weight:bold;">-</span></p>
-            <div class="menu-grid">
-                <div class="menu-card access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/')">
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <h4>Price Proposal</h4>
-                </div>
-                <div class="menu-card access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/')">
-                    <i class="fa-solid fa-shield-halved"></i>
-                    <h4>English Contract</h4>
-                </div>
-                <div class="menu-card access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/')">
-                    <i class="fa-solid fa-file-signature"></i>
-                    <h4>Arabic Contract</h4>
-                </div>
-                <div class="menu-card access-rec" onclick="loadFrame('receipt.html')">
-                    <i class="fa-solid fa-receipt"></i>
-                    <h4>Digital Receipt</h4>
-                </div>
+        <div class="content-area">
+            <div class="migrator-card" id="migration-view">
+                <h2 style="margin-top:0;">Data Command Center</h2>
+                <p style="color:#888; font-size:13px;">Select a sheet to migrate into the Firebase Vault</p>
+                
+                <select id="sheet-type">
+                    <option value="fleet">1. Fleet (السيارات)</option>
+                    <option value="customers">2. Customers (العملاء)</option>
+                    <option value="bookings">3. Orders (تسجيل الطلبات)</option>
+                    <option value="collections">4. Collections (التحصيلات)</option>
+                    <option value="car_expenses">5. Car Expenses (مصروفات السيارات)</option>
+                    <option value="gen_expenses">6. Gen Expenses (المصروفات العامة)</option>
+                </select>
+
+                <input type="file" id="csv-input" accept=".csv">
+                <button id="sync-btn" class="sync-btn" onclick="startMigration()">START BATCH SYNC</button>
+                
+                <div class="log-window" id="log">SYSTEM READY: Awaiting file...</div>
             </div>
         </div>
-        <iframe id="content-frame" src=""></iframe>
     </div>
 
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
-            authDomain: "brothers-egy-portal.firebaseapp.com",
             projectId: "brothers-egy-portal",
-            storageBucket: "brothers-egy-portal.firebasestorage.app",
-            messagingSenderId: "673531280760",
-            appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d",
-            measurementId: "G-YV2SHPQYT9"
+            appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
         };
-
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         async function attemptLogin() {
-            const user = document.getElementById('user-field').value.toLowerCase();
-            const pass = document.getElementById('pass-field').value;
-            const status = document.getElementById('login-status');
-            if(!user || !pass) return;
-            try {
-                const userDoc = await db.collection("users").doc(user).get();
-                if (userDoc.exists && userDoc.data().password === pass) {
-                    const data = userDoc.data();
-                    applyPermissions(data.access);
-                    document.getElementById('login-overlay').style.display = 'none';
-                    document.getElementById('main-portal').style.display = 'flex';
-                    document.getElementById('display-role').innerText = data.role || "Employee";
-                } else { throw new Error("Invalid Credentials"); }
-            } catch (err) { status.innerText = "ACCESS DENIED: " + err.message; status.style.color = "#ff4d4d"; }
+            const user = document.getElementById('u').value.toLowerCase();
+            const pass = document.getElementById('p').value;
+            const doc = await db.collection("users").doc(user).get();
+            if (doc.exists && doc.data().password === pass) {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('main-portal').style.display = 'flex';
+            } else { alert("Access Denied"); }
         }
 
-        function applyPermissions(accessArray) {
-            if (accessArray.includes(1)) document.querySelectorAll('.access-quote').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(2)) document.querySelectorAll('.access-en').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(3)) document.querySelectorAll('.access-ar').forEach(el => el.style.display = 'block');
-            if (accessArray.includes(4)) document.querySelectorAll('.access-rec').forEach(el => el.style.display = 'block');
+        function log(msg) {
+            const l = document.getElementById('log');
+            l.innerHTML += `<div>> ${msg}</div>`;
+            l.scrollTop = l.scrollHeight;
         }
 
-        function loadFrame(url, btn) {
-            document.getElementById('home-content').style.display = 'none';
-            const f = document.getElementById('content-frame');
-            f.style.display = 'block'; f.src = url;
-            document.querySelectorAll('.tab-btn').forEach(b => { b.style.background = 'rgba(255,255,255,0.05)'; b.style.color = 'white'; });
-            if(btn) { btn.style.background = 'white'; btn.style.color = '#04509D'; }
-        }
+        async function startMigration() {
+            const file = document.getElementById('csv-input').files[0];
+            const type = document.getElementById('sheet-type').value;
+            const btn = document.getElementById('sync-btn');
+            if(!file) return alert("Select CSV File!");
 
-        function showHome() {
-            document.getElementById('content-frame').style.display = 'none';
-            document.getElementById('home-content').style.display = 'block';
-            document.querySelectorAll('.tab-btn').forEach(b => { b.style.background = 'rgba(255,255,255,0.05)'; b.style.color = 'white'; });
+            btn.disabled = true;
+            log(`Initializing Migration for ${type.toUpperCase()}...`);
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const lines = e.target.result.split(/\r?\n/);
+                const headers = lines[0].split(',');
+                log(`Detected ${lines.length - 1} records. Mapping headers...`);
+
+                let batch = db.batch();
+                let count = 0;
+                let batchCount = 0;
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    if (!cols[0]) continue;
+
+                    const id = cols[0].trim().replace(/"/g, '');
+                    const docRef = db.collection(type).doc(id);
+                    
+                    // Universal Mapper (Zero Data Loss)
+                    let data = { migratedAt: Date.now() };
+                    cols.forEach((val, idx) => {
+                        const headerName = headers[idx] ? headers[idx].trim().replace(/"/g, '') : `Col_${idx}`;
+                        data[headerName] = val ? val.trim().replace(/"/g, '') : "";
+                    });
+
+                    batch.set(docRef, data, { merge: true });
+                    count++;
+                    batchCount++;
+
+                    if (batchCount === 400) { // Safety Batch
+                        log(`Committing Batch (Saved ${count} total)...`);
+                        await batch.commit();
+                        batch = db.batch();
+                        batchCount = 0;
+                    }
+                }
+
+                if (batchCount > 0) await batch.commit();
+                log(`SUCCESS: ${count} records migrated successfully.`);
+                btn.disabled = false;
+                alert("Migration Complete!");
+            };
+            reader.readAsText(file, 'UTF-8');
         }
     </script>
 </body>
