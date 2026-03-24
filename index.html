@@ -2,25 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Brothers EGY - Data Migrator 3.0</title>
+    <title>Brothers EGY - Master Migrator v4</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
         :root { --primary: #04509D; --accent: #e67e22; --success: #50fa7b; }
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .card { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; width: 450px; text-align: center; }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #222; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #log { background: #000; border: 1px solid #222; height: 150px; margin-top: 20px; overflow-y: auto; text-align: left; padding: 10px; font-family: monospace; font-size: 11px; color: var(--success); }
+        body { margin: 0; background: #050505; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .card { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; width: 450px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        select, input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 10px; border: 1px solid #444; background: #1a1a1a; color: white; box-sizing: border-box; }
+        .pumping-btn { width: 100%; padding: 16px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; margin-top: 15px; transition: 0.3s; }
+        .pumping-btn:hover { background: #0560bd; }
+        .pumping-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+        #status-log { background: #000; border: 1px solid #222; height: 180px; margin-top: 20px; overflow-y: auto; text-align: left; padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; color: var(--success); border-radius: 8px; line-height: 1.5; }
     </style>
 </head>
 <body>
 
-    <div class="card" id="app">
-        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="40">
-        <h3>Master Data Migrator</h3>
-        <select id="sheet-type">
+    <div class="card">
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="50" style="margin-bottom:10px;">
+        <h2 style="margin:0 0 20px 0; letter-spacing: 1px;">DATABASE PUMP</h2>
+        
+        <label style="font-size: 11px; color: #888; display: block; text-align: left; margin-bottom: 5px;">SELECT COLLECTION</label>
+        <select id="target-collection">
             <option value="fleet">1. Fleet (السيارات)</option>
             <option value="customers">2. Customers (العملاء)</option>
             <option value="bookings">3. Orders (تسجيل الطلبات)</option>
@@ -28,9 +32,13 @@
             <option value="car_expenses">5. Car Expenses (مصروفات السيارات)</option>
             <option value="gen_expenses">6. Gen Expenses (المصروفات العامة)</option>
         </select>
-        <input type="file" id="csv-input" accept=".csv">
-        <button id="sync-btn" onclick="startMigration()">START BATCH SYNC</button>
-        <div id="log">> System Ready. Select file...</div>
+
+        <label style="font-size: 11px; color: #888; display: block; text-align: left; margin-top: 15px;">SELECT CSV FILE</label>
+        <input type="file" id="csv-file-input" accept=".csv">
+
+        <button id="main-sync-btn" class="pumping-btn" onclick="executeMigration()">START DATABASE PUMP</button>
+        
+        <div id="status-log">READY: Awaiting instruction...</div>
     </div>
 
     <script>
@@ -42,69 +50,84 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        function log(msg) {
-            const l = document.getElementById('log');
-            l.innerHTML += `<div>> ${msg}</div>`;
-            l.scrollTop = l.scrollHeight;
+        function writeLog(text) {
+            const logDiv = document.getElementById('status-log');
+            logDiv.innerHTML += `<div>> ${text}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        async function startMigration() {
-            const fileInput = document.getElementById('csv-input');
-            const type = document.getElementById('sheet-type').value;
-            const btn = document.getElementById('sync-btn');
-            
-            if(!fileInput.files[0]) return alert("Please select a CSV file first!");
+        async function executeMigration() {
+            const fileBox = document.getElementById('csv-file-input');
+            const target = document.getElementById('target-collection').value;
+            const btn = document.getElementById('main-sync-btn');
+
+            if (!fileBox.files[0]) {
+                alert("Please select a CSV file first!");
+                return;
+            }
 
             btn.disabled = true;
-            btn.innerText = "PROCESSING...";
-            log(`Starting migration for: ${type}`);
+            btn.innerText = "PUMPING DATA...";
+            writeLog(`Initiating Batch Migration for [${target.toUpperCase()}]`);
 
             const reader = new FileReader();
-            reader.onload = async (e) => {
-                const lines = e.target.result.split(/\r?\n/);
-                // Clean headers
-                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            reader.onload = async (event) => {
+                const textData = event.target.result;
+                const rows = textData.split(/\r?\n/);
                 
-                let batch = db.batch();
+                // Extract and clean Headers
+                const headerRow = rows[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                writeLog(`Headers Detected: ${headerRow.length} columns found.`);
+
                 let count = 0;
                 let batchCount = 0;
+                let firebaseBatch = db.batch();
 
-                for (let i = 1; i < lines.length; i++) {
-                    if (!lines[i].trim()) continue;
+                for (let i = 1; i < rows.length; i++) {
+                    if (!rows[i].trim()) continue;
 
-                    // This specific regex handles commas inside quoted currency/text
-                    const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                    const id = cols[0].trim().replace(/"/g, '');
+                    // Support for quoted commas in currency/text
+                    const cells = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    const docId = cells[0].trim().replace(/"/g, '');
 
-                    if (id) {
-                        const docRef = db.collection(type).doc(id);
-                        let data = {};
-                        
-                        cols.forEach((val, idx) => {
-                            const headerName = headers[idx] || `Column_${idx}`;
-                            data[headerName] = val ? val.trim().replace(/"/g, '') : "";
+                    if (docId) {
+                        const ref = db.collection(target).doc(docId);
+                        let finalData = { _sys_updated: Date.now() };
+
+                        cells.forEach((val, index) => {
+                            const fieldName = headerRow[index] || `Field_${index}`;
+                            finalData[fieldName] = val ? val.trim().replace(/"/g, '') : "";
                         });
 
-                        batch.set(docRef, data, { merge: true });
+                        firebaseBatch.set(ref, finalData, { merge: true });
                         count++;
                         batchCount++;
 
-                        if (batchCount === 450) { // Firebase limit is 500 per batch
-                            log(`Saving batch... (Total: ${count})`);
-                            await batch.commit();
-                            batch = db.batch();
+                        if (batchCount === 400) {
+                            writeLog(`Committing Batch... Total processed: ${count}`);
+                            await firebaseBatch.commit();
+                            firebaseBatch = db.batch();
                             batchCount = 0;
                         }
                     }
                 }
 
-                if (batchCount > 0) await batch.commit();
-                log(`SUCCESS: ${count} records migrated.`);
+                if (batchCount > 0) {
+                    await firebaseBatch.commit();
+                }
+
+                writeLog(`SUCCESS: ${count} records are now live in Firestore.`);
                 btn.disabled = false;
-                btn.innerText = "START BATCH SYNC";
-                alert("Migration Finished Successfully!");
+                btn.innerText = "START DATABASE PUMP";
+                alert(`Migration Finished: ${count} items synced.`);
             };
-            reader.readAsText(fileInput.files[0], 'UTF-8');
+
+            reader.onerror = () => {
+                writeLog("ERROR: Failed to read file.");
+                btn.disabled = false;
+            };
+
+            reader.readAsText(fileBox.files[0], 'UTF-8');
         }
     </script>
 </body>
