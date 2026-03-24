@@ -2,86 +2,35 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive Hub 3.0</title>
+    <title>Brothers EGY - Data Migrator 3.0</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-    
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-
     <style>
-        :root { --primary: #04509D; --accent: #e67e22; --success: #50fa7b; --glass: rgba(255, 255, 255, 0.05); }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #000; color: white; overflow: hidden; }
-        
-        .video-wrapper { position: fixed; inset: 0; z-index: -2; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
-
-        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 350px; }
-        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: white; color: #333; box-sizing: border-box; }
-        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-
-        #main-portal { display: none; height: 100vh; flex-direction: column; }
-        .navbar { height: 70px; background: rgba(4, 80, 157, 0.2); backdrop-filter: blur(20px); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
-        .tab-btn { background: var(--glass); color: white; border: 1px solid #444; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-left: 10px; }
-        .tab-btn.active { background: white; color: var(--primary); }
-
-        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-        .migrator-card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 20px; width: 100%; max-width: 600px; text-align: center; }
-        
-        .log-window { background: #000; border: 1px solid #222; height: 200px; margin-top: 20px; overflow-y: auto; text-align: left; padding: 15px; font-family: monospace; font-size: 11px; color: var(--success); border-radius: 8px; width: 100%; box-sizing: border-box; }
-        select, input[type="file"] { width: 100%; padding: 12px; margin-top: 15px; background: #222; color: white; border: 1px solid #444; border-radius: 8px; }
-        .sync-btn { background: var(--accent); color: white; border: none; padding: 15px 30px; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 20px; width: 100%; }
-        .sync-btn:disabled { background: #444; cursor: not-allowed; }
+        :root { --primary: #04509D; --accent: #e67e22; --success: #50fa7b; }
+        body { margin: 0; background: #000; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .card { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; width: 450px; text-align: center; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #222; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #log { background: #000; border: 1px solid #222; height: 150px; margin-top: 20px; overflow-y: auto; text-align: left; padding: 10px; font-family: monospace; font-size: 11px; color: var(--success); }
     </style>
 </head>
 <body>
 
-    <div class="video-wrapper"><video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video></div>
-
-    <div id="login-overlay">
-        <div class="login-box">
-            <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="50">
-            <h3>EXECUTIVE HUB</h3>
-            <input type="text" id="u" placeholder="Username">
-            <input type="password" id="p" placeholder="Password">
-            <button onclick="attemptLogin()">AUTHORIZE</button>
-        </div>
-    </div>
-
-    <div id="main-portal">
-        <nav class="navbar">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="30">
-                <span style="font-weight:800;">BROTHERS EGY</span>
-            </div>
-            <div id="nav-tabs">
-                <button class="tab-btn active" onclick="showSection('migration')">Migration Center</button>
-                <button class="tab-btn" onclick="location.reload()"><i class="fa-solid fa-power-off"></i></button>
-            </div>
-        </nav>
-
-        <div class="content-area">
-            <div class="migrator-card" id="migration-view">
-                <h2 style="margin-top:0;">Data Command Center</h2>
-                <p style="color:#888; font-size:13px;">Select a sheet to migrate into the Firebase Vault</p>
-                
-                <select id="sheet-type">
-                    <option value="fleet">1. Fleet (السيارات)</option>
-                    <option value="customers">2. Customers (العملاء)</option>
-                    <option value="bookings">3. Orders (تسجيل الطلبات)</option>
-                    <option value="collections">4. Collections (التحصيلات)</option>
-                    <option value="car_expenses">5. Car Expenses (مصروفات السيارات)</option>
-                    <option value="gen_expenses">6. Gen Expenses (المصروفات العامة)</option>
-                </select>
-
-                <input type="file" id="csv-input" accept=".csv">
-                <button id="sync-btn" class="sync-btn" onclick="startMigration()">START BATCH SYNC</button>
-                
-                <div class="log-window" id="log">SYSTEM READY: Awaiting file...</div>
-            </div>
-        </div>
+    <div class="card" id="app">
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="40">
+        <h3>Master Data Migrator</h3>
+        <select id="sheet-type">
+            <option value="fleet">1. Fleet (السيارات)</option>
+            <option value="customers">2. Customers (العملاء)</option>
+            <option value="bookings">3. Orders (تسجيل الطلبات)</option>
+            <option value="collections">4. Collections (التحصيلات)</option>
+            <option value="car_expenses">5. Car Expenses (مصروفات السيارات)</option>
+            <option value="gen_expenses">6. Gen Expenses (المصروفات العامة)</option>
+        </select>
+        <input type="file" id="csv-input" accept=".csv">
+        <button id="sync-btn" onclick="startMigration()">START BATCH SYNC</button>
+        <div id="log">> System Ready. Select file...</div>
     </div>
 
     <script>
@@ -93,16 +42,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        async function attemptLogin() {
-            const user = document.getElementById('u').value.toLowerCase();
-            const pass = document.getElementById('p').value;
-            const doc = await db.collection("users").doc(user).get();
-            if (doc.exists && doc.data().password === pass) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-portal').style.display = 'flex';
-            } else { alert("Access Denied"); }
-        }
-
         function log(msg) {
             const l = document.getElementById('log');
             l.innerHTML += `<div>> ${msg}</div>`;
@@ -110,56 +49,62 @@
         }
 
         async function startMigration() {
-            const file = document.getElementById('csv-input').files[0];
+            const fileInput = document.getElementById('csv-input');
             const type = document.getElementById('sheet-type').value;
             const btn = document.getElementById('sync-btn');
-            if(!file) return alert("Select CSV File!");
+            
+            if(!fileInput.files[0]) return alert("Please select a CSV file first!");
 
             btn.disabled = true;
-            log(`Initializing Migration for ${type.toUpperCase()}...`);
+            btn.innerText = "PROCESSING...";
+            log(`Starting migration for: ${type}`);
 
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const lines = e.target.result.split(/\r?\n/);
-                const headers = lines[0].split(',');
-                log(`Detected ${lines.length - 1} records. Mapping headers...`);
-
+                // Clean headers
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                
                 let batch = db.batch();
                 let count = 0;
                 let batchCount = 0;
 
                 for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+
+                    // This specific regex handles commas inside quoted currency/text
                     const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                    if (!cols[0]) continue;
-
                     const id = cols[0].trim().replace(/"/g, '');
-                    const docRef = db.collection(type).doc(id);
-                    
-                    // Universal Mapper (Zero Data Loss)
-                    let data = { migratedAt: Date.now() };
-                    cols.forEach((val, idx) => {
-                        const headerName = headers[idx] ? headers[idx].trim().replace(/"/g, '') : `Col_${idx}`;
-                        data[headerName] = val ? val.trim().replace(/"/g, '') : "";
-                    });
 
-                    batch.set(docRef, data, { merge: true });
-                    count++;
-                    batchCount++;
+                    if (id) {
+                        const docRef = db.collection(type).doc(id);
+                        let data = {};
+                        
+                        cols.forEach((val, idx) => {
+                            const headerName = headers[idx] || `Column_${idx}`;
+                            data[headerName] = val ? val.trim().replace(/"/g, '') : "";
+                        });
 
-                    if (batchCount === 400) { // Safety Batch
-                        log(`Committing Batch (Saved ${count} total)...`);
-                        await batch.commit();
-                        batch = db.batch();
-                        batchCount = 0;
+                        batch.set(docRef, data, { merge: true });
+                        count++;
+                        batchCount++;
+
+                        if (batchCount === 450) { // Firebase limit is 500 per batch
+                            log(`Saving batch... (Total: ${count})`);
+                            await batch.commit();
+                            batch = db.batch();
+                            batchCount = 0;
+                        }
                     }
                 }
 
                 if (batchCount > 0) await batch.commit();
-                log(`SUCCESS: ${count} records migrated successfully.`);
+                log(`SUCCESS: ${count} records migrated.`);
                 btn.disabled = false;
-                alert("Migration Complete!");
+                btn.innerText = "START BATCH SYNC";
+                alert("Migration Finished Successfully!");
             };
-            reader.readAsText(file, 'UTF-8');
+            reader.readAsText(fileInput.files[0], 'UTF-8');
         }
     </script>
 </body>
