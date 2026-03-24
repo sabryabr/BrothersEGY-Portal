@@ -9,26 +9,16 @@
     <style>
         :root { --primary: #04509D; --success: #50fa7b; --rented: #ff4b4b; --bg: #050505; }
         body, html { margin: 0; padding: 0; background: var(--bg); color: white; font-family: sans-serif; height: 100vh; overflow: hidden; }
-        
-        /* Navigation */
         .navbar { position: fixed; top: 0; width: 100%; height: 70px; background: rgba(0,0,0,0.95); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 100; box-sizing: border-box; }
-        .nav-links { display: flex; gap: 15px; }
-        .tab-btn { background: #1a1a1a; color: #fff; border: 1px solid #444; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
-        .tab-btn:hover { border-color: var(--success); }
-
-        /* Login */
+        .tab-btn { background: #1a1a1a; color: #fff; border: 1px solid #444; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left:10px; }
         #login-overlay { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .login-box { background: #111; padding: 40px; border-radius: 20px; border: 1px solid #333; text-align: center; width: 320px; }
         input { display: block; width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: white; box-sizing: border-box; }
-
-        /* Dashboard Layout */
         #main-portal { display: none; padding-top: 80px; height: 100vh; flex-direction: column; }
         .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px 30px; }
         .metric-card { background: rgba(255,255,255,0.03); border: 1px solid #222; border-radius: 12px; padding: 15px; }
         .val { font-size: 20px; font-weight: bold; color: var(--success); }
         .content-area { flex-grow: 1; margin: 0 30px 20px; background: rgba(0,0,0,0.5); border: 1px solid #222; border-radius: 15px; padding: 20px; overflow-y: auto; }
-        
-        /* Gantt Radar */
         .car-row { display: flex; align-items: center; height: 45px; border-bottom: 1px solid #111; }
         .car-label { width: 180px; font-size: 11px; color: #888; }
         .car-track { flex-grow: 1; height: 20px; background: #0a0a0a; border-radius: 4px; position: relative; }
@@ -49,22 +39,18 @@
     <div id="main-portal">
         <nav class="navbar">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:32px;">
-            <div class="nav-links">
-                <button class="tab-btn" onclick="location.reload()">Fleet Radar</button>
-                <button class="tab-btn" onclick="showImporter()">Bulk Import</button>
-                <button class="tab-btn" onclick="location.reload()"><i class="fa-solid fa-power-off"></i></button>
+            <div>
+                <button class="tab-btn" onclick="location.reload()">Radar</button>
+                <button class="tab-btn" onclick="showImporter()">Import</button>
             </div>
         </nav>
-
         <div class="metrics-bar">
-            <div class="metric-card"><label>Fleet Size</label><div class="val" id="m-fleet">0</div></div>
-            <div class="metric-card"><label>Active Orders</label><div class="val" id="m-count">0</div></div>
-            <div class="metric-card"><label>Total Rev (EGP)</label><div class="val" id="m-rev">0</div></div>
-            <div class="metric-card"><label>Database</label><div class="val" style="color:var(--success)">Connected</div></div>
+            <div class="metric-card"><label>Fleet</label><div class="val" id="m-fleet">0</div></div>
+            <div class="metric-card"><label>Orders</label><div class="val" id="m-count">0</div></div>
+            <div class="metric-card"><label>Total Rev</label><div class="val" id="m-rev">0</div></div>
+            <div class="metric-card"><label>Status</label><div class="val" style="color:var(--success)">Live</div></div>
         </div>
-
-        <div class="content-area" id="main-content">
-            </div>
+        <div class="content-area" id="main-content"></div>
     </div>
 
     <script>
@@ -79,23 +65,24 @@
         async function login() {
             const u = document.getElementById('user').value.toLowerCase().trim();
             const p = document.getElementById('pass').value;
-            const doc = await db.collection("users").doc(u).get();
-            if (doc.exists && doc.data().password === p) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('main-portal').style.display = 'flex';
-                loadDashboard();
-            } else { alert("Invalid Credentials"); }
+            try {
+                const doc = await db.collection("users").doc(u).get();
+                if (doc.exists && doc.data().password === p) {
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('main-portal').style.display = 'flex';
+                    startApp(); // Synced Name
+                } else { alert("Invalid login"); }
+            } catch (e) { alert("Database Error. Check Rules."); }
         }
 
-        async function loadDashboard() {
+        async function startApp() {
             const fleet = await db.collection("fleet").get();
             const bookings = await db.collection("bookings").get();
-            
             document.getElementById('m-fleet').innerText = fleet.size;
             document.getElementById('m-count').innerText = bookings.size;
             
             const grid = document.getElementById('main-content');
-            grid.innerHTML = "<h4>🗓️ LIVE FLEET RADAR</h4><div id='radar-grid'></div>";
+            grid.innerHTML = "<h4>🗓️ FLEET RADAR</h4><div id='r-grid'></div>";
             
             let revenue = 0;
             fleet.forEach(carDoc => {
@@ -103,7 +90,7 @@
                 const row = document.createElement('div');
                 row.className = 'car-row';
                 row.innerHTML = `<div class='car-label'>#${carDoc.id} ${car.model || ''}</div><div class='car-track' id='t-${carDoc.id}'></div>`;
-                document.getElementById('radar-grid').appendChild(row);
+                document.getElementById('r-grid').appendChild(row);
 
                 bookings.forEach(bDoc => {
                     const b = bDoc.data();
@@ -116,78 +103,55 @@
                     }
                 });
             });
-            document.getElementById('m-rev').innerText = revenue.toLocaleString();
+            document.getElementById('m-rev').innerText = revenue.toLocaleString() + " EGP";
         }
 
         function showImporter() {
             document.getElementById('main-content').innerHTML = `
-                <div style="padding:40px; text-align:center; background:rgba(255,255,255,0.02); border-radius:15px; border:1px dashed #333;">
-                    <h3 style="color:var(--success)">Bulk CSV Sync Engine</h3>
-                    <p style="color:#666">Upload your 'تسجيل الطلبات' CSV to populate 3-Year History.</p>
-                    <input type="file" id="csvFile" accept=".csv" style="margin:20px 0; color:white;">
+                <div style="padding:30px; text-align:center; border:1px dashed #444;">
+                    <h3>Sync CSV Data</h3>
+                    <input type="file" id="csvFile" accept=".csv" style="margin:20px 0;">
                     <br>
-                    <button onclick="handleCSV()" style="padding:15px 30px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">START SYNC</button>
-                    <div id="status" style="margin-top:20px; font-weight:bold;"></div>
+                    <button id="sync-btn" onclick="handleCSV()" style="padding:15px 30px; background:var(--primary); color:white; border:none; cursor:pointer; font-weight:bold;">START SYNC</button>
+                    <div id="status" style="margin-top:20px; font-weight:bold; color:var(--success)"></div>
                 </div>`;
         }
 
         async function handleCSV() {
+            const btn = document.getElementById('sync-btn');
             const file = document.getElementById('csvFile').files[0];
-            if(!file) return alert("Select file!");
+            if(!file) return alert("Select CSV file!");
             
+            btn.innerText = "UPDATING...";
+            btn.disabled = true;
+
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const lines = e.target.result.split(/\r?\n/);
                 const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
                 
-                // SMART INDEX FINDER (Finds column even if names change slightly)
-                const findIdx = (keywords) => headers.findIndex(h => keywords.some(k => h.includes(k)));
-                
-                const idxNo = findIdx(['No', 'مسلسل', 'رقم']);
-                const idxCar = findIdx(['كود السيارة', 'Car ID', 'كود السياره']);
-                const idxRate = findIdx(['سعر السيارة اليومي', 'Rate', 'السعر']);
-                const idxDays = findIdx(['مدة الخدمة يوم', 'Days', 'المده']);
-                const idxPaid = findIdx(['المدفوع', 'Paid']);
-        
-                console.log("Indices found:", { idxNo, idxCar, idxRate, idxDays });
-        
-                if (idxNo === -1 || idxCar === -1) {
-                    return alert("Error: Could not find 'No.' or 'Car ID' columns. Check CSV headers.");
-                }
-        
+                const findIdx = (k) => headers.findIndex(h => k.some(x => h.includes(x)));
+                const idxNo = findIdx(['No', 'مسلسل']);
+                const idxCar = findIdx(['كود السيارة', 'Car ID']);
+                const idxRate = findIdx(['سعر السيارة اليومي', 'Rate']);
+                const idxDays = findIdx(['مدة الخدمة يوم', 'Days']);
+
                 let count = 0;
-                const status = document.getElementById('status');
-                
                 for (let i = 1; i < lines.length; i++) {
-                    // This regex handles commas inside currency (e.g. "1,800.00")
                     const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ''));
-                    
                     if (cols[idxNo]) {
-                        // Clean the numbers (Remove £, commas, spaces)
-                        const cleanNum = (str) => parseFloat(str?.replace(/[^\d.]/g, '')) || 0;
-                        
-                        const rate = cleanNum(cols[idxRate]);
-                        const days = cleanNum(cols[idxDays]) || 1;
-                        const paid = cleanNum(cols[idxPaid]);
-                        const total = rate * days;
-        
-                        try {
-                            await db.collection('bookings').doc(cols[idxNo]).set({
-                                carId: cols[idxCar],
-                                total: total,
-                                paid: paid,
-                                timestamp: Date.now()
-                            }, { merge: true });
-                            
-                            count++;
-                            status.innerText = `✅ Synced Row #${cols[idxNo]}... (${count} total)`;
-                        } catch (err) {
-                            console.error("Firestore Error:", err);
-                        }
+                        const rate = parseFloat(cols[idxRate]?.replace(/[^\d.]/g, '')) || 0;
+                        const days = parseFloat(cols[idxDays]) || 1;
+                        await db.collection('bookings').doc(cols[idxNo]).set({
+                            carId: cols[idxCar],
+                            total: (rate * days),
+                            timestamp: Date.now()
+                        }, { merge: true });
+                        count++;
+                        document.getElementById('status').innerText = `Syncing Row #${cols[idxNo]}...`;
                     }
                 }
-                alert("Success! " + count + " rows synced to Brothers EGY Database.");
-                location.reload();
+                alert("Database Refreshed!"); location.reload();
             };
             reader.readAsText(file, 'UTF-8');
         }
