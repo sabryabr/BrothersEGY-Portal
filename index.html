@@ -17,10 +17,10 @@
             --sidebar-w: 260px;
         }
         
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', 'Cairo', sans-serif; background: #000; color: white; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', 'Cairo', sans-serif; background: linear-gradient(135deg, #05070a 0%, #11141d 100%); color: white; overflow: hidden; }
         
         /* Video Background */
-        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; }
+        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; }
         #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
 
         /* Centered Login */
@@ -35,52 +35,58 @@
         #app-layout { display: none; height: 100vh; width: 100vw; }
         
         /* Top Navbar */
-        .navbar { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 100; box-sizing: border-box; }
+        .navbar { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 100; box-sizing: border-box; }
         .nav-tabs { display: flex; gap: 10px; }
         .top-btn { background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--glass-border); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: none; transition: 0.2s; }
         .top-btn:hover { background: white; color: var(--primary); }
         
-        /* Sidebar (Streamlit Modules) */
+        /* Sidebar */
         .sidebar { position: fixed; top: 70px; left: 0; width: var(--sidebar-w); height: calc(100vh - 70px); background: var(--glass-bg); backdrop-filter: blur(20px); border-right: 1px solid var(--glass-border); padding: 20px 15px; box-sizing: border-box; display: flex; flex-direction: column; z-index: 90; }
         .side-item { padding: 14px 15px; margin-bottom: 8px; border-radius: 10px; cursor: pointer; color: #aaa; font-weight: 600; display: flex; align-items: center; gap: 12px; transition: 0.3s; }
         .side-item i { font-size: 1.2rem; width: 25px; text-align: center; }
         .side-item:hover, .side-item.active { background: var(--primary); color: white; box-shadow: 0 5px 15px rgba(4,80,157,0.3); }
 
         /* Main Workspace */
-        .workspace { margin-top: 70px; margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); height: calc(100vh - 70px); padding: 30px; box-sizing: border-box; overflow-y: auto; background: rgba(0,0,0,0.4); }
-        .view-section { display: none; }
+        .workspace { margin-top: 70px; margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); height: calc(100vh - 70px); padding: 30px; box-sizing: border-box; overflow-y: auto; background: rgba(0,0,0,0.5); }
+        .view-section { display: none; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Metrics & Tables */
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
-        .m-card { background: rgba(20, 25, 35, 0.8); border: 1px solid var(--glass-border); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .m-card label { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; }
-        .m-card .val { font-size: 28px; font-weight: 800; margin-top: 5px; }
+        /* Metrics & Cards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .m-card { background: rgba(30, 37, 48, 0.8); border: 1px solid #3b4252; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .m-card label { color: #8f9bba; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .m-card .val { font-size: 28px; font-weight: 800; margin-top: 8px; color: var(--success); }
 
-        .data-table { width: 100%; border-collapse: collapse; background: rgba(15, 20, 25, 0.9); border-radius: 15px; overflow: hidden; border: 1px solid var(--glass-border); }
-        .data-table th { background: rgba(255,255,255,0.03); padding: 18px; text-align: left; font-size: 12px; color: #888; text-transform: uppercase; border-bottom: 1px solid var(--glass-border); }
-        .data-table td { padding: 18px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 14px; }
-        .data-table tr:hover { background: rgba(255,255,255,0.02); }
+        /* Tables */
+        .table-responsive { width: 100%; overflow-x: auto; border-radius: 15px; border: 1px solid #3b4252; background: rgba(30, 37, 48, 0.9); }
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .data-table th { background: #1e2530; padding: 15px 20px; font-size: 12px; color: #8f9bba; text-transform: uppercase; font-weight: 600; white-space: nowrap; border-bottom: 2px solid #3b4252; }
+        .data-table td { padding: 15px 20px; border-bottom: 1px solid #3b4252; font-size: 14px; color: #eceff4; white-space: nowrap; }
+        .data-table tr:hover { background: rgba(255,255,255,0.03); }
 
+        /* Badges */
         .badge { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
         .bg-green { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
         .bg-red { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
         .bg-orange { background: rgba(230, 126, 34, 0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
-        
-        .action-btn { background: transparent; border: none; color: #888; cursor: pointer; transition: 0.2s; font-size: 16px; }
-        .action-btn:hover { color: white; }
 
+        /* Inputs */
+        .search-bar, select { width: 100%; padding: 15px 20px; background: rgba(15, 20, 25, 0.9); border: 1px solid var(--glass-border); border-radius: 12px; color: white; margin-bottom: 20px; font-size: 14px; outline: none; }
+        select { cursor: pointer; }
         iframe { width: 100%; height: 100%; border: none; border-radius: 15px; background: white; }
-        .search-bar { width: 100%; padding: 15px 20px; background: rgba(15, 20, 25, 0.9); border: 1px solid var(--glass-border); border-radius: 12px; color: white; margin-bottom: 20px; font-size: 15px; }
 
-        /* Loading Spinner */
-        .loader { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 50px auto; }
+        /* Full Screen Loader */
+        #data-loader { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9998; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div class="video-wrapper">
-        <video autoplay muted loop playsinline id="bg-video"><source src="background.mp4" type="video/mp4"></video>
+        <video autoplay muted loop playsinline id="bg-video">
+            <source src="background.mp4" type="video/mp4">
+        </video>
     </div>
 
     <div id="login-overlay">
@@ -94,8 +100,12 @@
         </div>
     </div>
 
+    <div id="data-loader">
+        <div class="spinner"></div>
+        <h3 id="loader-text">Syncing Central Database...</h3>
+    </div>
+
     <div id="app-layout">
-        
         <nav class="navbar">
             <div style="display: flex; align-items: center; gap: 15px;">
                 <button onclick="route('home')" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
@@ -122,61 +132,106 @@
             
             <div style="font-size:11px; color:#666; margin:20px 0 10px 10px; font-weight:bold;">MANAGEMENT</div>
             <div class="side-item" onclick="route('crm', this)"><i class="fa-solid fa-users"></i> CRM Hub</div>
-            <div class="side-item" onclick="route('fin', this)" id="nav-fin" style="display:none;"><i class="fa-solid fa-vault"></i> Financial HQ</div>
             <div class="side-item" onclick="route('risk', this)"><i class="fa-solid fa-shield-exclamation"></i> Risk Radar</div>
+            <div class="side-item" onclick="route('fin', this)" id="nav-fin" style="display:none;"><i class="fa-solid fa-vault"></i> Financial HQ</div>
         </div>
 
         <div class="workspace">
             
             <div id="view-home" class="view-section" style="text-align:center; padding-top:10vh; display:block;">
                 <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="100" style="opacity:0.8">
-                <h1 style="font-size:4rem; margin:20px 0 0 0; letter-spacing:-2px;">Executive Database</h1>
-                <p style="color:#888; font-size:1.2rem;">Select a module from the sidebar to begin.</p>
+                <h1 style="font-size:3.5rem; margin:20px 0 0 0; letter-spacing:-2px;">Executive Dashboard</h1>
+                <p style="color:#888; font-size:1.2rem;">All Cloud Databases Synchronized.</p>
             </div>
 
             <div id="view-radar" class="view-section">
                 <h2>🛰️ Fleet Operations Radar</h2>
                 <div class="metrics-grid">
                     <div class="m-card"><label>Active Rentals</label><div class="val" id="r-rented">0</div></div>
-                    <div class="m-card"><label>Available Fleet</label><div class="val" id="r-avail" style="color:var(--success)">0</div></div>
-                    <div class="m-card"><label>Upcoming</label><div class="val" id="r-future" style="color:var(--primary)">0</div></div>
-                    <div class="m-card"><label>Total Tracked</label><div class="val" id="r-total">0</div></div>
+                    <div class="m-card"><label>Available Fleet</label><div class="val" id="r-avail">0</div></div>
+                    <div class="m-card"><label>Upcoming Bookings</label><div class="val" id="r-future" style="color:var(--accent)">0</div></div>
+                    <div class="m-card"><label>Tracked Cars</label><div class="val" id="r-total" style="color:white">0</div></div>
                 </div>
                 <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')">
-                <table class="data-table">
-                    <thead><tr><th>Vehicle ID & Specs</th><th>Plate Identity</th><th>Status</th><th>Current Assignment</th><th>Financial State</th><th>Action</th></tr></thead>
-                    <tbody id="radar-body"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead><tr><th>Vehicle ID & Specs</th><th>Plate Identity</th><th>Status</th><th>Current Assignment</th><th>Financial State</th></tr></thead>
+                        <tbody id="radar-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div id="view-orders" class="view-section">
                 <h2>📋 Master Order Book</h2>
                 <input type="text" class="search-bar" id="search-orders" placeholder="Search Order # or Customer..." onkeyup="searchTable('orders-body', 'search-orders')">
-                <table class="data-table">
-                    <thead><tr><th>Order #</th><th>Customer</th><th>Car</th><th>Period</th><th>Grand Total</th><th>Paid</th><th>Status</th></tr></thead>
-                    <tbody id="orders-body"></tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead><tr><th>Order #</th><th>Customer</th><th>Car</th><th>Period</th><th>Grand Total</th><th>Paid</th><th>Status</th></tr></thead>
+                        <tbody id="orders-body"></tbody>
+                    </table>
+                </div>
             </div>
 
-            <div id="view-v360" class="view-section"><h2>🚗 Vehicle 360</h2><p style="color:#888">Select a vehicle to view its complete P&L, maintenance, and trip history.</p></div>
-            <div id="view-crm" class="view-section"><h2>👥 CRM Hub</h2><p style="color:#888">Client database, spend analytics, and retained deposits.</p></div>
-            <div id="view-fin" class="view-section"><h2>💰 Financial HQ</h2><p style="color:#888">Global P&L, Cash flow, and Owner Accruals.</p></div>
-            <div id="view-risk" class="view-section"><h2>⚠️ Risk Radar</h2><p style="color:#888">Tracking expiring licenses, insurance, and owner contracts.</p></div>
+            <div id="view-v360" class="view-section">
+                <h2>🚗 Vehicle 360</h2>
+                <select id="v360-select" onchange="buildV360()">
+                    <option value="">-- Select a Vehicle --</option>
+                </select>
+                <div class="metrics-grid" style="margin-top:20px;">
+                    <div class="m-card"><label>Total Generated</label><div class="val" id="v-rev">0 EGP</div></div>
+                    <div class="m-card"><label>Maintenance Spent</label><div class="val" id="v-maint" style="color:var(--danger)">0 EGP</div></div>
+                    <div class="m-card"><label>Total Trips</label><div class="val" id="v-trips" style="color:white">0</div></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead><tr><th>Order/Expense ID</th><th>Type</th><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+                        <tbody id="v360-body"></tbody>
+                    </table>
+                </div>
+            </div>
 
-            <div id="view-frame" class="view-section" style="height:100%;"><iframe id="content-frame" src=""></iframe></div>
+            <div id="view-crm" class="view-section">
+                <h2>👥 CRM Hub</h2>
+                <div class="metrics-grid">
+                    <div class="m-card"><label>Total Unique Clients</label><div class="val" id="crm-total" style="color:white">0</div></div>
+                    <div class="m-card"><label>Deposits Held</label><div class="val" id="crm-dep">0 EGP</div></div>
+                </div>
+                <input type="text" class="search-bar" id="search-crm" placeholder="Search Client Name..." onkeyup="searchTable('crm-body', 'search-crm')">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead><tr><th>Client Name</th><th>Total Trips</th><th>Total Spend (EGP)</th><th>Total Spend (USD)</th><th>Deposit Held</th></tr></thead>
+                        <tbody id="crm-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-risk" class="view-section">
+                <h2>⚠️ Risk Radar</h2>
+                <p style="color:#888; font-size:14px; margin-top:-10px;">Tracking Expirations for License, Insurance, and Owner Contracts.</p>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead><tr><th>Vehicle</th><th>Risk Type</th><th>Expiration Date</th><th>Days Left</th><th>Severity</th></tr></thead>
+                        <tbody id="risk-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-frame" class="view-section" style="height:100%;">
+                <iframe id="content-frame" src=""></iframe>
+            </div>
 
         </div>
     </div>
 
     <script>
+        // --- 1. FIREBASE & GLOBALS ---
         const firebaseConfig = { apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal", appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Global Data Cache (Like load_data_v3 in Streamlit)
-        let APP_DATA = { cars: [], bookings: [], users: null };
+        const APP_DATA = { cars: [], bookings: [], car_expenses: [], clients: [], user: null };
 
-        // Enter Key Login
+        // --- 2. AUTHENTICATION ---
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
 
         async function attemptLogin() {
@@ -192,14 +247,17 @@
                 const userDoc = await db.collection("users").doc(user).get();
                 if (userDoc.exists && userDoc.data().password === pass) {
                     APP_DATA.user = userDoc.data();
-                    applyPermissions(APP_DATA.user.access);
                     
                     document.getElementById('login-overlay').style.display = 'none';
-                    document.getElementById('app-layout').style.display = 'block';
+                    document.getElementById('data-loader').style.display = 'flex'; // Show loader
+                    
+                    applyPermissions(APP_DATA.user.access);
                     document.getElementById('display-role').innerText = APP_DATA.user.role || "Executive";
                     
-                    // Pre-fetch critical databases to make tabs instant
-                    await loadCloudData();
+                    await loadCloudData(); // Fetch everything
+                    
+                    document.getElementById('data-loader').style.display = 'none';
+                    document.getElementById('app-layout').style.display = 'block';
                 } else { throw new Error("Invalid Credentials"); }
             } catch (err) { status.innerText = "ACCESS DENIED"; status.style.color = "var(--danger)"; }
         }
@@ -209,32 +267,45 @@
             Object.keys(map).forEach(key => {
                 if(accessArray.includes(parseInt(key))) document.querySelectorAll(map[key]).forEach(el => el.style.display = 'block');
             });
-            // Show Financial HQ if user has level 7 (Owner)
             if(accessArray.includes(7)) document.getElementById('nav-fin').style.display = 'flex';
         }
 
+        // --- 3. DATA ENGINE (The Pandas Replacement) ---
         async function loadCloudData() {
             const cSnap = await db.collection('fleet').get();
-            const bSnap = await db.collection('bookings').get();
-            
             cSnap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
+
+            document.getElementById('loader-text').innerText = "Syncing Orders...";
+            const bSnap = await db.collection('bookings').get();
             bSnap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
+
+            document.getElementById('loader-text').innerText = "Syncing Financials...";
+            const eSnap = await db.collection('car_expenses').get();
+            eSnap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
         }
 
-        // Routing Engine (Switching Tabs)
+        function parseCurrency(val) {
+            if(!val) return 0;
+            return parseFloat(String(val).replace(/[^0-9.-]+/g,"")) || 0;
+        }
+
+        function formatEGP(val) {
+            return val.toLocaleString() + " ج.م";
+        }
+
+        // --- 4. ROUTING ---
         function route(viewId, btnEl = null) {
-            // Hide all sections
             document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
-            // Remove active class from sidebar
             document.querySelectorAll('.side-item').forEach(el => el.classList.remove('active'));
             
-            // Show target
             document.getElementById(`view-${viewId}`).style.display = 'block';
             if(btnEl) btnEl.classList.add('active');
 
-            // Execute Logic based on view
             if(viewId === 'radar') buildRadar();
             if(viewId === 'orders') buildOrderBook();
+            if(viewId === 'v360') populateV360Select();
+            if(viewId === 'crm') buildCRM();
+            if(viewId === 'risk') buildRiskRadar();
         }
 
         function loadFrame(url) {
@@ -244,7 +315,8 @@
             document.getElementById('content-frame').src = url;
         }
 
-        // --- MODULE 1: CONTROL TOWER (FLEET RADAR) ---
+        // --- 5. MODULE LOGIC ---
+
         function buildRadar() {
             const body = document.getElementById('radar-body');
             body.innerHTML = '';
@@ -252,22 +324,19 @@
             let cRent = 0, cAvail = 0, cFuture = 0, cTotal = 0;
 
             APP_DATA.cars.forEach(c => {
-                // 1. Valid Contract Filter
                 const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 if(!contract.includes('valid') && !contract.includes('ساري')) return;
                 cTotal++;
 
-                // 2. Plate Formatting
-                const plateNum = c['رقم اللوحة'] || "";
-                const plateLet = c['احرف اللوحة'] || "";
-                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${plateNum}</span> <span style="color:var(--accent); font-size:16px; margin-left:10px; font-weight:600;">${plateLet}</span>`;
+                const pNum = c['رقم اللوحة'] || "";
+                const pLet = c['احرف اللوحة'] || "";
+                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${pNum}</span> <span style="color:var(--accent); font-size:16px; margin-left:10px; font-weight:600;">${pLet}</span>`;
 
                 let status = '<span class="badge bg-green">AVAILABLE</span>';
                 let bookingInfo = '<span style="color:#666">No Active Contract</span>';
                 let finBadge = '<span class="badge" style="background:#333">NO DATA</span>';
                 let isRented = false;
 
-                // 3. Operational Calculations
                 APP_DATA.bookings.forEach(b => {
                     if(b['كود السيارة'] == c.id) {
                         const start = new Date(b['بداية التعاقد']);
@@ -277,27 +346,25 @@
                         if (now >= start && now <= end && !isLegacy) {
                             isRented = true;
                             status = '<span class="badge bg-red">RENTED</span>';
-                            bookingInfo = `<b>${b['اسم العميل']}</b><br><span style="color:#888; font-size:11px;">Ends: ${b['نهاية التعاقد'].split(' ')[0]}</span>`;
+                            bookingInfo = `<b style="color:var(--accent)">${b['اسم العميل']}</b><br><span style="color:#888; font-size:11px;">Ends: ${b['نهاية التعاقد'].split(' ')[0]}</span>`;
                             
-                            const paid = parseFloat(String(b['المدفوع EGP']).replace(/[^0-9.-]+/g,"")) || 0;
-                            const total = parseFloat(String(b['إجمالي المستحق (Total)']).replace(/[^0-9.-]+/g,"")) || 0;
+                            const paid = parseCurrency(b['المدفوع EGP']);
+                            const total = parseCurrency(b['إجمالي المستحق (Total)']);
                             if(paid >= total) finBadge = '<span class="badge bg-green">PAID</span>';
                             else finBadge = `<span class="badge bg-orange">DEBT: ${(total-paid).toLocaleString()}</span>`;
                         } else if (start > now && !isRented) {
-                            status = '<span class="badge" style="background:var(--primary);">UPCOMING</span>';
+                            status = '<span class="badge bg-orange" style="color:var(--primary); border-color:var(--primary)">UPCOMING</span>';
                             bookingInfo = `Starts: ${b['بداية التعاقد'].split(' ')[0]}`;
                         }
                     }
                 });
 
-                if(status.includes('RENTED')) cRent++;
-                else if(status.includes('AVAILABLE')) cAvail++;
-                else if(status.includes('UPCOMING')) cFuture++;
+                if(status.includes('RENTED')) cRent++; else if(status.includes('AVAILABLE')) cAvail++; else if(status.includes('UPCOMING')) cFuture++;
 
-                row = body.insertRow();
+                const row = body.insertRow();
                 row.innerHTML = `
                     <td>
-                        <div style="font-weight:800; font-size:15px; color:var(--accent);">#${c.id}</div>
+                        <div style="font-weight:800; font-size:15px; color:var(--primary);">#${c.id}</div>
                         <div style="font-weight:600;">${c['Type'] || ''} ${c['Model'] || ''}</div>
                         <div style="font-size:11px; color:#888;">${c['سنة الصنع'] || ''} | ${c['Color'] || ''}</div>
                     </td>
@@ -305,7 +372,6 @@
                     <td>${status}</td>
                     <td>${bookingInfo}</td>
                     <td>${finBadge}</td>
-                    <td><button class="action-btn" title="Edit Car"><i class="fa-solid fa-pen-to-square"></i></button></td>
                 `;
             });
 
@@ -315,7 +381,6 @@
             document.getElementById('r-total').innerText = cTotal;
         }
 
-        // --- MODULE 2: MASTER ORDER BOOK ---
         function buildOrderBook() {
             const body = document.getElementById('orders-body');
             body.innerHTML = '';
@@ -323,13 +388,10 @@
             APP_DATA.bookings.forEach(b => {
                 const start = new Date(b['بداية التعاقد']);
                 const isLegacy = start.getFullYear() < 2026;
-                
-                const total = parseFloat(String(b['إجمالي المستحق (Total)']).replace(/[^0-9.-]+/g,"")) || 0;
-                let paid = parseFloat(String(b['المدفوع EGP']).replace(/[^0-9.-]+/g,"")) || 0;
-                
+                const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                let paid = parseCurrency(b['المدفوع EGP']);
                 let statusBadge = '';
                 
-                // If pre-2026, force paid and closed
                 if(isLegacy) {
                     paid = total;
                     statusBadge = '<span class="badge bg-green">LEGACY CLOSED</span>';
@@ -338,20 +400,148 @@
                     else statusBadge = '<span class="badge bg-orange">PENDING</span>';
                 }
 
-                row = body.insertRow();
+                const row = body.insertRow();
                 row.innerHTML = `
                     <td><b>#${b.id}</b></td>
-                    <td>${b['اسم العميل'] || '-'}</td>
+                    <td style="color:var(--accent); font-weight:600;">${b['اسم العميل'] || '-'}</td>
                     <td>Car #${b['كود السيارة']}</td>
-                    <td><div style="font-size:12px;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td>
-                    <td style="font-weight:bold;">${total.toLocaleString()} <span style="font-size:10px; color:#888;">EGP</span></td>
-                    <td style="color:var(--success); font-weight:bold;">${paid.toLocaleString()}</td>
+                    <td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td>
+                    <td style="font-weight:bold;">${formatEGP(total)}</td>
+                    <td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td>
                     <td>${statusBadge}</td>
                 `;
             });
         }
 
-        // Utility: Table Search
+        function populateV360Select() {
+            const select = document.getElementById('v360-select');
+            if(select.options.length > 1) return; // Already populated
+            APP_DATA.cars.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.innerText = `[${c.id}] ${c['Type'] || ''} ${c['Model'] || ''} - ${c['رقم اللوحة'] || ''}`;
+                select.appendChild(opt);
+            });
+        }
+
+        function buildV360() {
+            const carId = document.getElementById('v360-select').value;
+            if(!carId) return;
+
+            const body = document.getElementById('v360-body');
+            body.innerHTML = '';
+            
+            let totalRev = 0, totalMaint = 0, trips = 0;
+            let timeline = [];
+
+            // Get Revenue
+            APP_DATA.bookings.forEach(b => {
+                if(b['كود السيارة'] == carId) {
+                    const rev = parseCurrency(b['إجمالي المستحق (Total)']);
+                    totalRev += rev;
+                    trips++;
+                    timeline.push({ id: b.id, type: '<span class="badge bg-green">RENTAL</span>', date: b['بداية التعاقد']?.split(' ')[0], desc: `Rented to ${b['اسم العميل']}`, amt: formatEGP(rev) });
+                }
+            });
+
+            // Get Expenses
+            APP_DATA.car_expenses.forEach(e => {
+                if(e['كود السيارة'] == carId || e['كود السيارة\r'] == carId) {
+                    const amt = parseCurrency(e['قيمة المصروف']);
+                    totalMaint += amt;
+                    timeline.push({ id: e.id || '-', type: '<span class="badge bg-red">EXPENSE</span>', date: `${e['سنة']}-${e['شهر']}-${e['يوم']}`, desc: e['بيان الصيانة'] || e['بيان النثريات'], amt: formatEGP(amt) });
+                }
+            });
+
+            document.getElementById('v-rev').innerText = formatEGP(totalRev);
+            document.getElementById('v-maint').innerText = formatEGP(totalMaint);
+            document.getElementById('v-trips').innerText = trips;
+
+            // Sort by Date Descending
+            timeline.sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            timeline.forEach(t => {
+                const row = body.insertRow();
+                row.innerHTML = `<td>#${t.id}</td><td>${t.type}</td><td>${t.date}</td><td>${t.desc}</td><td style="font-weight:bold;">${t.amt}</td>`;
+            });
+        }
+
+        function buildCRM() {
+            const body = document.getElementById('crm-body');
+            body.innerHTML = '';
+            
+            const clients = {};
+            let totalDep = 0;
+
+            APP_DATA.bookings.forEach(b => {
+                const name = b['اسم العميل'];
+                if(!name) return;
+                
+                if(!clients[name]) clients[name] = { trips: 0, spendEGP: 0, spendUSD: 0, deposit: 0 };
+                
+                clients[name].trips++;
+                clients[name].spendEGP += parseCurrency(b['إجمالي المستحق (Total)']);
+                clients[name].spendUSD += parseCurrency(b['المدفوع USD']);
+                
+                const dep = parseCurrency(b['الوديعة المعلقة لدينا']);
+                clients[name].deposit += dep;
+                totalDep += dep;
+            });
+
+            document.getElementById('crm-total').innerText = Object.keys(clients).length;
+            document.getElementById('crm-dep').innerText = formatEGP(totalDep);
+
+            // Sort by Spend
+            const sortedClients = Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP);
+
+            sortedClients.forEach(([name, data]) => {
+                const row = body.insertRow();
+                row.innerHTML = `
+                    <td style="color:var(--accent); font-weight:bold;">${name}</td>
+                    <td>${data.trips}</td>
+                    <td>${formatEGP(data.spendEGP)}</td>
+                    <td>$${data.spendUSD.toLocaleString()}</td>
+                    <td style="color:${data.deposit > 0 ? 'var(--danger)' : 'var(--success)'}">${formatEGP(data.deposit)}</td>
+                `;
+            });
+        }
+
+        function buildRiskRadar() {
+            const body = document.getElementById('risk-body');
+            body.innerHTML = '';
+            const now = new Date();
+
+            APP_DATA.cars.forEach(c => {
+                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
+                if(!contract.includes('valid') && !contract.includes('ساري')) return;
+
+                const name = `#${c.id} - ${c['Type'] || ''} ${c['Model'] || ''}`;
+                
+                const checkRisk = (dateStr, type) => {
+                    if(!dateStr || dateStr.toLowerCase() === 'nan') return;
+                    const d = new Date(dateStr);
+                    if(isNaN(d)) return;
+                    
+                    const diffTime = d - now;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if(diffDays > 180) return; // Low Risk, ignore for radar
+
+                    let badge = '<span class="badge bg-orange">MEDIUM (3-6m)</span>';
+                    if(diffDays <= 90) badge = '<span class="badge bg-red">HIGH (0-3m)</span>';
+                    if(diffDays < 0) badge = '<span class="badge" style="background:#e74c3c; color:white;">EXPIRED</span>';
+
+                    const row = body.insertRow();
+                    row.innerHTML = `<td><b>${name}</b></td><td style="color:#aaa;">${type}</td><td>${d.toLocaleDateString()}</td><td>${diffDays} days</td><td>${badge}</td>`;
+                };
+
+                checkRisk(c['نهاية الترخيص'], 'License');
+                checkRisk(c['نهاية التأمين'], 'Insurance');
+                checkRisk(c['نهاية التعاقد'], 'Owner Contract');
+            });
+        }
+
+        // Utility: Search Table
         function searchTable(tbodyId, inputId) {
             const filter = document.getElementById(inputId).value.toLowerCase();
             const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
