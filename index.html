@@ -20,8 +20,8 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', 'Cairo', sans-serif; background: linear-gradient(135deg, #05070a 0%, #11141d 100%); color: white; overflow: hidden; }
         
         /* Video Background */
-        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
+        .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; pointer-events: none; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.35); }
 
         /* Centered Login */
         #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
@@ -70,9 +70,12 @@
         .bg-red { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
         .bg-orange { background: rgba(230, 126, 34, 0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
 
-        /* Inputs */
-        .search-bar, select { width: 100%; padding: 15px 20px; background: rgba(15, 20, 25, 0.9); border: 1px solid var(--glass-border); border-radius: 12px; color: white; margin-bottom: 20px; font-size: 14px; outline: none; }
-        select { cursor: pointer; }
+        /* Inputs & Filters */
+        .filter-row { display: flex; gap: 15px; margin-bottom: 20px; }
+        .search-bar, select { padding: 14px 20px; background: rgba(15, 20, 25, 0.9); border: 1px solid var(--glass-border); border-radius: 12px; color: white; font-size: 14px; outline: none; }
+        .search-bar { flex-grow: 1; }
+        select { cursor: pointer; width: 220px; }
+        
         iframe { width: 100%; height: 100%; border: none; border-radius: 15px; background: white; }
 
         /* Full Screen Loader */
@@ -85,7 +88,7 @@
 
     <div class="video-wrapper">
         <video autoplay muted loop playsinline id="bg-video">
-            <source src="background.mp4" type="video/mp4">
+            <source src="./background.mp4" type="video/mp4">
         </video>
     </div>
 
@@ -108,7 +111,6 @@
     <div id="app-layout">
         <nav class="navbar">
             <div style="display: flex; align-items: center; gap: 15px;">
-                <button onclick="route('home')" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
                 <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="32">
                 <span style="font-weight: 800; letter-spacing: 1px; font-size: 16px;">BROTHERS EGY</span>
             </div>
@@ -119,8 +121,9 @@
                 <button class="top-btn access-rec" onclick="loadFrame('receipt.html')">Digital Receipt</button>
             </div>
             <div style="display:flex; align-items:center; gap:15px;">
-                <div style="text-align:right; font-size:12px; color:#aaa;">Role<br><b id="display-role" style="color:var(--accent); font-size:14px;">-</b></div>
-                <button onclick="location.reload()" style="background:#e74c3c; color:white; border:none; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+                <div style="text-align:right; font-size:12px; color:#aaa; margin-right:10px;">Role<br><b id="display-role" style="color:var(--accent); font-size:14px;">-</b></div>
+                <button onclick="route('home')" title="Return Home" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer; transition:0.2s;"><i class="fa-solid fa-house"></i></button>
+                <button onclick="location.reload()" title="Secure Logout" style="background:#e74c3c; color:white; border:none; width:40px; height:40px; border-radius:10px; cursor:pointer; transition:0.2s;"><i class="fa-solid fa-power-off"></i></button>
             </div>
         </nav>
 
@@ -152,7 +155,16 @@
                     <div class="m-card"><label>Upcoming Bookings</label><div class="val" id="r-future" style="color:var(--accent)">0</div></div>
                     <div class="m-card"><label>Tracked Cars</label><div class="val" id="r-total" style="color:white">0</div></div>
                 </div>
-                <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')">
+                
+                <div class="filter-row">
+                    <select id="radar-status-filter" onchange="buildRadar()">
+                        <option value="active">Active Fleet Only</option>
+                        <option value="all">All Registered Vehicles</option>
+                        <option value="archive">Archived / Stopped</option>
+                    </select>
+                    <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="margin-bottom:0;">
+                </div>
+
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead><tr><th>Vehicle ID & Specs</th><th>Plate Identity</th><th>Status</th><th>Current Assignment</th><th>Financial State</th></tr></thead>
@@ -163,7 +175,17 @@
 
             <div id="view-orders" class="view-section">
                 <h2>📋 Master Order Book</h2>
-                <input type="text" class="search-bar" id="search-orders" placeholder="Search Order # or Customer..." onkeyup="searchTable('orders-body', 'search-orders')">
+                
+                <div class="filter-row">
+                    <select id="order-period-filter" onchange="buildOrderBook()">
+                        <option value="all">All Time History</option>
+                        <option value="this_month">This Month</option>
+                        <option value="last_month">Last Month</option>
+                        <option value="this_year">This Year</option>
+                    </select>
+                    <input type="text" class="search-bar" id="search-orders" placeholder="Search Order # or Customer..." onkeyup="searchTable('orders-body', 'search-orders')" style="margin-bottom:0;">
+                </div>
+
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead><tr><th>Order #</th><th>Customer</th><th>Car</th><th>Period</th><th>Grand Total</th><th>Paid</th><th>Status</th></tr></thead>
@@ -174,17 +196,17 @@
 
             <div id="view-v360" class="view-section">
                 <h2>🚗 Vehicle 360</h2>
-                <select id="v360-select" onchange="buildV360()">
+                <select id="v360-select" onchange="buildV360()" style="width:100%; margin-bottom:20px;">
                     <option value="">-- Select a Vehicle --</option>
                 </select>
-                <div class="metrics-grid" style="margin-top:20px;">
+                <div class="metrics-grid">
                     <div class="m-card"><label>Total Generated</label><div class="val" id="v-rev">0 EGP</div></div>
                     <div class="m-card"><label>Maintenance Spent</label><div class="val" id="v-maint" style="color:var(--danger)">0 EGP</div></div>
                     <div class="m-card"><label>Total Trips</label><div class="val" id="v-trips" style="color:white">0</div></div>
                 </div>
                 <div class="table-responsive">
                     <table class="data-table">
-                        <thead><tr><th>Order/Expense ID</th><th>Type</th><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+                        <thead><tr><th>ID</th><th>Record Type</th><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
                         <tbody id="v360-body"></tbody>
                     </table>
                 </div>
@@ -224,12 +246,18 @@
     </div>
 
     <script>
+        // Force video play for strict browsers
+        document.addEventListener('DOMContentLoaded', () => {
+            const vid = document.getElementById('bg-video');
+            if(vid) vid.play().catch(e => console.log("Auto-play constrained by browser."));
+        });
+
         // --- 1. FIREBASE & GLOBALS ---
         const firebaseConfig = { apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal", appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        const APP_DATA = { cars: [], bookings: [], car_expenses: [], clients: [], user: null };
+        const APP_DATA = { cars: [], bookings: [], car_expenses: [], user: null };
 
         // --- 2. AUTHENTICATION ---
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
@@ -249,12 +277,12 @@
                     APP_DATA.user = userDoc.data();
                     
                     document.getElementById('login-overlay').style.display = 'none';
-                    document.getElementById('data-loader').style.display = 'flex'; // Show loader
+                    document.getElementById('data-loader').style.display = 'flex'; 
                     
                     applyPermissions(APP_DATA.user.access);
                     document.getElementById('display-role').innerText = APP_DATA.user.role || "Executive";
                     
-                    await loadCloudData(); // Fetch everything
+                    await loadCloudData(); 
                     
                     document.getElementById('data-loader').style.display = 'none';
                     document.getElementById('app-layout').style.display = 'block';
@@ -270,7 +298,7 @@
             if(accessArray.includes(7)) document.getElementById('nav-fin').style.display = 'flex';
         }
 
-        // --- 3. DATA ENGINE (The Pandas Replacement) ---
+        // --- 3. DATA ENGINE ---
         async function loadCloudData() {
             const cSnap = await db.collection('fleet').get();
             cSnap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
@@ -288,10 +316,7 @@
             if(!val) return 0;
             return parseFloat(String(val).replace(/[^0-9.-]+/g,"")) || 0;
         }
-
-        function formatEGP(val) {
-            return val.toLocaleString() + " ج.م";
-        }
+        function formatEGP(val) { return val.toLocaleString() + " EGP"; }
 
         // --- 4. ROUTING ---
         function route(viewId, btnEl = null) {
@@ -321,16 +346,22 @@
             const body = document.getElementById('radar-body');
             body.innerHTML = '';
             const now = new Date();
+            const filter = document.getElementById('radar-status-filter').value;
             let cRent = 0, cAvail = 0, cFuture = 0, cTotal = 0;
 
             APP_DATA.cars.forEach(c => {
                 const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
-                if(!contract.includes('valid') && !contract.includes('ساري')) return;
+                const isActive = contract.includes('valid') || contract.includes('ساري');
+                
+                // Apply Fleet Status Filter
+                if(filter === 'active' && !isActive) return;
+                if(filter === 'archive' && isActive) return;
                 cTotal++;
 
-                const pNum = c['رقم اللوحة'] || "";
-                const pLet = c['احرف اللوحة'] || "";
-                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${pNum}</span> <span style="color:var(--accent); font-size:16px; margin-left:10px; font-weight:600;">${pLet}</span>`;
+                // Plate Smart Decoder (Checks for explicitly named 'plate' field, or combines them)
+                let rawPlate = c['Plate'] || c['plate'] || c['رقم اللوحة'] || "";
+                let rawLetters = c['احرف اللوحة'] || "";
+                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${rawPlate}</span> <span style="color:var(--accent); font-size:16px; margin-left:8px; font-weight:600;">${rawLetters}</span>`;
 
                 let status = '<span class="badge bg-green">AVAILABLE</span>';
                 let bookingInfo = '<span style="color:#666">No Active Contract</span>';
@@ -368,7 +399,7 @@
                         <div style="font-weight:600;">${c['Type'] || ''} ${c['Model'] || ''}</div>
                         <div style="font-size:11px; color:#888;">${c['سنة الصنع'] || ''} | ${c['Color'] || ''}</div>
                     </td>
-                    <td>${plateHTML}</td>
+                    <td style="direction:rtl; text-align:right;">${plateHTML}</td>
                     <td>${status}</td>
                     <td>${bookingInfo}</td>
                     <td>${finBadge}</td>
@@ -383,10 +414,22 @@
 
         function buildOrderBook() {
             const body = document.getElementById('orders-body');
+            const periodFilter = document.getElementById('order-period-filter').value;
+            const now = new Date();
             body.innerHTML = '';
             
             APP_DATA.bookings.forEach(b => {
+                if(!b['بداية التعاقد']) return;
                 const start = new Date(b['بداية التعاقد']);
+                
+                // Apply Period Filter
+                if (periodFilter === 'this_month' && (start.getMonth() !== now.getMonth() || start.getFullYear() !== now.getFullYear())) return;
+                if (periodFilter === 'last_month') {
+                    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    if (start.getMonth() !== lastMonth.getMonth() || start.getFullYear() !== lastMonth.getFullYear()) return;
+                }
+                if (periodFilter === 'this_year' && start.getFullYear() !== now.getFullYear()) return;
+
                 const isLegacy = start.getFullYear() < 2026;
                 const total = parseCurrency(b['إجمالي المستحق (Total)']);
                 let paid = parseCurrency(b['المدفوع EGP']);
@@ -415,11 +458,11 @@
 
         function populateV360Select() {
             const select = document.getElementById('v360-select');
-            if(select.options.length > 1) return; // Already populated
+            if(select.options.length > 1) return; 
             APP_DATA.cars.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.id;
-                opt.innerText = `[${c.id}] ${c['Type'] || ''} ${c['Model'] || ''} - ${c['رقم اللوحة'] || ''}`;
+                opt.innerText = `[#${c.id}] ${c['Type'] || ''} ${c['Model'] || ''} - ${c['رقم اللوحة'] || ''} ${c['احرف اللوحة'] || ''}`;
                 select.appendChild(opt);
             });
         }
@@ -434,7 +477,6 @@
             let totalRev = 0, totalMaint = 0, trips = 0;
             let timeline = [];
 
-            // Get Revenue
             APP_DATA.bookings.forEach(b => {
                 if(b['كود السيارة'] == carId) {
                     const rev = parseCurrency(b['إجمالي المستحق (Total)']);
@@ -444,7 +486,6 @@
                 }
             });
 
-            // Get Expenses
             APP_DATA.car_expenses.forEach(e => {
                 if(e['كود السيارة'] == carId || e['كود السيارة\r'] == carId) {
                     const amt = parseCurrency(e['قيمة المصروف']);
@@ -457,9 +498,7 @@
             document.getElementById('v-maint').innerText = formatEGP(totalMaint);
             document.getElementById('v-trips').innerText = trips;
 
-            // Sort by Date Descending
             timeline.sort((a,b) => new Date(b.date) - new Date(a.date));
-            
             timeline.forEach(t => {
                 const row = body.insertRow();
                 row.innerHTML = `<td>#${t.id}</td><td>${t.type}</td><td>${t.date}</td><td>${t.desc}</td><td style="font-weight:bold;">${t.amt}</td>`;
@@ -469,14 +508,12 @@
         function buildCRM() {
             const body = document.getElementById('crm-body');
             body.innerHTML = '';
-            
             const clients = {};
             let totalDep = 0;
 
             APP_DATA.bookings.forEach(b => {
                 const name = b['اسم العميل'];
                 if(!name) return;
-                
                 if(!clients[name]) clients[name] = { trips: 0, spendEGP: 0, spendUSD: 0, deposit: 0 };
                 
                 clients[name].trips++;
@@ -491,10 +528,7 @@
             document.getElementById('crm-total').innerText = Object.keys(clients).length;
             document.getElementById('crm-dep').innerText = formatEGP(totalDep);
 
-            // Sort by Spend
-            const sortedClients = Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP);
-
-            sortedClients.forEach(([name, data]) => {
+            Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP).forEach(([name, data]) => {
                 const row = body.insertRow();
                 row.innerHTML = `
                     <td style="color:var(--accent); font-weight:bold;">${name}</td>
@@ -522,17 +556,15 @@
                     const d = new Date(dateStr);
                     if(isNaN(d)) return;
                     
-                    const diffTime = d - now;
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    if(diffDays > 180) return; // Low Risk, ignore for radar
+                    const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
+                    if(diffDays > 180) return; 
 
                     let badge = '<span class="badge bg-orange">MEDIUM (3-6m)</span>';
                     if(diffDays <= 90) badge = '<span class="badge bg-red">HIGH (0-3m)</span>';
                     if(diffDays < 0) badge = '<span class="badge" style="background:#e74c3c; color:white;">EXPIRED</span>';
 
                     const row = body.insertRow();
-                    row.innerHTML = `<td><b>${name}</b></td><td style="color:#aaa;">${type}</td><td>${d.toLocaleDateString()}</td><td>${diffDays} days</td><td>${badge}</td>`;
+                    row.innerHTML = `<td><b>${name}</b></td><td style="color:#888;">${type}</td><td>${d.toLocaleDateString()}</td><td style="font-weight:bold;">${diffDays} days</td><td>${badge}</td>`;
                 };
 
                 checkRisk(c['نهاية الترخيص'], 'License');
@@ -541,7 +573,6 @@
             });
         }
 
-        // Utility: Search Table
         function searchTable(tbodyId, inputId) {
             const filter = document.getElementById(inputId).value.toLowerCase();
             const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
