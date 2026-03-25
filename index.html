@@ -3,63 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brothers EGY - Executive Fusion Hub</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <title>Brothers EGY - Master Cloud ERP</title>
     
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
         :root { 
             --primary: #04509D; --accent: #e67e22; --success: #2ecc71; --danger: #e74c3c;
-            --glass-bg: rgba(255, 255, 255, 0.05); --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(15, 20, 25, 0.85); --glass-border: rgba(255, 255, 255, 0.1);
+            --sidebar-w: 260px;
         }
         
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', sans-serif; background-color: #000; color: white; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', 'Cairo', sans-serif; background: #000; color: white; overflow: hidden; }
         
         /* Video Background */
         .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.35); }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.3); }
 
         /* Centered Login */
-        #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-box { background: rgba(15, 15, 15, 0.9); padding: 50px 40px; border-radius: 30px; border: 1px solid var(--glass-border); text-align: center; max-width: 380px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
-        .login-box img { height: 70px; margin-bottom: 25px; }
-        .login-box input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #444; background: white; color: #333; text-align: center; font-weight: 600; box-sizing: border-box; }
+        #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .login-box { background: rgba(15, 15, 15, 0.95); padding: 50px 40px; border-radius: 30px; border: 1px solid var(--glass-border); text-align: center; width: 350px; box-shadow: 0 25px 50px rgba(0,0,0,0.8); }
+        .login-box img { height: 75px; margin-bottom: 20px; }
+        .login-box input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid #444; background: white; color: #111; text-align: center; font-weight: bold; box-sizing: border-box; }
         .login-box button { width: 100%; padding: 14px; margin-top: 15px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: 800; cursor: pointer; transition: 0.3s; }
         .login-box button:hover { background: #0560bd; }
 
-        /* Layout Structure */
-        #main-portal { display: none; height: 100vh; flex-direction: column; }
+        /* Application Layout */
+        #app-layout { display: none; height: 100vh; width: 100vw; }
         
-        .navbar { position: fixed; top: 0; width: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 12px 30px; z-index: 100; box-sizing: border-box; }
-        
+        /* Top Navbar */
+        .navbar { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 100; box-sizing: border-box; }
         .nav-tabs { display: flex; gap: 10px; }
-        .tab-btn { background: var(--glass-bg); color: white; border: 1px solid var(--glass-border); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 600; display: none; transition: 0.3s; }
-        .tab-btn.active, .tab-btn:hover { background: white; color: var(--primary); }
+        .top-btn { background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--glass-border); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: none; transition: 0.2s; }
+        .top-btn:hover { background: white; color: var(--primary); }
+        
+        /* Sidebar (Streamlit Modules) */
+        .sidebar { position: fixed; top: 70px; left: 0; width: var(--sidebar-w); height: calc(100vh - 70px); background: var(--glass-bg); backdrop-filter: blur(20px); border-right: 1px solid var(--glass-border); padding: 20px 15px; box-sizing: border-box; display: flex; flex-direction: column; z-index: 90; }
+        .side-item { padding: 14px 15px; margin-bottom: 8px; border-radius: 10px; cursor: pointer; color: #aaa; font-weight: 600; display: flex; align-items: center; gap: 12px; transition: 0.3s; }
+        .side-item i { font-size: 1.2rem; width: 25px; text-align: center; }
+        .side-item:hover, .side-item.active { background: var(--primary); color: white; box-shadow: 0 5px 15px rgba(4,80,157,0.3); }
 
-        .content-container { margin-top: 70px; height: calc(100vh - 70px); overflow-y: auto; padding: 30px; box-sizing: border-box; }
+        /* Main Workspace */
+        .workspace { margin-top: 70px; margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); height: calc(100vh - 70px); padding: 30px; box-sizing: border-box; overflow-y: auto; background: rgba(0,0,0,0.4); }
+        .view-section { display: none; }
         
-        /* Dashboard Cards */
-        .dashboard-center { text-align: center; padding-top: 5vh; }
-        .menu-grid { display: flex; gap: 25px; margin-top: 50px; flex-wrap: wrap; justify-content: center; }
-        .menu-card { background: var(--glass-bg); backdrop-filter: blur(15px); padding: 40px 30px; border-radius: 25px; border: 1px solid var(--glass-border); cursor: pointer; width: 210px; transition: 0.4s; display: none; text-align: center; }
-        .menu-card:hover { transform: translateY(-10px); border-color: var(--accent); background: rgba(255,255,255,0.08); }
-        .menu-card i { font-size: 2.5rem; color: var(--accent); margin-bottom: 20px; display: block; }
+        /* Metrics & Tables */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .m-card { background: rgba(20, 25, 35, 0.8); border: 1px solid var(--glass-border); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .m-card label { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .m-card .val { font-size: 28px; font-weight: 800; margin-top: 5px; }
 
-        /* Fleet Radar Table */
-        .radar-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: 10px; }
-        .radar-table th { padding: 15px; text-align: left; font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1px; }
-        .radar-table tr td { background: rgba(20, 20, 20, 0.6); padding: 18px 15px; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
-        .radar-table tr td:first-child { border-left: 1px solid var(--glass-border); border-top-left-radius: 15px; border-bottom-left-radius: 15px; }
-        .radar-table tr td:last-child { border-right: 1px solid var(--glass-border); border-top-right-radius: 15px; border-bottom-right-radius: 15px; }
+        .data-table { width: 100%; border-collapse: collapse; background: rgba(15, 20, 25, 0.9); border-radius: 15px; overflow: hidden; border: 1px solid var(--glass-border); }
+        .data-table th { background: rgba(255,255,255,0.03); padding: 18px; text-align: left; font-size: 12px; color: #888; text-transform: uppercase; border-bottom: 1px solid var(--glass-border); }
+        .data-table td { padding: 18px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 14px; }
+        .data-table tr:hover { background: rgba(255,255,255,0.02); }
+
+        .badge { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+        .bg-green { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
+        .bg-red { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+        .bg-orange { background: rgba(230, 126, 34, 0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
         
-        .badge { padding: 5px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-        .bg-rented { background: rgba(231, 76, 60, 0.2); color: #ff6b6b; border: 1px solid rgba(231,76,60,0.3); }
-        .bg-avail { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
-        
-        iframe { width: 100%; height: 100%; border: none; display: none; border-radius: 20px; background: white; }
+        .action-btn { background: transparent; border: none; color: #888; cursor: pointer; transition: 0.2s; font-size: 16px; }
+        .action-btn:hover { color: white; }
+
+        iframe { width: 100%; height: 100%; border: none; border-radius: 15px; background: white; }
+        .search-bar { width: 100%; padding: 15px 20px; background: rgba(15, 20, 25, 0.9); border: 1px solid var(--glass-border); border-radius: 12px; color: white; margin-bottom: 20px; font-size: 15px; }
+
+        /* Loading Spinner */
+        .loader { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 50px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -71,206 +86,278 @@
     <div id="login-overlay">
         <div class="login-box">
             <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Brothers Logo">
-            <h2 style="margin:0; font-weight:800; letter-spacing:-1px;">EXECUTIVE HUB</h2>
-            <p id="login-status" style="color:#666; font-size: 11px; margin-bottom: 25px;">SECURE FIREBASE AUTHENTICATION</p>
+            <h2 style="margin:0 0 5px 0; font-weight:800; letter-spacing:-1px;">EXECUTIVE ERP</h2>
+            <p id="login-status" style="color:#888; font-size: 11px; margin-bottom: 25px;">SECURE CLOUD AUTHENTICATION</p>
             <input type="text" id="user-field" placeholder="Username" autocomplete="off">
             <input type="password" id="pass-field" placeholder="Password">
             <button onclick="attemptLogin()">AUTHORIZE ACCESS</button>
         </div>
     </div>
 
-    <div id="main-portal">
+    <div id="app-layout">
+        
         <nav class="navbar">
-            <div onclick="showHome()" style="cursor: pointer; display: flex; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button onclick="route('home')" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
                 <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="32">
-                <span style="font-weight: 800; letter-spacing: 1px; font-size: 15px;">BROTHERS EGY</span>
+                <span style="font-weight: 800; letter-spacing: 1px; font-size: 16px;">BROTHERS EGY</span>
             </div>
             <div class="nav-tabs">
-                <button class="tab-btn access-radar" onclick="showRadar(this)">Fleet Radar</button>
-                <button class="tab-btn access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Proposal</button>
-                <button class="tab-btn access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/', this)">EN Contract</button>
-                <button class="tab-btn access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">AR Contract</button>
-                <button class="tab-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
+                <button class="top-btn access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/')">Price Proposal</button>
+                <button class="top-btn access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/')">EN Contract</button>
+                <button class="top-btn access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/')">AR Contract</button>
+                <button class="top-btn access-rec" onclick="loadFrame('receipt.html')">Digital Receipt</button>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button onclick="showHome()" style="background:var(--glass-bg); color:white; border:1px solid var(--glass-border); padding:8px 12px; border-radius:8px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
-                <button onclick="location.reload()" style="background:#e74c3c; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div style="text-align:right; font-size:12px; color:#aaa;">Role<br><b id="display-role" style="color:var(--accent); font-size:14px;">-</b></div>
+                <button onclick="location.reload()" style="background:#e74c3c; color:white; border:none; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
             </div>
         </nav>
 
-        <div class="content-container" id="main-scroll">
-            <div id="home-content" class="dashboard-center">
-                <h1 style="font-size: 3.5rem; font-weight: 800; margin: 0; letter-spacing: -3px;">Executive Dashboard</h1>
-                <p style="opacity: 0.5; font-size: 14px; margin-top: 5px;">Welcome back, <span id="display-role" style="color:var(--accent); font-weight:bold;">Executive</span></p>
-                <div class="menu-grid">
-                    <div class="menu-card access-radar" onclick="showRadar()">
-                        <i class="fa-solid fa-tower-broadcast"></i><h4>Fleet Radar</h4>
-                    </div>
-                    <div class="menu-card access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/')">
-                        <i class="fa-solid fa-file-invoice-dollar"></i><h4>Proposal</h4>
-                    </div>
-                    <div class="menu-card access-en" onclick="loadFrame('https://sabryabr.github.io/Brothers-contract/')">
-                        <i class="fa-solid fa-shield-halved"></i><h4>EN Contract</h4>
-                    </div>
-                    <div class="menu-card access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/')">
-                        <i class="fa-solid fa-file-signature"></i><h4>AR Contract</h4>
-                    </div>
-                </div>
+        <div class="sidebar">
+            <div style="font-size:11px; color:#666; margin-bottom:10px; padding-left:10px; font-weight:bold;">OPERATIONS</div>
+            <div class="side-item active" onclick="route('radar', this)"><i class="fa-solid fa-tower-broadcast"></i> Fleet Radar</div>
+            <div class="side-item" onclick="route('orders', this)"><i class="fa-solid fa-book-open"></i> Order Book</div>
+            <div class="side-item" onclick="route('v360', this)"><i class="fa-solid fa-car-on"></i> Vehicle 360</div>
+            
+            <div style="font-size:11px; color:#666; margin:20px 0 10px 10px; font-weight:bold;">MANAGEMENT</div>
+            <div class="side-item" onclick="route('crm', this)"><i class="fa-solid fa-users"></i> CRM Hub</div>
+            <div class="side-item" onclick="route('fin', this)" id="nav-fin" style="display:none;"><i class="fa-solid fa-vault"></i> Financial HQ</div>
+            <div class="side-item" onclick="route('risk', this)"><i class="fa-solid fa-shield-exclamation"></i> Risk Radar</div>
+        </div>
+
+        <div class="workspace">
+            
+            <div id="view-home" class="view-section" style="text-align:center; padding-top:10vh; display:block;">
+                <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="100" style="opacity:0.8">
+                <h1 style="font-size:4rem; margin:20px 0 0 0; letter-spacing:-2px;">Executive Database</h1>
+                <p style="color:#888; font-size:1.2rem;">Select a module from the sidebar to begin.</p>
             </div>
 
-            <div id="radar-content" style="display:none;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:25px;">
-                    <div>
-                        <h2 style="margin:0; font-size: 24px;">Fleet Operations Radar</h2>
-                        <p style="color:#666; font-size:12px; margin:0;">Real-time tracking of active contracting fleet</p>
-                    </div>
-                    <div id="radar-stats" style="text-align:right; font-size:12px; font-weight:bold; color:var(--success);"></div>
+            <div id="view-radar" class="view-section">
+                <h2>🛰️ Fleet Operations Radar</h2>
+                <div class="metrics-grid">
+                    <div class="m-card"><label>Active Rentals</label><div class="val" id="r-rented">0</div></div>
+                    <div class="m-card"><label>Available Fleet</label><div class="val" id="r-avail" style="color:var(--success)">0</div></div>
+                    <div class="m-card"><label>Upcoming</label><div class="val" id="r-future" style="color:var(--primary)">0</div></div>
+                    <div class="m-card"><label>Total Tracked</label><div class="val" id="r-total">0</div></div>
                 </div>
-                <table class="radar-table">
-                    <thead>
-                        <tr>
-                            <th>Vehicle Specs</th>
-                            <th>Plate Identity</th>
-                            <th>Status</th>
-                            <th>Current Booking</th>
-                            <th>Accounting</th>
-                        </tr>
-                    </thead>
+                <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')">
+                <table class="data-table">
+                    <thead><tr><th>Vehicle ID & Specs</th><th>Plate Identity</th><th>Status</th><th>Current Assignment</th><th>Financial State</th><th>Action</th></tr></thead>
                     <tbody id="radar-body"></tbody>
                 </table>
             </div>
 
-            <iframe id="content-frame" src=""></iframe>
+            <div id="view-orders" class="view-section">
+                <h2>📋 Master Order Book</h2>
+                <input type="text" class="search-bar" id="search-orders" placeholder="Search Order # or Customer..." onkeyup="searchTable('orders-body', 'search-orders')">
+                <table class="data-table">
+                    <thead><tr><th>Order #</th><th>Customer</th><th>Car</th><th>Period</th><th>Grand Total</th><th>Paid</th><th>Status</th></tr></thead>
+                    <tbody id="orders-body"></tbody>
+                </table>
+            </div>
+
+            <div id="view-v360" class="view-section"><h2>🚗 Vehicle 360</h2><p style="color:#888">Select a vehicle to view its complete P&L, maintenance, and trip history.</p></div>
+            <div id="view-crm" class="view-section"><h2>👥 CRM Hub</h2><p style="color:#888">Client database, spend analytics, and retained deposits.</p></div>
+            <div id="view-fin" class="view-section"><h2>💰 Financial HQ</h2><p style="color:#888">Global P&L, Cash flow, and Owner Accruals.</p></div>
+            <div id="view-risk" class="view-section"><h2>⚠️ Risk Radar</h2><p style="color:#888">Tracking expiring licenses, insurance, and owner contracts.</p></div>
+
+            <div id="view-frame" class="view-section" style="height:100%;"><iframe id="content-frame" src=""></iframe></div>
+
         </div>
     </div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
-            projectId: "brothers-egy-portal",
-            appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal", appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Login with Enter Key
+        // Global Data Cache (Like load_data_v3 in Streamlit)
+        let APP_DATA = { cars: [], bookings: [], users: null };
+
+        // Enter Key Login
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
 
         async function attemptLogin() {
             const user = document.getElementById('user-field').value.toLowerCase().trim();
             const pass = document.getElementById('pass-field').value;
             const status = document.getElementById('login-status');
+            
             if(!user || !pass) return;
+            status.innerText = "AUTHENTICATING...";
+            status.style.color = "var(--primary)";
+
             try {
                 const userDoc = await db.collection("users").doc(user).get();
                 if (userDoc.exists && userDoc.data().password === pass) {
-                    const data = userDoc.data();
-                    applyPermissions(data.access);
+                    APP_DATA.user = userDoc.data();
+                    applyPermissions(APP_DATA.user.access);
+                    
                     document.getElementById('login-overlay').style.display = 'none';
-                    document.getElementById('main-portal').style.display = 'flex';
-                    document.getElementById('display-role').innerText = data.role || "Executive";
-                } else { throw new Error("Credentials Invalid"); }
+                    document.getElementById('app-layout').style.display = 'block';
+                    document.getElementById('display-role').innerText = APP_DATA.user.role || "Executive";
+                    
+                    // Pre-fetch critical databases to make tabs instant
+                    await loadCloudData();
+                } else { throw new Error("Invalid Credentials"); }
             } catch (err) { status.innerText = "ACCESS DENIED"; status.style.color = "var(--danger)"; }
         }
 
         function applyPermissions(accessArray) {
-            const map = {1:'.access-quote', 2:'.access-en', 3:'.access-ar', 4:'.access-rec', 5:'.access-radar'};
+            const map = {1:'.access-quote', 2:'.access-en', 3:'.access-ar', 4:'.access-rec'};
             Object.keys(map).forEach(key => {
                 if(accessArray.includes(parseInt(key))) document.querySelectorAll(map[key]).forEach(el => el.style.display = 'block');
             });
+            // Show Financial HQ if user has level 7 (Owner)
+            if(accessArray.includes(7)) document.getElementById('nav-fin').style.display = 'flex';
         }
 
-        async function showRadar(btn) {
-            hideAll();
-            document.getElementById('radar-content').style.display = 'block';
-            if(btn) setActiveTab(btn);
+        async function loadCloudData() {
+            const cSnap = await db.collection('fleet').get();
+            const bSnap = await db.collection('bookings').get();
             
+            cSnap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
+            bSnap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
+        }
+
+        // Routing Engine (Switching Tabs)
+        function route(viewId, btnEl = null) {
+            // Hide all sections
+            document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+            // Remove active class from sidebar
+            document.querySelectorAll('.side-item').forEach(el => el.classList.remove('active'));
+            
+            // Show target
+            document.getElementById(`view-${viewId}`).style.display = 'block';
+            if(btnEl) btnEl.classList.add('active');
+
+            // Execute Logic based on view
+            if(viewId === 'radar') buildRadar();
+            if(viewId === 'orders') buildOrderBook();
+        }
+
+        function loadFrame(url) {
+            document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.side-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-frame').style.display = 'block';
+            document.getElementById('content-frame').src = url;
+        }
+
+        // --- MODULE 1: CONTROL TOWER (FLEET RADAR) ---
+        function buildRadar() {
             const body = document.getElementById('radar-body');
-            body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:50px; opacity:0.5;">Analyzing Satellite Fleet Data...</td></tr>';
-
-            const cars = await db.collection('fleet').get();
-            const bookings = await db.collection('bookings').get();
-            const now = new Date();
-            let activeCount = 0;
             body.innerHTML = '';
+            const now = new Date();
+            let cRent = 0, cAvail = 0, cFuture = 0, cTotal = 0;
 
-            cars.forEach(doc => {
-                const c = doc.data();
+            APP_DATA.cars.forEach(c => {
+                // 1. Valid Contract Filter
                 const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 if(!contract.includes('valid') && !contract.includes('ساري')) return;
-                activeCount++;
+                cTotal++;
 
-                // Plate Construction: Spaced Numbers and Spaced Letters
-                const pNum = c['رقم اللوحة'] || "";
-                const pLet = c['احرف اللوحة'] || "";
-                const plateDisplay = `<span style="font-size:18px; font-weight:800; color:white;">${pNum}</span> <span style="color:var(--accent); font-weight:400; margin-left:10px;">${pLet}</span>`;
+                // 2. Plate Formatting
+                const plateNum = c['رقم اللوحة'] || "";
+                const plateLet = c['احرف اللوحة'] || "";
+                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${plateNum}</span> <span style="color:var(--accent); font-size:16px; margin-left:10px; font-weight:600;">${plateLet}</span>`;
 
-                let status = '<span class="badge bg-avail">AVAILABLE</span>';
-                let bookingInfo = '<span style="opacity:0.3">Idle</span>';
-                let financeBadge = '<span class="badge" style="background:#333;">NO RECORD</span>';
+                let status = '<span class="badge bg-green">AVAILABLE</span>';
+                let bookingInfo = '<span style="color:#666">No Active Contract</span>';
+                let finBadge = '<span class="badge" style="background:#333">NO DATA</span>';
+                let isRented = false;
 
-                bookings.forEach(bDoc => {
-                    const b = bDoc.data();
-                    if(b['كود السيارة'] == doc.id) {
-                        const startStr = b['بداية التعاقد'] || "";
-                        const endStr = b['نهاية التعاقد'] || "";
-                        const start = new Date(startStr);
-                        const end = new Date(endStr);
-                        
-                        // History Rule: Mark all before Jan 2026 as PAID/COMPLETED
+                // 3. Operational Calculations
+                APP_DATA.bookings.forEach(b => {
+                    if(b['كود السيارة'] == c.id) {
+                        const start = new Date(b['بداية التعاقد']);
+                        const end = new Date(b['نهاية التعاقد']);
                         const isLegacy = start.getFullYear() < 2026;
-                        
-                        if (now >= start && now <= end && !isLegacy) {
-                            status = '<span class="badge bg-rented">RENTED</span>';
-                            bookingInfo = `<div style="font-weight:bold;">${b['اسم العميل']}</div><div style="font-size:10px; color:#888;">Exp: ${endStr.split(' ')[0]}</div>`;
-                        }
 
-                        if(isLegacy) {
-                            financeBadge = '<span class="badge" style="border:1px solid #2ecc71; color:#2ecc71;">LEGACY PAID</span>';
-                        } else {
+                        if (now >= start && now <= end && !isLegacy) {
+                            isRented = true;
+                            status = '<span class="badge bg-red">RENTED</span>';
+                            bookingInfo = `<b>${b['اسم العميل']}</b><br><span style="color:#888; font-size:11px;">Ends: ${b['نهاية التعاقد'].split(' ')[0]}</span>`;
+                            
                             const paid = parseFloat(String(b['المدفوع EGP']).replace(/[^0-9.-]+/g,"")) || 0;
                             const total = parseFloat(String(b['إجمالي المستحق (Total)']).replace(/[^0-9.-]+/g,"")) || 0;
-                            if(paid >= total) financeBadge = '<span class="badge bg-avail">CLEAR</span>';
-                            else financeBadge = '<span class="badge bg-pending" style="color:var(--accent); border:1px solid var(--accent);">PENDING</span>';
+                            if(paid >= total) finBadge = '<span class="badge bg-green">PAID</span>';
+                            else finBadge = `<span class="badge bg-orange">DEBT: ${(total-paid).toLocaleString()}</span>`;
+                        } else if (start > now && !isRented) {
+                            status = '<span class="badge" style="background:var(--primary);">UPCOMING</span>';
+                            bookingInfo = `Starts: ${b['بداية التعاقد'].split(' ')[0]}`;
                         }
                     }
                 });
 
-                const row = body.insertRow();
+                if(status.includes('RENTED')) cRent++;
+                else if(status.includes('AVAILABLE')) cAvail++;
+                else if(status.includes('UPCOMING')) cFuture++;
+
+                row = body.insertRow();
                 row.innerHTML = `
                     <td>
-                        <div style="font-weight:800; font-size:14px;">${c['Type'] || ''} ${c['Model'] || ''}</div>
-                        <div style="font-size:10px; color:#666; text-transform:uppercase;">${c['Color'] || ''} • ${c['سنة الصنع'] || ''} • ID #${doc.id}</div>
+                        <div style="font-weight:800; font-size:15px; color:var(--accent);">#${c.id}</div>
+                        <div style="font-weight:600;">${c['Type'] || ''} ${c['Model'] || ''}</div>
+                        <div style="font-size:11px; color:#888;">${c['سنة الصنع'] || ''} | ${c['Color'] || ''}</div>
                     </td>
-                    <td>${plateDisplay}</td>
+                    <td>${plateHTML}</td>
                     <td>${status}</td>
                     <td>${bookingInfo}</td>
-                    <td>${financeBadge}</td>
+                    <td>${finBadge}</td>
+                    <td><button class="action-btn" title="Edit Car"><i class="fa-solid fa-pen-to-square"></i></button></td>
                 `;
             });
-            document.getElementById('radar-stats').innerText = `LIVE CONTRACTS: ${activeCount}`;
+
+            document.getElementById('r-rented').innerText = cRent;
+            document.getElementById('r-avail').innerText = cAvail;
+            document.getElementById('r-future').innerText = cFuture;
+            document.getElementById('r-total').innerText = cTotal;
         }
 
-        function loadFrame(url, btn) {
-            hideAll();
-            const f = document.getElementById('content-frame');
-            f.style.display = 'block'; f.src = url;
-            if(btn) setActiveTab(btn);
+        // --- MODULE 2: MASTER ORDER BOOK ---
+        function buildOrderBook() {
+            const body = document.getElementById('orders-body');
+            body.innerHTML = '';
+            
+            APP_DATA.bookings.forEach(b => {
+                const start = new Date(b['بداية التعاقد']);
+                const isLegacy = start.getFullYear() < 2026;
+                
+                const total = parseFloat(String(b['إجمالي المستحق (Total)']).replace(/[^0-9.-]+/g,"")) || 0;
+                let paid = parseFloat(String(b['المدفوع EGP']).replace(/[^0-9.-]+/g,"")) || 0;
+                
+                let statusBadge = '';
+                
+                // If pre-2026, force paid and closed
+                if(isLegacy) {
+                    paid = total;
+                    statusBadge = '<span class="badge bg-green">LEGACY CLOSED</span>';
+                } else {
+                    if (paid >= total) statusBadge = '<span class="badge bg-green">PAID</span>';
+                    else statusBadge = '<span class="badge bg-orange">PENDING</span>';
+                }
+
+                row = body.insertRow();
+                row.innerHTML = `
+                    <td><b>#${b.id}</b></td>
+                    <td>${b['اسم العميل'] || '-'}</td>
+                    <td>Car #${b['كود السيارة']}</td>
+                    <td><div style="font-size:12px;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td>
+                    <td style="font-weight:bold;">${total.toLocaleString()} <span style="font-size:10px; color:#888;">EGP</span></td>
+                    <td style="color:var(--success); font-weight:bold;">${paid.toLocaleString()}</td>
+                    <td>${statusBadge}</td>
+                `;
+            });
         }
 
-        function showHome() {
-            hideAll();
-            document.getElementById('home-content').style.display = 'block';
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        }
-
-        function hideAll() {
-            ['home-content', 'radar-content', 'content-frame'].forEach(id => document.getElementById(id).style.display = 'none');
-        }
-
-        function setActiveTab(btn) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+        // Utility: Table Search
+        function searchTable(tbodyId, inputId) {
+            const filter = document.getElementById(inputId).value.toLowerCase();
+            const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                rows[i].style.display = rows[i].innerText.toLowerCase().includes(filter) ? "" : "none";
+            }
         }
     </script>
 </body>
