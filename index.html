@@ -206,7 +206,7 @@
                 <button class="top-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
             </div>
             <div style="display:flex; align-items:center; gap:15px;">
-                <div id="global-rates-panel" style="display:none; gap:10px; align-items:center;">
+                <div id="global-rates-panel" style="display:flex; gap:10px; align-items:center;">
                     <div style="display:flex; align-items:center; gap:8px; background:#0a0a0a; padding:6px 12px; border-radius:8px; border:1px solid #333;">
                         <i class="fa-solid fa-dollar-sign" style="color:var(--success); font-size:14px;"></i>
                         <input type="number" id="global_usd" value="50.00" style="width:50px; height:20px; background:transparent; border:none; color:white; font-weight:bold; font-size:14px; text-align:center; padding:0; outline:none;" oninput="if(typeof runContractCalc === 'function') runContractCalc()">
@@ -647,7 +647,7 @@
 
         // --- 4. ROUTING ---
         function route(viewId, btnEl = null) {
-            document.getElementById('global-rates-panel').style.display = (viewId === 'en-contract') ? 'flex' : 'none';
+            document.getElementById('global-rates-panel').style.display = 'flex'; // Force globally visible
             document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.side-item, .top-btn').forEach(el => el.classList.remove('active'));
             
@@ -844,15 +844,16 @@
         };
 
         function prepNativeContract() {
-            // Fixes the "Loading Active Fleet" bug by forcing it to rebuild every time
             const sel = document.getElementById('con_carSelect');
-            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
+            sel.innerHTML = '<option value="">-- Select Car From Fleet --</option>';
+            
+            // Safe mapping to prevent database crashes
             APP_DATA.cars.forEach(c => {
-                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
-                if(!contract.includes('valid') && !contract.includes('ساري')) return; 
                 let pNum = c['رقم اللوحة'] || c['Plate'] || "";
                 let pLet = c['احرف اللوحة'] || "";
-                let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${c['Model'] || c['الطراز']} - ${pNum} ${pLet}`;
+                let opt = document.createElement('option'); 
+                opt.value = c.id; 
+                opt.text = `[#${c.id}] ${c['Model'] || c['الطراز'] || 'Vehicle'} - ${pNum} ${pLet}`;
                 sel.add(opt);
             });
             
@@ -865,8 +866,12 @@
             if(!list) return;
             list.innerHTML = '';
             
-            // Sort alphabetically by first name safely
-            const sortedClients = [...APP_DATA.customers].sort((a, b) => (a['الاسم الأول'] || '').localeCompare(b['الاسم الأول'] || ''));
+            // Safe alphabetical sorting
+            const sortedClients = [...APP_DATA.customers].sort((a, b) => {
+                const nameA = String(a['الاسم الأول'] || '');
+                const nameB = String(b['الاسم الأول'] || '');
+                return nameA.localeCompare(nameB);
+            });
             
             sortedClients.forEach(c => {
                 const fName = c['الاسم الأول'] || '';
@@ -935,14 +940,18 @@
             document.getElementById('btn_cancel_client').style.display = "block";
         }
 
+        function hasCRMAccess() {
+            if (!APP_DATA.user) return false;
+            const role = String(APP_DATA.user.role || "").toLowerCase();
+            const accessArr = APP_DATA.user.access || [];
+            // Allow if "admin" is anywhere in their role, OR if they have strict permissions
+            return role.includes('admin') || accessArr.includes(6) || accessArr.includes(7);
+        }
+
         function enableClientEdit() {
             if(!document.getElementById('con_client_id').value) return alert("Select a client from the search bar first to edit.");
             
-            // Allow Super Admin to bypass
-            const isSuperAdmin = (APP_DATA.user.role === "Super Admin");
-            if(!isSuperAdmin && !APP_DATA.user.access.includes(6) && !APP_DATA.user.access.includes(7)) {
-                return alert("Access Denied: You do not have CRM Edit permissions.");
-            }
+            if(!hasCRMAccess()) return alert("Access Denied: You do not have CRM Edit permissions.");
 
             document.querySelectorAll('.crm-fields input').forEach(input => {
                 if(input.id !== 'con_ph_code') {
@@ -976,15 +985,16 @@
         }
 
         async function saveClientToFirebase() {
-            const isSuperAdmin = (APP_DATA.user.role === "Super Admin");
-            if(!isSuperAdmin && !APP_DATA.user.access.includes(6) && !APP_DATA.user.access.includes(7)) {
-                return alert("Access Denied: You do not have CRM Edit permissions.");
-            }
+            if(!hasCRMAccess()) return alert("Access Denied: You do not have CRM Edit permissions.");
             
             const fname = document.getElementById('con_fname').value.trim();
             const pass = document.getElementById('con_pass').value.trim();
             
             if(!fname || !pass) return alert("First Name and Passport/National ID are required.");
+
+            // CAIRO TIME AUDIT LOGGING
+            const cairoTime = new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' });
+            const editorName = APP_DATA.user.name || APP_DATA.user.role || "System";
 
             const clientData = {
                 "الاسم الأول": fname,
@@ -997,8 +1007,8 @@
                 "العنوان": document.getElementById('con_addr').value.trim(),
                 "رمز الدولة": document.getElementById('con_nation').value.trim(),
                 "_sys_updated": Date.now(),
-                "_sys_updated_by": APP_DATA.user ? APP_DATA.user.name || "System" : "Unknown User", // Track who made the change
-                "_sys_updated_timestamp": new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' }) // Track when in Cairo time
+                "_sys_updated_by": editorName,
+                "_sys_updated_timestamp": cairoTime
             };
 
             const existingId = document.getElementById('con_client_id').value;
@@ -1008,19 +1018,19 @@
                 
                 if(existingId) {
                     await db.collection('customers').doc(existingId).update(clientData);
-                    alert("Client Updated!");
+                    alert("Client Updated Successfully!");
                     const idx = APP_DATA.customers.findIndex(x => x.id === existingId);
                     if(idx !== -1) APP_DATA.customers[idx] = { id: existingId, ...clientData };
                 } else {
                     const docRef = await db.collection('customers').add(clientData);
                     document.getElementById('con_client_id').value = docRef.id;
                     APP_DATA.customers.push({ id: docRef.id, ...clientData });
-                    alert("New Client Saved!");
+                    alert("New Client Saved to Database!");
                 }
                 
                 document.getElementById('display_client_id').innerText = document.getElementById('con_client_id').value + " (SAVED)";
                 document.getElementById('btn_save_client').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save';
-                populateClientList(); // Refresh dropdown
+                populateClientList(); 
                 lockClientForm();
 
             } catch(e) {
