@@ -134,7 +134,7 @@
         .pt { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 5px; }
         .pt th, .pt td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: middle; }
         .pt th { background: #f0f0f0; text-align: center; font-weight: bold; }
-        .terms-grid { font-size: 8.5pt; text-align: justify; column-count: 2; column-gap: 30px; line-height: 1.25; flex-grow: 1; }
+        .terms-grid { font-size: 8.5pt; text-align: justify; column-count: 2; column-gap: 30px; line-height: 1.2; margin-bottom: 5px; }
         .term-p { margin-bottom: 12px; break-inside: avoid; }
         .term-h { font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 3px; border-bottom: 1px solid #999; padding-bottom: 2px; font-size: 9.5pt; color: #04509D; }
         .car-img-container { width: 100%; aspect-ratio: 960/618; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
@@ -553,8 +553,12 @@
                 const dt = document.getElementById('global_date');
                 if (clk) {
                     const now = new Date();
-                    clk.innerText = now.toLocaleTimeString('en-US');
-                    dt.innerText = now.toLocaleDateString('en-GB');
+                    // Force display to Egypt Standard Time (Cairo)
+                    const optionsTime = { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+                    const optionsDate = { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' };
+                    
+                    clk.innerText = now.toLocaleTimeString('en-US', optionsTime);
+                    dt.innerText = now.toLocaleDateString('en-GB', optionsDate);
                 }
             }, 1000);
         });
@@ -992,7 +996,9 @@
                 "رقم رخصة القيادة": document.getElementById('con_lic').value.trim(),
                 "العنوان": document.getElementById('con_addr').value.trim(),
                 "رمز الدولة": document.getElementById('con_nation').value.trim(),
-                "_sys_updated": Date.now()
+                "_sys_updated": Date.now(),
+                "_sys_updated_by": APP_DATA.user ? APP_DATA.user.name || "System" : "Unknown User", // Track who made the change
+                "_sys_updated_timestamp": new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' }) // Track when in Cairo time
             };
 
             const existingId = document.getElementById('con_client_id').value;
@@ -1114,7 +1120,7 @@
                 if(!dtString) return "";
                 const d = new Date(dtString);
                 if(isNaN(d)) return dtString;
-                return `<b>${d.toLocaleDateString('en-GB')}</b> &nbsp; ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}`;
+                return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}`;
             };
 
             const buildPayStr = (pfx) => {
