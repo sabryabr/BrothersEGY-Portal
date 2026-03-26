@@ -19,11 +19,11 @@
         
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', 'Cairo', sans-serif; background: transparent; color: white; overflow: hidden; }
         
-        /* Video Background */
+        /* Video Background Fixed */
         .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; pointer-events: none; }
         #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.4); transition: object-position 0.8s ease-in-out; }
 
-        /* Centered Login */
+        /* Login */
         #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
         .login-box { background: rgba(15, 15, 15, 0.85); padding: 50px 40px; border-radius: 30px; border: 1px solid var(--glass-border); text-align: center; width: 350px; box-shadow: 0 25px 50px rgba(0,0,0,0.8); }
         .login-box img { height: 75px; margin-bottom: 20px; }
@@ -77,9 +77,8 @@
 
         #data-loader { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 9998; display: none; flex-direction: column; align-items: center; justify-content: center; }
         .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* ================= SMART CONTRACT NATIVE CSS ================= */
+        /* ================= SMART CONTRACT CSS ================= */
         .cp-body { background: rgba(15, 20, 25, 0.6); backdrop-filter: blur(15px); padding: 30px; border-radius: 15px; border: 1px solid var(--glass-border); margin-bottom: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
         .section-head { font-size: 14px; font-weight: 800; color: white; text-transform: uppercase; margin: 25px 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 8px; }
         .section-head:first-child { margin-top: 0; }
@@ -94,16 +93,16 @@
         .phone-group input:last-child { flex: 1; }
         .balance-box { background: rgba(0, 0, 0, 0.6); border: 1px solid var(--glass-border); color: white; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; height: 100%; box-sizing: border-box; }
         .bal-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 3px; }
-        .btn-gen { background: var(--primary-dark); color: white; border: 1px solid var(--glass-border); padding: 18px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px; transition: 0.3s; text-transform: uppercase; }
-        .btn-gen:hover { background: var(--primary); transform: translateY(-2px); }
+        .btn-gen { background: #04509D; color: white; border: 1px solid var(--glass-border); padding: 18px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px; transition: 0.3s; text-transform: uppercase; }
+        .btn-gen:hover { background: #3a86ff; }
         
-        #contractOutput { display: none; margin-top: 20px; padding-bottom: 50px;}
+        /* STRICT PRINT PAGE CSS */
+        #contractOutput { display: none; }
         .a4-page { width: 210mm; height: 296mm; padding: 10mm 15mm; margin: 0 auto 30px auto; background: white; position: relative; box-sizing: border-box; overflow: hidden; font-family: 'Helvetica', 'Arial', sans-serif; font-size: 9.5pt; line-height: 1.35; color: #000; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); }
-        
         .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 75%; opacity: 0.05; z-index: 0; pointer-events: none; }
         .watermark img { width: 100%; height: auto; }
         .page-content { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
-        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--primary-dark); padding-bottom: 10px; margin-bottom: 12px; }
+        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #04509D; padding-bottom: 10px; margin-bottom: 12px; }
         .logo { width: 180px; height: auto; object-fit: contain; }
         .hq-info { font-size: 8pt; color: #555; line-height: 1.4; text-align: right; }
         .box-section { border: 1px solid #000; padding: 8px; margin-bottom: 12px; position: relative; }
@@ -113,7 +112,7 @@
         .pt th { background: #f0f0f0; text-align: center; font-weight: bold; }
         .terms-grid { font-size: 9pt; text-align: justify; column-count: 2; column-gap: 30px; line-height: 1.3; flex-grow: 1; }
         .term-p { margin-bottom: 12px; break-inside: avoid; }
-        .term-h { font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 3px; border-bottom: 1px solid #999; padding-bottom: 2px; font-size: 9.5pt; color: var(--primary-dark); }
+        .term-h { font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 3px; border-bottom: 1px solid #999; padding-bottom: 2px; font-size: 9.5pt; color: #04509D; }
         .car-img-container { width: 100%; aspect-ratio: 960/618; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
         .car-img-container img { width: 100%; height: 100%; object-fit: contain; }
         .tire-img-wrapper { display: flex; align-items: center; gap: 5px; justify-content: center; margin-top: 2px; }
@@ -133,7 +132,7 @@
         .receipt-half { height: 48%; border: 2px solid #000; padding: 15px; display: flex; flex-direction: column; position: relative; box-sizing: border-box; background: white; margin-bottom: 0; }
         .rec-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
         .rec-logo { height: 45px; }
-        .rec-title { font-size: 16pt; font-weight: bold; text-transform: uppercase; color: var(--primary-dark); }
+        .rec-title { font-size: 16pt; font-weight: bold; text-transform: uppercase; color: #04509D; }
         .rec-body-grid { display: flex; gap: 20px; font-size: 9pt; line-height: 1.6; border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
         .rec-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
         .rec-row { display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; }
@@ -145,15 +144,13 @@
         .rec-amount-val { font-size: 18pt; font-weight: bold; color: #000; }
         .rec-sig-line { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 9pt; font-weight: bold; }
 
-        /* STRICT PRINT PAGE ENFORCEMENT */
+        /* ABSOLUTE PRINT ISOLATION */
         @media print {
-            body { background: white !important; overflow: auto !important; height: auto !important; padding: 0 !important; }
-            .video-wrapper, #login-overlay, .navbar, .sidebar, #data-loader, .cp-body { display: none !important; }
-            .workspace { margin: 0 !important; padding: 0 !important; width: 100% !important; background: white !important; overflow: visible !important; }
-            .view-section { display: none !important; }
-            #view-en-contract { display: block !important; }
-            #contractOutput { visibility: visible; display: block !important; position: absolute; left: 0; top: 0; width: 100%; margin: 0; }
-            .a4-page { box-shadow: none !important; margin: 0 !important; border: none !important; page-break-after: always; page-break-inside: avoid; height: 296mm; width: 210mm; overflow: hidden; }
+            body { visibility: hidden; background: white !important; margin: 0; padding: 0; }
+            #app-layout, .video-wrapper, #login-overlay, .navbar, .sidebar { display: none !important; }
+            #contractOutput { visibility: visible; display: block !important; position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+            #contractOutput * { visibility: visible; }
+            .a4-page { box-shadow: none !important; margin: 0 !important; border: none !important; page-break-after: always; height: 296mm; width: 210mm; }
         }
     </style>
 </head>
@@ -161,7 +158,7 @@
 
     <div class="video-wrapper">
         <video autoplay muted loop playsinline id="bg-video">
-            <source src="./background.mp4" type="video/mp4">
+            <source src="background.mp4" type="video/mp4">
         </video>
     </div>
 
@@ -194,15 +191,9 @@
                 <button class="top-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
             </div>
             <div style="display:flex; align-items:center; gap:15px;">
-                <div style="display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); padding:4px 10px; border-radius:8px;">
-                    <div style="font-size:10px; font-weight:bold; color:#aaa; text-align:right;">
-                        <span style="color:var(--success)">USD</span> <span id="nav_usd">50.00</span><br>
-                        <span style="color:var(--success)">EUR</span> <span id="nav_eur">54.00</span>
-                    </div>
-                </div>
                 <div style="text-align:right; font-size:12px; color:#aaa; margin-right:10px;">Role<br><b id="display-role" style="color:var(--accent); font-size:14px;">-</b></div>
-                <button onclick="route('home')" title="Return Home" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer; transition:0.2s;"><i class="fa-solid fa-house"></i></button>
-                <button onclick="location.reload()" title="Secure Logout" style="background:#e74c3c; color:white; border:none; width:40px; height:40px; border-radius:10px; cursor:pointer; transition:0.2s;"><i class="fa-solid fa-power-off"></i></button>
+                <button onclick="route('home')" title="Return Home" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
+                <button onclick="location.reload()" title="Secure Logout" style="background:#e74c3c; color:white; border:none; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
             </div>
         </nav>
 
@@ -234,7 +225,6 @@
                     <div class="m-card"><label>Upcoming Bookings</label><div class="val" id="r-future" style="color:var(--accent)">0</div></div>
                     <div class="m-card"><label>Tracked Cars</label><div class="val" id="r-total" style="color:white">0</div></div>
                 </div>
-                
                 <div class="filter-row">
                     <select id="radar-status-filter" onchange="buildRadar()">
                         <option value="active">Active Fleet Only</option>
@@ -243,7 +233,6 @@
                     </select>
                     <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="margin-bottom:0;">
                 </div>
-
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead><tr><th>Vehicle ID & Specs</th><th>Plate Identity</th><th>Status</th><th>Current Assignment</th><th>Financial State</th></tr></thead>
@@ -273,9 +262,7 @@
 
             <div id="view-v360" class="view-section">
                 <h2>🚗 Vehicle 360</h2>
-                <select id="v360-select" onchange="buildV360()" style="width:100%; margin-bottom:20px;">
-                    <option value="">-- Select a Vehicle --</option>
-                </select>
+                <select id="v360-select" onchange="buildV360()" style="width:100%; margin-bottom:20px;"><option value="">-- Select a Vehicle --</option></select>
                 <div class="metrics-grid">
                     <div class="m-card"><label>Total Generated</label><div class="val" id="v-rev">0 EGP</div></div>
                     <div class="m-card"><label>Maintenance Spent</label><div class="val" id="v-maint" style="color:var(--danger)">0 EGP</div></div>
@@ -306,7 +293,6 @@
 
             <div id="view-risk" class="view-section">
                 <h2>⚠️ Risk Radar</h2>
-                <p style="color:#888; font-size:14px; margin-top:-10px;">Tracking Expirations for License, Insurance, and Owner Contracts.</p>
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead><tr><th>Vehicle</th><th>Risk Type</th><th>Expiration Date</th><th>Days Left</th><th>Severity</th></tr></thead>
@@ -319,29 +305,35 @@
                 <div class="cp-body">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2 style="margin:0;"><i class="fa-solid fa-file-contract"></i> Smart EN Contract Generator</h2>
-                        <div style="font-family:monospace; font-size:16px; color:var(--primary); font-weight:bold;" id="con_clock">--:--:--</div>
+                        <div style="display:flex; gap:15px; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <label style="margin:0; font-size:12px; color:var(--success)">USD RATE</label>
+                                <input type="number" id="con_ex_usd" value="50.00" class="contract-input" style="width:70px; height:30px; text-align:center; padding:0;" oninput="runContractCalc()">
+                            </div>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <label style="margin:0; font-size:12px; color:var(--success)">EUR RATE</label>
+                                <input type="number" id="con_ex_eur" value="54.00" class="contract-input" style="width:70px; height:30px; text-align:center; padding:0;" oninput="runContractCalc()">
+                            </div>
+                            <div style="font-family:monospace; font-size:16px; color:var(--primary); font-weight:bold; margin-left:10px;" id="con_clock">--:--:--</div>
+                        </div>
                     </div>
                     
                     <div class="section-head">1. Contract & Branch</div>
                     <div class="grid-3">
                         <div><label class="contract-label">Issuing Branch</label>
                             <select class="contract-input" id="con_branch" onchange="runContractCalc()">
-                                <option value="HRG">Hurghada Branch</option>
-                                <option value="ALX">Alexandria (HQ)</option>
-                                <option value="CAI">Cairo Branch</option>
-                                <option value="RSD">Rashid Branch</option>
+                                <option value="HRG">Hurghada Branch</option><option value="ALX">Alexandria (HQ)</option>
+                                <option value="CAI">Cairo Branch</option><option value="RSD">Rashid Branch</option>
                             </select>
                         </div>
                         <div><label class="contract-label">Rental Mode</label>
                             <select class="contract-input" id="con_mode" onchange="document.getElementById('lbl_rate').innerText = this.value === 'Monthly' ? 'Monthly Rent (EGP)' : 'Daily Rent (EGP)'; runContractCalc();">
-                                <option value="Daily">Daily (Short Term)</option>
-                                <option value="Monthly">Monthly (Long Term)</option>
+                                <option value="Daily">Daily (Short Term)</option><option value="Monthly">Monthly (Long Term)</option>
                             </select>
                         </div>
                         <div><label class="contract-label">Agreement Type</label>
                             <select class="contract-input" id="con_type" onchange="document.getElementById('con_prev').style.display = this.value === 'Extension' ? 'block' : 'none'; runContractCalc();">
-                                <option value="New">New Agreement</option>
-                                <option value="Extension">Extension</option>
+                                <option value="New">New Agreement</option><option value="Extension">Extension</option>
                             </select>
                             <input type="text" class="contract-input" id="con_prev" placeholder="Prev. Contract No..." style="display:none; margin-top:5px; border-color:var(--accent);" oninput="runContractCalc()">
                         </div>
@@ -350,9 +342,7 @@
                     <div class="section-head">2. Vehicle Details</div>
                     <div class="grid-2">
                         <div><label class="contract-label">Select From Live Fleet</label>
-                            <select class="contract-input" id="con_carSelect" onchange="conLoadCar()">
-                                <option value="">-- Loading Active Fleet... --</option>
-                            </select>
+                            <select class="contract-input" id="con_carSelect" onchange="conLoadCar()"><option value="">-- Loading Active Fleet... --</option></select>
                         </div>
                         <div><label class="contract-label">Manual Model Input</label><input type="text" class="contract-input" id="con_manModel"></div>
                     </div>
@@ -361,9 +351,7 @@
                     <div class="grid-4">
                         <div><label class="contract-label">KM Out</label><input type="number" class="contract-input" id="con_kmOut" value="0" oninput="runContractCalc()"></div>
                         <div><label class="contract-label">Fuel Level</label>
-                            <select class="contract-input" id="con_fuelOut">
-                                <option>Full (8/8)</option><option>3/4</option><option>1/2</option><option>1/4</option><option>Reserve</option>
-                            </select>
+                            <select class="contract-input" id="con_fuelOut"><option>Full (8/8)</option><option>3/4</option><option>1/2</option><option>1/4</option><option>Reserve</option></select>
                         </div>
                         <div><label class="contract-label" id="lbl_rate">Daily Rent (EGP)</label><input type="number" class="contract-input" id="con_rateRent" value="0" oninput="runContractCalc()"></div>
                         <div><label class="contract-label">Ins. Fee (Daily)</label><input type="number" class="contract-input" id="con_rateIns" value="0" oninput="runContractCalc()"></div>
@@ -378,10 +366,7 @@
                     </div>
                     <div class="grid-4">
                         <div><label class="contract-label">Phone</label>
-                            <div class="phone-group">
-                                <input type="text" class="contract-input" id="con_ph_code" value="+20" placeholder="+20">
-                                <input type="text" class="contract-input" id="con_phone" placeholder="1XXXXXXXXX">
-                            </div>
+                            <div class="phone-group"><input type="text" class="contract-input" id="con_ph_code" value="+20" placeholder="+20"><input type="text" class="contract-input" id="con_phone" placeholder="1XXXXXXXXX"></div>
                         </div>
                         <div><label class="contract-label">Email Address</label><input type="email" class="contract-input" id="con_email" placeholder="client@mail.com"></div>
                         <div><label class="contract-label">Driver License</label><input type="text" class="contract-input" id="con_lic" placeholder="Main License"></div>
@@ -396,16 +381,12 @@
                     <div class="grid-4" style="margin-top:10px;">
                         <div><label class="contract-label">Pickup Date/Time</label><input type="datetime-local" class="contract-input" id="con_p_time" onchange="runContractCalc()"></div>
                         <div><label class="contract-label">Pickup Location</label>
-                            <select class="contract-input" id="con_p_loc" onchange="runContractCalc()">
-                                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option>
-                            </select>
+                            <select class="contract-input" id="con_p_loc" onchange="runContractCalc()"><option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option></select>
                             <input type="text" class="contract-input" id="con_p_addr" placeholder="Specific Addr..." style="margin-top:5px;" oninput="runContractCalc()">
                         </div>
                         <div><label class="contract-label">Dropoff Date/Time</label><input type="datetime-local" class="contract-input" id="con_d_time" onchange="runContractCalc()"></div>
                         <div><label class="contract-label">Dropoff Location</label>
-                            <select class="contract-input" id="con_d_loc" onchange="runContractCalc()">
-                                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option>
-                            </select>
+                            <select class="contract-input" id="con_d_loc" onchange="runContractCalc()"><option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option></select>
                             <input type="text" class="contract-input" id="con_d_addr" placeholder="Specific Addr..." style="margin-top:5px;" oninput="runContractCalc()">
                         </div>
                     </div>
@@ -506,16 +487,13 @@
                         </div>
                     </div>
 
-                    <button class="btn-gen" onclick="executeENContract()"><i class="fa-solid fa-file-contract"></i> GENERATE PREVIEW & PRINT</button>
+                    <button class="btn-gen" onclick="executeENContract()"><i class="fa-solid fa-file-contract"></i> GENERATE & PRINT CONTRACT</button>
                 </div>
-                
-                <div id="contractOutput"></div>
             </div>
 
             <div id="view-frame" class="view-section" style="height:100%;">
                 <iframe id="content-frame" src=""></iframe>
             </div>
-
         </div>
     </div>
 
@@ -524,16 +502,17 @@
         <img id="img_car" src="https://brothersegy.com/wp-content/uploads/2026/02/car-template.png" crossorigin="anonymous">
     </div>
 
+    <div id="contractOutput"></div>
+
     <script>
         // Force video play
         document.addEventListener('DOMContentLoaded', () => {
             const vid = document.getElementById('bg-video');
             if(vid) vid.play().catch(e => console.log("Auto-play constrained."));
             
-            // Start clock for native contract
             setInterval(() => { 
                 const clk = document.getElementById('con_clock');
-                if (clk) clk.innerText = new Date().toLocaleString(); 
+                if (clk) clk.innerText = new Date().toLocaleTimeString(); 
             }, 1000);
         });
 
@@ -541,7 +520,6 @@
         const firebaseConfig = { apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal", appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-
         const APP_DATA = { cars: [], bookings: [], car_expenses: [], user: null, liveRates: { usd: 50, eur: 54 } };
 
         // --- 2. AUTHENTICATION ---
@@ -592,8 +570,8 @@
                 if(d.rates.EGP) {
                     APP_DATA.liveRates.usd = d.rates.EGP;
                     APP_DATA.liveRates.eur = d.rates.EGP / d.rates.EUR;
-                    document.getElementById('nav_usd').innerText = APP_DATA.liveRates.usd.toFixed(2);
-                    document.getElementById('nav_eur').innerText = APP_DATA.liveRates.eur.toFixed(2);
+                    document.getElementById('con_ex_usd').value = APP_DATA.liveRates.usd.toFixed(2);
+                    document.getElementById('con_ex_eur').value = APP_DATA.liveRates.eur.toFixed(2);
                 }
             } catch(e) { console.log("Rate API blocked. Using defaults."); }
         }
@@ -640,21 +618,188 @@
             document.getElementById('content-frame').src = url;
         }
 
-        // --- 5. NATIVE EN CONTRACT ENGINE ---
+        // --- DASHBOARD MODULES (Radar, CRM, Orders, V360, Risk) ---
+        function buildRadar() {
+            const body = document.getElementById('radar-body');
+            body.innerHTML = '';
+            const now = new Date();
+            const filter = document.getElementById('radar-status-filter').value;
+            let cRent = 0, cAvail = 0, cFuture = 0, cTotal = 0;
+
+            APP_DATA.cars.forEach(c => {
+                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
+                const isActive = contract.includes('valid') || contract.includes('ساري');
+                if(filter === 'active' && !isActive) return;
+                if(filter === 'archive' && isActive) return;
+                cTotal++;
+
+                let rawPlate = c['Plate'] || c['plate'] || c['رقم اللوحة'] || "";
+                let rawLetters = c['احرف اللوحة'] || "";
+                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${rawPlate}</span> <span style="color:var(--accent); font-size:16px; margin-left:8px; font-weight:600;">${rawLetters}</span>`;
+
+                let status = '<span class="badge bg-green">AVAILABLE</span>';
+                let bookingInfo = '<span style="color:#666">No Active Contract</span>';
+                let finBadge = '<span class="badge" style="background:#333">NO DATA</span>';
+                let isRented = false;
+
+                APP_DATA.bookings.forEach(b => {
+                    if(b['كود السيارة'] == c.id) {
+                        const start = new Date(b['بداية التعاقد']);
+                        const end = new Date(b['نهاية التعاقد']);
+                        const isLegacy = start.getFullYear() < 2026;
+
+                        if (now >= start && now <= end && !isLegacy) {
+                            isRented = true;
+                            status = '<span class="badge bg-red">RENTED</span>';
+                            bookingInfo = `<b style="color:var(--accent)">${b['اسم العميل']}</b><br><span style="color:#888; font-size:11px;">Ends: ${b['نهاية التعاقد'].split(' ')[0]}</span>`;
+                            const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                            if(paid >= total) finBadge = '<span class="badge bg-green">PAID</span>';
+                            else finBadge = `<span class="badge bg-orange">DEBT: ${(total-paid).toLocaleString()}</span>`;
+                        } else if (start > now && !isRented) {
+                            status = '<span class="badge bg-orange" style="color:var(--primary); border-color:var(--primary)">UPCOMING</span>';
+                            bookingInfo = `Starts: ${b['بداية التعاقد'].split(' ')[0]}`;
+                        }
+                    }
+                });
+
+                if(status.includes('RENTED')) cRent++; else if(status.includes('AVAILABLE')) cAvail++; else if(status.includes('UPCOMING')) cFuture++;
+
+                const row = body.insertRow();
+                row.innerHTML = `<td><div style="font-weight:800; font-size:15px; color:var(--primary);">#${c.id}</div><div style="font-weight:600;">${c['Type'] || ''} ${c['Model'] || ''}</div><div style="font-size:11px; color:#888;">${c['سنة الصنع'] || ''} | ${c['Color'] || ''}</div></td><td style="direction:rtl; text-align:right;">${plateHTML}</td><td>${status}</td><td>${bookingInfo}</td><td>${finBadge}</td>`;
+            });
+
+            document.getElementById('r-rented').innerText = cRent; document.getElementById('r-avail').innerText = cAvail; document.getElementById('r-future').innerText = cFuture; document.getElementById('r-total').innerText = cTotal;
+        }
+
+        function buildOrderBook() {
+            const body = document.getElementById('orders-body');
+            const periodFilter = document.getElementById('order-period-filter').value;
+            const now = new Date();
+            body.innerHTML = '';
+            
+            APP_DATA.bookings.forEach(b => {
+                if(!b['بداية التعاقد']) return;
+                const start = new Date(b['بداية التعاقد']);
+                
+                if (periodFilter === 'this_month' && (start.getMonth() !== now.getMonth() || start.getFullYear() !== now.getFullYear())) return;
+                if (periodFilter === 'last_month') { const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1); if (start.getMonth() !== lastMonth.getMonth() || start.getFullYear() !== lastMonth.getFullYear()) return; }
+                if (periodFilter === 'this_year' && start.getFullYear() !== now.getFullYear()) return;
+
+                const isLegacy = start.getFullYear() < 2026;
+                const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                let paid = parseCurrency(b['المدفوع EGP']);
+                let statusBadge = isLegacy ? '<span class="badge bg-green">LEGACY CLOSED</span>' : (paid >= total ? '<span class="badge bg-green">PAID</span>' : '<span class="badge bg-orange">PENDING</span>');
+                if(isLegacy) paid = total;
+
+                const row = body.insertRow();
+                row.innerHTML = `<td><b>#${b.id}</b></td><td style="color:var(--accent); font-weight:600;">${b['اسم العميل'] || '-'}</td><td>Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
+            });
+        }
+
+        function populateV360Select() {
+            const select = document.getElementById('v360-select');
+            if(select.options.length > 1) return; 
+            APP_DATA.cars.forEach(c => {
+                const opt = document.createElement('option'); opt.value = c.id;
+                opt.innerText = `[#${c.id}] ${c['Type'] || ''} ${c['Model'] || ''} - ${c['Plate']||c['رقم اللوحة']||''} ${c['احرف اللوحة']||''}`;
+                select.appendChild(opt);
+            });
+        }
+
+        function buildV360() {
+            const carId = document.getElementById('v360-select').value;
+            if(!carId) return;
+            const body = document.getElementById('v360-body'); body.innerHTML = '';
+            let totalRev = 0, totalMaint = 0, trips = 0, timeline = [];
+
+            APP_DATA.bookings.forEach(b => {
+                if(b['كود السيارة'] == carId) { const rev = parseCurrency(b['إجمالي المستحق (Total)']); totalRev += rev; trips++; timeline.push({ id: b.id, type: '<span class="badge bg-green">RENTAL</span>', date: b['بداية التعاقد']?.split(' ')[0], desc: `Rented to ${b['اسم العميل']}`, amt: formatEGP(rev) }); }
+            });
+            APP_DATA.car_expenses.forEach(e => {
+                if(e['كود السيارة'] == carId || e['كود السيارة\r'] == carId) { const amt = parseCurrency(e['قيمة المصروف']); totalMaint += amt; timeline.push({ id: e.id || '-', type: '<span class="badge bg-red">EXPENSE</span>', date: `${e['سنة']}-${e['شهر']}-${e['يوم']}`, desc: e['بيان الصيانة'] || e['بيان النثريات'], amt: formatEGP(amt) }); }
+            });
+
+            document.getElementById('v-rev').innerText = formatEGP(totalRev); document.getElementById('v-maint').innerText = formatEGP(totalMaint); document.getElementById('v-trips').innerText = trips;
+            timeline.sort((a,b) => new Date(b.date) - new Date(a.date));
+            timeline.forEach(t => { const row = body.insertRow(); row.innerHTML = `<td>#${t.id}</td><td>${t.type}</td><td>${t.date}</td><td>${t.desc}</td><td style="font-weight:bold;">${t.amt}</td>`; });
+        }
+
+        function buildCRM() {
+            const body = document.getElementById('crm-body'); body.innerHTML = '';
+            const clients = {}; let totalDep = 0;
+
+            APP_DATA.bookings.forEach(b => {
+                const name = b['اسم العميل']; if(!name) return;
+                if(!clients[name]) clients[name] = { trips: 0, spendEGP: 0, spendUSD: 0, deposit: 0 };
+                clients[name].trips++; clients[name].spendEGP += parseCurrency(b['إجمالي المستحق (Total)']); clients[name].spendUSD += parseCurrency(b['المدفوع USD']);
+                const dep = parseCurrency(b['الوديعة المعلقة لدينا']); clients[name].deposit += dep; totalDep += dep;
+            });
+
+            document.getElementById('crm-total').innerText = Object.keys(clients).length; document.getElementById('crm-dep').innerText = formatEGP(totalDep);
+            Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP).forEach(([name, data]) => {
+                const row = body.insertRow(); row.innerHTML = `<td style="color:var(--accent); font-weight:bold;">${name}</td><td>${data.trips}</td><td>${formatEGP(data.spendEGP)}</td><td>$${data.spendUSD.toLocaleString()}</td><td style="color:${data.deposit > 0 ? 'var(--danger)' : 'var(--success)'}">${formatEGP(data.deposit)}</td>`;
+            });
+        }
+
+        function buildRiskRadar() {
+            const body = document.getElementById('risk-body'); body.innerHTML = ''; const now = new Date();
+            APP_DATA.cars.forEach(c => {
+                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
+                if(!contract.includes('valid') && !contract.includes('ساري')) return;
+                const name = `#${c.id} - ${c['Type'] || ''} ${c['Model'] || ''}`;
+                
+                const checkRisk = (dateStr, type) => {
+                    if(!dateStr || dateStr.toLowerCase() === 'nan') return;
+                    const d = new Date(dateStr); if(isNaN(d)) return;
+                    const diffDays = Math.ceil((d - now) / (86400000));
+                    if(diffDays > 180) return; 
+                    let badge = '<span class="badge bg-orange">MEDIUM (3-6m)</span>';
+                    if(diffDays <= 90) badge = '<span class="badge bg-red">HIGH (0-3m)</span>';
+                    if(diffDays < 0) badge = '<span class="badge" style="background:#e74c3c; color:white;">EXPIRED</span>';
+                    const row = body.insertRow(); row.innerHTML = `<td><b>${name}</b></td><td style="color:#888;">${type}</td><td>${d.toLocaleDateString()}</td><td style="font-weight:bold;">${diffDays} days</td><td>${badge}</td>`;
+                };
+                checkRisk(c['نهاية الترخيص'], 'License'); checkRisk(c['نهاية التأمين'], 'Insurance'); checkRisk(c['نهاية التعاقد'], 'Owner Contract');
+            });
+        }
+
+        function searchTable(tbodyId, inputId) {
+            const filter = document.getElementById(inputId).value.toLowerCase();
+            const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) { rows[i].style.display = rows[i].innerText.toLowerCase().includes(filter) ? "" : "none"; }
+        }
+
+        // --- 5. NATIVE EN CONTRACT ENGINE & PRINTING ---
+        const termsText = {
+            1: `* <strong>Minimum Age:</strong> You must be 21 years or older.<br>* <strong>License:</strong> Valid ID and Driving License accepted in Egypt are mandatory.<br>* <strong>Authorized Drivers:</strong> Only the person named on the contract may drive. Additional drivers must be approved and listed.`,
+            2: `* <strong>24-Hour Cycle:</strong> Charges based on 24-hour units.<br>* <strong>Rental Cycle:</strong> Charges based on 24-hour units. Every hour is charged from the 1st hour. If the period is exceeded by 5 hours, a full additional day is charged.<br>* <strong>Extensions:</strong> Any extension must be approved by the Company. Unauthorized late returns are charged at a higher local tariff.<br>* <strong>Early Return:</strong> No refunds are issued for vehicles returned early (Non-refundable).`,
+            3: `* <strong>Free Cancellation:</strong> Full refund if cancelled more than 48 hours before pickup.<br>* <strong>Late Cancellation (<48h):</strong> If cancelled less than 48 hours before pickup, 30% of the booking value is retained.<br>* <strong>No Show:</strong> Failure to pick up the car without prior notice results in a 100% forfeiture of the booking amount.`,
+            4: `* <strong>Mileage Limit:</strong> Standard limit is 120 KM/day (unless an Extra KM Package is purchased). Total allowance is summed (Standard 120/Day + Package KM). Extra KM charged upon return.<br>* <strong>Delivery Locations:</strong> Delivery is available to Hotels and Airports. We do not deliver to private accommodation.<br>* <strong>One-Way Rental:</strong> Dropping off at a different branch incurs a specific fee based on distance.`,
+            6: `* <strong>Theft Policy:</strong> Theft is <strong>NOT</strong> covered by insurance. The vehicle is the Lessee's sole responsibility and must be parked in secure locations.`,
+            7: `Insurance is considered <strong>NULL AND VOID</strong> (Lessee pays 100% of all costs) in the following cases:<br>1. Failure to provide an official <strong>Police Report</strong> immediately after an accident.<br>2. Driving under the influence of alcohol or drugs.<br>3. Driving off-road (Safari) or on unpaved roads.<br>4. Driving by an unauthorized person.<br>5. Gross negligence (e.g., failing to engage handbrake).`,
+            8: `The following items are NOT covered by any insurance plan. Lessee agrees to pay:<br>* <strong>Loss of Car Key:</strong> $400 USD (or equivalent EGP).<br>* <strong>License Loss:</strong> $250 USD.<br>* <strong>Spare Tire/Tools:</strong> $300 USD.<br>* <strong>Fire Extinguisher:</strong> $200 USD.<br>* <strong>Tire Damage:</strong> $200 USD per tire.<br>* <strong>Interior Damage:</strong> $100 - $1,000 USD.<br>* <strong>Dirty Return:</strong> Minimum $10 USD (350 EGP).`,
+            9: `* <strong>Deposit Block:</strong> A security amount is blocked/paid at pickup to cover excess liability, fuel, and fines.<br>* <strong>Refund Policy:</strong> Deposit is 100% refundable upon safe return of the vehicle in original condition.<br>* <strong>Refund Method:</strong> Deposit is returned in the same currency mix as received. If paid by Card, it is refunded in EGP CASH to avoid bank delays.<br>* <strong>Release Time:</strong> Released only after the Handover Inspection Report is signed and closed.`,
+            10: `If there is a disagreement regarding the COST or TIME of repair, we follow this strict protocol:<br><strong>Step 1: Independent Evaluation.</strong> The vehicle will be assessed by an authorized, independent Car Service Center. Their quotation is final.<br><strong>Step 2: Liability.</strong> The at-fault party pays the Repair Cost + Lost Rental Days + Inspection Fee.<br><strong>Step 3: Legal.</strong> Unresolved disputes are referred to the Competent Court under Egyptian Law.`,
+            11: `The Lessee is fully responsible for any traffic violations (Speeding, Parking, Radar). The Company reserves the right to charge these costs + administrative fees.`,
+            12: `In case of breakdown, call the Company immediately. Do not attempt unauthorized repairs. If the breakdown is due to Company fault (Battery/Engine), you pay nothing. If due to negligence (e.g., wrong fuel), Lessee pays all costs.`,
+            13: `* <strong>Interior Negligence:</strong> Insurance does NOT cover negligence inside the vehicle (e.g., cigarette burns, stained seats, broken handles).<br>* <strong>Minor Damages:</strong> For small scratches, tire, or glass damage where a Police Report is impractical, the Lessee agrees to pay the repair cost directly to save time.<br>* <strong>Police Report:</strong> If Lessee refuses to settle damages, a Police Report from the accident scene is MANDATORY.`
+        };
+
+        const insDetails = {
+            "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`,
+            "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`,
+            "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.`
+        };
+
         function prepNativeContract() {
             const sel = document.getElementById('con_carSelect');
-            if(sel.options.length === 1) { // Populate only once
+            if(sel.options.length === 1) { 
                 sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
                 APP_DATA.cars.forEach(c => {
                     const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
-                    if(!contract.includes('valid') && !contract.includes('ساري')) return; // Active only
-                    
+                    if(!contract.includes('valid') && !contract.includes('ساري')) return; 
                     let pNum = c['رقم اللوحة'] || c['Plate'] || "";
                     let pLet = c['احرف اللوحة'] || "";
-                    
-                    let opt = document.createElement('option');
-                    opt.value = c.id;
-                    opt.text = `[#${c.id}] ${c['Model'] || c['الطراز']} - ${pNum} ${pLet}`;
+                    let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${c['Model'] || c['الطراز']} - ${pNum} ${pLet}`;
                     sel.add(opt);
                 });
             }
@@ -679,7 +824,7 @@
 
         function runContractCalc() {
             try {
-                const rateUsd = APP_DATA.liveRates.usd; const rateEur = APP_DATA.liveRates.eur;
+                const rateUsd = conNum('ex_usd') || 50; const rateEur = conNum('ex_eur') || 54;
                 const pStr = conVal('p_time'); const dStr = conVal('d_time'); const mode = conVal('mode');
 
                 let days = 1;
@@ -713,7 +858,6 @@
                 let totalDepPaid = Math.round(conNum('pay_dep_egp') + (conNum('pay_dep_usd') * rateUsd) + (conNum('pay_dep_eur') * rateEur) + conNum('pay_dep_card'));
                 let depPending = reqDep - totalDepPaid;
 
-                // Update UI
                 document.getElementById('con_c_days').innerText = days;
                 document.getElementById('con_c_rent').innerText = Math.round(totalRentOnly).toLocaleString();
                 document.getElementById('con_c_fees').innerText = Math.round(fee_d + fee_c).toLocaleString();
@@ -751,12 +895,12 @@
                 let egp = conNum(pfx + '_egp'), u = conNum(pfx + '_usd'), e = conNum(pfx + '_eur'), card = conNum(pfx + '_card');
                 let total = egp + (u * c.rateUsd) + (e * c.rateEur) + card;
                 let parts = [];
-                if (egp > 0) parts.push(egp + " EGP");
-                if (u > 0) parts.push(u + " USD");
-                if (e > 0) parts.push(e + " EUR");
-                if (card > 0) parts.push(card + " Card");
+                if (egp > 0) parts.push(egp + " Cash (EGP)");
+                if (u > 0) parts.push(u + " USD (Rate: " + c.rateUsd + ")");
+                if (e > 0) parts.push(e + " EUR (Rate: " + c.rateEur + ")");
+                if (card > 0) parts.push(card + " Card (EGP)");
                 let detail = parts.length > 0 ? `(${parts.join(' + ')})` : "";
-                return { total: total, text: `<strong>${Math.round(total).toLocaleString()} EGP</strong> <span style="font-size:8.5pt;">${detail}</span>`, breakdownDetails: detail };
+                return { total: total, text: `<strong>${Math.round(total).toLocaleString()} EGP</strong> <span style="font-size:8.5pt; font-weight:normal;">${detail}</span>`, breakdownDetails: detail };
             };
 
             let rentInfo = buildPayStr('pay_rent'); let depInfo = buildPayStr('pay_dep');
@@ -769,7 +913,15 @@
             let dText = conVal('d_loc') + (conVal('d_addr') ? " (" + conVal('d_addr') + ")" : "");
 
             const insKey = conVal('insPack') || "Basic";
-            const insText = { "Basic": "100% Client Liability", "Intermediate": "70% Liability / 30% Company", "Full Protection": "Zero Deductible" };
+            const insClass = insKey === 'Full Protection' ? 'ins-full' : (insKey === 'Intermediate' ? 'ins-inter' : 'ins-basic');
+            const simpleInsText = {
+                "Basic": "Basic Insurance: 100% Client Liability for Damages.",
+                "Intermediate": "Intermediate: 70% Client Liability / 30% Company Coverage.",
+                "Full Protection": "Full Protection: Zero Deductible (Subject to caps)."
+            };
+
+            const prevCon = conVal('prevCon');
+            const extHtml = conVal('type') === 'Extension' ? `<div style="font-size:10pt; font-weight:bold; margin-top:3px;">(EXTENSION TO ${prevCon})</div>` : '';
 
             const logoSrc = document.getElementById('img_logo').src;
             const carSrc = document.getElementById('img_car').src;
@@ -778,15 +930,26 @@
             const pkgKMValue = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
             const kmAllowedTotal = pkgKMValue === 999999 ? "Unlimited" : (120 * c.days + pkgKMValue).toLocaleString() + " KM Total";
 
-            // BUILDING PRINT HTML (Cleaned for space)
-            let html = `
+            let html = ``;
+
+            // --- PAGE 1: CONTRACT ---
+            html += `
             <div class="a4-page">
                 <div class="watermark"><img src="${logoSrc}"></div>
                 <div class="page-content">
                     <div class="doc-head">
                         <img src="${logoSrc}" class="logo">
-                        <div style="text-align:center"><h1 style="margin:0; font-size:18pt; color:#04509D">CAR RENTAL AGREEMENT</h1><div style="font-weight:bold; font-size:12pt;">${cid}</div></div>
-                        <div class="hq-info" style="text-align:right;"><strong>BROTHERS EGY HQ</strong><br>Alexandria<br>Branch: ${conVal('branch')}</div>
+                        <div style="text-align:center">
+                            <h1 style="margin:0; font-size:18pt; color:#04509D">CAR RENTAL AGREEMENT</h1>
+                            <div id="preview-cid" style="font-weight:bold; font-size:12pt;">${cid}</div>
+                            ${extHtml}
+                        </div>
+                        <div class="hq-info" style="text-align:right;">
+                            <strong>BROTHERS EGY HQ</strong><br>
+                            50 Abd Al Latef Al Soufani, Sidi Gabir,<br>Alexandria<br>
+                            Tax: 589-464-418 | CR: 10770<br>
+                            Branch: ${conVal('branch')}
+                        </div>
                     </div>
 
                     <div class="box-section"><span class="bs-title">PARTIES</span>
@@ -794,56 +957,256 @@
                             <tr><td width="30%"><strong>LESSOR</strong><br>El Alakhua El Mutahidun<br>${conVal('branch')} Branch</td>
                                 <td><strong>LESSEE</strong><br>
                                 <b>Name:</b> ${conVal('fname')} ${conVal('sname')}<br>
-                                <b>Passport:</b> ${conVal('pass')} | <b>License:</b> ${conVal('lic')} | <b>Phone:</b> ${conVal('ph_code')} ${conVal('phone')}<br>
-                                <b>Addr:</b> ${conVal('addr')}</td></tr>
+                                <b>Passport / ID:</b> ${conVal('pass')} | <b>License No:</b> ${conVal('lic')} | <b>Nation:</b> ${conVal('nation')}<br>
+                                <b>Phone:</b> ${conVal('ph_code')} ${conVal('phone')} | <b>Email:</b> ${conVal('email')}<br>
+                                <b>Addr:</b> ${conVal('addr')}<br>
+                                ${conVal('add_driver') ? '<b>Add. Driver:</b> ' + conVal('add_driver') + (conVal('add_lic') ? ' | <b>Lic:</b> ' + conVal('add_lic') : '') : ''}</td></tr>
                         </table>
                     </div>
 
                     <div class="box-section"><span class="bs-title">VEHICLE & PERIOD</span>
                         <table class="pt">
-                            <tr><th>Model</th><td>${conVal('manModel')}</td><th>Plate</th><td><b>${conVal('plate')}</b></td><th>KM Out</th><td>${conVal('kmOut')}</td></tr>
-                            <tr><th>Pickup</th><td>${conVal('p_time').replace('T', ' ')}</td><th>Dropoff</th><td>${conVal('d_time').replace('T', ' ')}</td><th>Duration</th><td>${c.days} Days</td></tr>
+                            <tr><th>Model</th><td>${conVal('manModel')}</td><th>Plate</th><td dir="ltr" style="text-align:left;"><b>${conVal('plate')}</b></td><th>KM Out</th><td>${conVal('kmOut')}</td></tr>
+                            <tr><th>VIN</th><td>${conVal('vin')}</td><th>Motor</th><td>${conVal('motor')}</td><th>Allow</th><td><strong>${kmAllowedTotal}</strong></td></tr>
+                            <tr><th>Pickup</th><td>${conVal('p_time').replace('T', ' ')}<br>${pText}</td>
+                                <th>Dropoff</th><td>${conVal('d_time').replace('T', ' ')}<br>${dText}</td>
+                                <th>Duration</th><td>${c.days} Days</td></tr>
                         </table>
                     </div>
 
                     <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span>
                         <table class="pt">
-                            <tr><th>Item Description</th><th>Calculation</th><th style="text-align:right">Amount (EGP)</th></tr>
+                            <tr><th>Item Description</th><th>Rate / Calculation</th><th style="text-align:right">Amount (EGP)</th></tr>
                             <tr><td>Base Rent</td><td>${rateTxt}</td><td align="right">${Math.round(base).toLocaleString()}</td></tr>
+                            ${c.i > 0 ? `<tr><td>Insurance Fees</td><td>${c.i} x ${c.days} Days</td><td align="right">${(c.i * c.days).toLocaleString()}</td></tr>` : ''}
+                            ${c.kmPackageCost > 0 ? `<tr><td>Mileage Package (${kmSel.options[kmSel.selectedIndex].text})</td><td>Package Fee</td><td align="right">${c.kmPackageCost.toLocaleString()}</td></tr>` : ''}
+                            ${document.getElementById('con_add_dr').checked ? `<tr><td>Additional Driver</td><td>${conNum('rate_dr')} x ${c.days} Days</td><td align="right">${(conNum('rate_dr') * c.days).toLocaleString()}</td></tr>` : ''}
+                            ${document.getElementById('con_add_st').checked ? `<tr><td>Child Car Seat</td><td>${conNum('rate_st')} x ${c.days} Days</td><td align="right">${(conNum('rate_st') * c.days).toLocaleString()}</td></tr>` : ''}
+                            ${c.fee_d > 0 ? `<tr><td>Delivery Fee (${pText})</td><td>Fixed</td><td align="right">${c.fee_d}</td></tr>` : ''}
+                            ${c.fee_c > 0 ? `<tr><td>Pickup Fee (${dText})</td><td>Fixed</td><td align="right">${c.fee_c}</td></tr>` : ''}
                             <tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" align="right">TOTAL CONTRACT VALUE:</td><td align="right">${Math.round(c.totalDue).toLocaleString()} EGP</td></tr>
                         </table>
-                        <div style="background:#eee; padding:5px; text-align:center;">PAID NOW: ${rentInfo.text} <br> <b>PENDING: ${Math.round(c.rentPending).toLocaleString()} EGP</b></div>
+                        <div style="border:1px solid #000; padding:5px; text-align:center; font-size:9pt; margin-bottom:5px; border-radius:4px;">
+                            ${simpleInsText[insKey]}
+                        </div>
+                        <div style="background:#eee; padding:5px; text-align:center;">
+                            PAID NOW: ${rentInfo.text} <br> <span style="color:${c.rentPending > 0 ? '#c0392b' : '#27ae60'}; font-weight:bold;">PENDING: ${Math.round(c.rentPending).toLocaleString()} EGP</span>
+                        </div>
+                    </div>
+
+                    ${(c.reqDep > 0 || totalDepPaid > 0) ? `
+                    <div style="border:2px solid orange; padding:5px; margin-bottom:10px; font-size:9pt;">
+                        <strong>DEPOSIT HELD:</strong> ${depInfo.text} 
+                        <span style="float:right; font-weight:bold; color:${c.depPending > 0 ? '#c0392b' : '#27ae60'}">${c.depPending > 0 ? Math.round(c.depPending) + ' EGP PENDING' : 'FULLY HELD'}</span>
+                    </div>` : ''}
+                    
+                     <div style="text-align:center; border:2px dashed #000; padding:10px; font-size:9pt; margin-top:10px;">
+                        <strong>IMPORTANT:</strong> Contract is void for any period NOT covered by an official payment receipt.<br>
+                        <strong>LIABILITY:</strong> If the RETURN CHECK is not closed/signed, the Lessee retains full liability for the vehicle until official closure.
+                        The Lessee bears full legal and criminal liability for the rented vehicle during the entire rental period.
                     </div>
 
                     <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px; margin-bottom: 30px;">
                         <div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;">
-                            <div style="width:40%;">LESSOR SIGNATURE<br><br><br>____________________</div>
-                             <div style="width:40%;">LESSEE SIGNATURE<br><br><br>____________________</div>
+                            <div style="width:40%;">LESSOR SIGNATURE<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">Date: ........................</div></div>
+                             <div style="width:40%;">LESSEE SIGNATURE<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">Date: ........................</div></div>
                         </div>
                     </div>
                 </div>
             </div>`;
 
-            document.getElementById('contractOutput').innerHTML = html;
-            document.getElementById('contractOutput').style.display = "block";
-            
-            // Scroll to the bottom of the workspace securely
-            const ws = document.getElementById('main-workspace');
-            ws.scrollTo({ top: ws.scrollHeight, behavior: 'smooth' });
-            
-            // Auto Trigger Print Dialog
-            setTimeout(() => { window.print(); }, 800);
-        }
+            // --- PAGE 2: TERMS ---
+            const insContent = insDetails[insKey] || insDetails["Basic"];
 
-        // --- DASHBOARD MODULES (Radar, CRM, Orders, V360, Risk) ---
-        // (Keeping original implementations for dashboard views to save prompt space, all work as previously defined)
-        function buildRadar() { /* Logic unchanged */ }
-        function buildOrderBook() { /* Logic unchanged */ }
-        function buildV360() { /* Logic unchanged */ }
-        function buildCRM() { /* Logic unchanged */ }
-        function buildRiskRadar() { /* Logic unchanged */ }
-        function populateV360Select() { /* Logic unchanged */ }
-        function searchTable(tbodyId, inputId) { /* Logic unchanged */ }
+            html += `
+            <div class="a4-page">
+                <div class="watermark"><img src="${logoSrc}"></div>
+                <div class="page-content">
+                    <div class="doc-head"><strong>TERMS & CONDITIONS</strong><span>Page 2/4</span></div>
+                    <div class="terms-grid">
+                        <div class="term-p"><span class="term-h">1. DRIVER REQUIREMENTS & ELIGIBILITY</span>${termsText[1]}</div>
+                        <div class="term-p"><span class="term-h">2. RENTAL CYCLE & EXTENSIONS</span>${termsText[2]}</div>
+                        <div class="term-p"><span class="term-h">3. CANCELLATION & NO-SHOW POLICY</span>${termsText[3]}</div>
+                        <div class="term-p"><span class="term-h">4. DELIVERY & MILEAGE</span>${termsText[4]}</div>
+                        <div class="term-p" style="border:2px solid #e67e22; padding:5px; background:#fff8e1; break-inside:avoid;">
+                            <span class="term-h" style="color:#e67e22; border-bottom-color:#e67e22;">5. YOUR INSURANCE PACKAGE: ${insKey.toUpperCase()}</span>
+                            <div style="font-weight:normal; font-size:8pt; margin-top:5px; line-height:1.3;">${insContent}</div>
+                        </div>
+                        <div class="term-p"><span class="term-h">6. THEFT & LOSS WAIVER</span>${termsText[6]}</div>
+                        <div class="term-p"><span class="term-h">7. VOIDING OF INSURANCE</span>${termsText[7]}</div>
+                        <div class="term-p"><span class="term-h">8. SCHEDULE OF PENALTIES (NEGLIGENCE)</span>${termsText[8]}</div>
+                        <div class="term-p"><span class="term-h">9. SECURITY DEPOSIT & REFUNDS</span>${termsText[9]}</div>
+                        <div class="term-p"><span class="term-h">10. DISPUTE RESOLUTION</span>${termsText[10]}</div>
+                        <div class="term-p"><span class="term-h">11. TRAFFIC FINES</span>${termsText[11]}</div>
+                        <div class="term-p"><span class="term-h">12. MECHANICAL DIFFICULTIES</span>${termsText[12]}</div>
+                        <div class="term-p"><span class="term-h">13. INSURANCE & LIABILITY NOTICES</span>${termsText[13]}</div>
+                    </div>
+                    <div style="margin-top:auto; padding:10px; border-top:1px solid #000; font-weight:bold; text-align:center;">
+                        <strong>I have read and accepted all terms & conditions.</strong> <br><br>
+                        <div style="display:flex; justify-content:center; gap:50px; align-items:flex-end; margin-top:5px;">
+                            <div>Signature: __________________________</div>
+                            <div style="font-size:9pt;">Date: ........................</div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // --- PAGE 3: INSPECTION ---
+            const chkRow = (lbl) => `<div class="v-insp-row"><span class="v-label">${lbl}</span><div class="v-check-group"><div class="v-check-box v-green"></div><div class="v-check-box v-red"></div></div></div>`;
+            const checklistGroups = `
+                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">
+                    <div style="width:48%;"><div class="insp-group-head">PASSENGER</div>${chkRow('(D) FEND F')}${chkRow('(L) DOOR F')}${chkRow('(K) DOOR R')}${chkRow('(J) FEND R')}</div>
+                    <div style="width:48%;"><div class="insp-group-head">FRONT</div>${chkRow('(E) BUMPER')}${chkRow('(F) HOOD')}${chkRow('(W) WINDSH')}</div>
+                    <div style="width:48%;"><div class="insp-group-head">REAR</div>${chkRow('(Q) TRUNK')}${chkRow('(H) BUMPER')}${chkRow('(I) LIGHTS')}</div>
+                    <div style="width:48%;"><div class="insp-group-head">DRIVER</div>${chkRow('(M) FEND F')}${chkRow('(C) DOOR F')}${chkRow('(B) DOOR R')}${chkRow('(A) FEND R')}</div>
+                </div>`;
+
+            let pickupHtmlClean = `
+                <div class="insp-left-col">
+                    <div class="insp-section-head">PICKUP CHECK (Start of Rental)</div>
+                    <div class="box-section" style="padding:2px; margin-bottom:5px;">
+                        <table class="pt" style="font-size:7pt; margin-bottom:0;">
+                            <tr style="background:#eee;"><th>KM OUT</th><td align="center">${conVal('kmOut')}</td></tr>
+                            <tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${conVal('fuelOut')}</td></tr>
+                        </table>
+                    </div>
+                    <div style="text-align:center; font-size:7pt; font-weight:bold;">EXISTING DAMAGES:</div>
+                    <div class="car-img-container"><img src="${carSrc}"></div>
+                    <div class="tire-img-wrapper">
+                        <div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div>
+                        <div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div>
+                    </div>
+                    ${checklistGroups}
+                    <div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;">
+                        <div style="font-size:7pt; font-weight:bold;">NOTES / ACCESSORIES:</div>
+                        <div style="font-size:7pt;">Spare Tire [ ] Jack [ ] Fire Ext [ ] Triangle [ ]</div>
+                    </div>
+                </div>`;
+
+            const returnHtml = `
+                <div class="insp-right-col">
+                    <div class="insp-section-head">RETURN CHECK (End of Rental)</div>
+                    <div class="box-section" style="padding:2px; margin-bottom:5px;">
+                         <table class="pt" style="font-size:7pt; margin-bottom:0;">
+                            <tr style="background:#eee;"><th>KM IN (${kmAllowedTotal} Max)</th><td><br>__________________</td></tr>
+                            <tr style="background:#eee;"><th>FUEL LEVEL</th><td><span style="font-size:7pt;">[ ] Full [ ] 3/4 [ ] 1/2 [ ] 1/4 [ ] Empty</span></td></tr>
+                         </table>
+                    </div>
+                    <div style="text-align:center; font-size:7pt; font-weight:bold;">MARK NEW DAMAGES:</div>
+                    <div class="car-img-container"><img src="${carSrc}"></div>
+                    <div class="tire-img-wrapper">
+                        <div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div>
+                        <div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div>
+                    </div>
+                    ${checklistGroups}
+                    <div class="box-section" style="margin-top:5px; margin-bottom:2px; padding:2px;">
+                        <span class="bs-title" style="font-size:7pt;">FINAL SETTLEMENT</span>
+                        <table class="pt" style="font-size:8pt; margin-bottom:0;">
+                            <tr><th width="45%">Item Description</th><th width="30%">Rate x Qty</th><th width="25%">Total (EGP)</th></tr> 
+                            <tr><td>Excess KM</td><td align="center">_______ x _______</td><td align="right">___________</td></tr>
+                            <tr><td>Late Return</td><td align="center">_______ x _______</td><td align="right">___________</td></tr>
+                            <tr><td>Cleaning Fees</td><td align="center">-</td><td align="right">___________</td></tr>
+                            <tr><td>Fuel Shortage</td><td align="center">-</td><td align="right">___________</td></tr>
+                            <tr><td>Traffic Fines</td><td align="center">-</td><td align="right">___________</td></tr>
+                            <tr><td>New Damages</td><td align="center">-</td><td align="right">___________</td></tr>
+                            <tr style="font-weight:bold; background:#eee;"><td colspan="2" align="right">TOTAL DEDUCTIONS:</td><td align="right">___________ EGP</td></tr>
+                        </table>
+                    </div>
+                    <div style="font-size:7.5pt; font-weight:bold; margin-top:5px; border:1px solid #000; padding:3px; background:#fff3e0;">
+                        IMPORTANT: If the RETURN CHECK is not closed/signed, the Lessee retains full liability.
+                    </div>
+                </div>`;
+
+            html += `
+            <div class="a4-page">
+                <div class="watermark"><img src="${logoSrc}"></div>
+                <div class="page-content">
+                    <div class="doc-head"><strong>VISUAL INSPECTION REPORT</strong><span>Page 3/4</span></div>
+                    <div style="font-size:8pt; text-align:center; font-weight:bold; margin-bottom:5px;">Contract: ${cid} | Date: ${today}</div>
+                    <div class="insp-two-col">${pickupHtmlClean}${returnHtml}</div>
+                    <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px;">
+                        <div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;">
+                            <div style="width:30%;">PICKUP: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div>
+                            <div style="width:30%;">RETURN: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div>
+                            <div style="width:30%;">RETURN: Employee<br><br><br><br>____________________</div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // --- PAGE 4+: RECEIPTS ---
+            const singleRecHtml = (title, copyType, amountStr, details, isBlankDate = false, periodStr = "", isDeposit = false) => `
+                <div class="receipt-half">
+                    <div class="rec-header">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td width="20%"><img src="${logoSrc}" style="height:45px; object-fit:contain;"></td>
+                                <td width="60%" align="center"><div class="rec-title">OFFICIAL RECEIPT</div><div style="font-size:9pt;">${copyType}</div></td>
+                                <td width="20%" align="right"><img src="https://api.qrserver.com/v1/create-qr-code/?data=https://brothersegy.com&size=80x80" style="height:45px;"></td>
+                            </tr>
+                        </table>
+                        <div style="text-align:right; font-size:9pt; margin-top:5px;">DATE: ${isBlankDate ? "___/___/202_" : today}</div>
+                        <div style="text-align:right; font-weight:bold;">${title}</div>
+                    </div>
+                    
+                    <div class="rec-body-grid">
+                        <div class="rec-col">
+                            <div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${conVal('fname')} ${conVal('sname')}</span></div>
+                            <div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${conVal('pass') || '-'}</span></div>
+                            <div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${conVal('ph_code')} ${conVal('phone')}</span></div>
+                        </div>
+                        <div class="rec-col">
+                            <div class="rec-row"><span class="rec-label">CONTRACT NO</span><span class="rec-val">${cid}</span></div>
+                            <div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:left;">${conVal('manModel')} | ${conVal('plate')}</span></div>
+                            ${isDeposit ? '' : `<div class="rec-row"><span class="rec-label">PERIOD</span><span class="rec-val" style="font-size:8pt;">${periodStr}</span></div>`}
+                        </div>
+                    </div>
+
+                    <div class="rec-amount-box">
+                        <div class="rec-amount-row"><span class="rec-amount-lbl">AMOUNT RECEIVED</span><span class="rec-amount-val">${isBlankDate ? "____________ EGP" : amountStr}</span></div>
+                        <div class="rec-amount-row" style="margin-bottom:0;"><span class="rec-amount-lbl" style="font-size:8pt;">PAYMENT DETAILS</span><span class="rec-val" style="font-size:8pt; font-weight:normal;">${isBlankDate ? "________________________" : details}</span></div>
+                    </div>
+                    
+                    <div style="font-size:7pt; color:#666; margin-top:5px;">
+                        ${isDeposit ? "<strong style='color:#c0392b;'>* Fully refundable if returned in same condition. Deductions apply for damages/fines.</strong><br>" : "<strong>Breakdown:</strong> Base Tariff + Added Services (Insurance, Delivery, Logistics).<br>"}
+                        ${!isDeposit && c.rentPending > 0 ? `<span style="color:#c0392b; font-weight:bold;">⚠ OUTSTANDING BALANCE: ${Math.round(c.rentPending).toLocaleString()} EGP</span>` : ''}
+                    </div>
+                    <div class="rec-footer" style="padding-top:10px;">
+                         <div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;">
+                            <div style="flex-grow:1;"></div>
+                            <div class="rec-sig-line">AUTHORIZED SIGNATURE<div style="font-size:8pt; margin-top:2px;">Date: ........................</div></div>
+                        </div>
+                    </div>
+                </div>`;
+
+            let loopCount = (c.mode === 'Monthly') ? Math.ceil(c.days / 30) : 1;
+            let sDate = new Date(conVal('p_time')); if (isNaN(sDate)) sDate = new Date();
+            let finalDropoffDate = new Date(conVal('d_time')); if (isNaN(finalDropoffDate)) finalDropoffDate = new Date(sDate.getTime() + (c.days * 24 * 60 * 60 * 1000));
+            let monthlyAmount = c.mult > 0 ? Math.round(c.totalRentOnly / c.mult) : c.totalRentOnly;
+
+            for (let j = 1; j <= loopCount; j++) {
+                let eDate = new Date(sDate);
+                if (c.mode === 'Monthly') { eDate.setMonth(eDate.getMonth() + 1); if (eDate > finalDropoffDate) eDate = finalDropoffDate; } 
+                else { eDate = finalDropoffDate; }
+
+                let pStr = `${sDate.toLocaleDateString('en-GB')} to ${eDate.toLocaleDateString('en-GB')}`;
+                let isFirst = (j === 1);
+                let amtStr = isFirst ? (Math.round(c.totalRentPaid).toLocaleString() + " EGP") : (Math.round(monthlyAmount).toLocaleString() + " EGP");
+                let detStr = isFirst ? rentInfo.breakdownDetails : "________________________";
+                let loopTitle = (c.mode === 'Monthly') ? `RENTAL PAYMENT (Month ${j})` : `RENTAL PAYMENT`;
+
+                html += `<div class="a4-page"><div class="page-content">${singleRecHtml(loopTitle, 'CLIENT COPY', amtStr, detStr, !isFirst, pStr, false)}<div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>${singleRecHtml(loopTitle, 'COMPANY COPY', amtStr, detStr, !isFirst, pStr, false)}</div></div>`;
+                sDate = eDate;
+            }
+
+            if (c.reqDep > 0 || totalDepPaid > 0) {
+                let depAmtStr = Math.round(totalDepPaid > 0 ? totalDepPaid : c.reqDep).toLocaleString() + " EGP";
+                html += `<div class="a4-page"><div class="page-content">${singleRecHtml('SECURITY DEPOSIT', 'CLIENT COPY', depAmtStr, depInfo.breakdownDetails || "Pending", totalDepPaid <= 0, "", true)}<div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>${singleRecHtml('SECURITY DEPOSIT', 'COMPANY COPY', depAmtStr, depInfo.breakdownDetails || "Pending", totalDepPaid <= 0, "", true)}</div></div>`;
+            }
+
+            document.getElementById('contractOutput').innerHTML = html;
+            setTimeout(() => { window.print(); }, 500);
+        }
     </script>
 </body>
 </html>
