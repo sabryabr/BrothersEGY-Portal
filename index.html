@@ -216,9 +216,9 @@
                         <input type="number" id="global_eur" value="54.00" style="width:50px; height:20px; background:transparent; border:none; color:white; font-weight:bold; font-size:14px; text-align:center; padding:0; outline:none;" oninput="if(typeof runContractCalc === 'function') runContractCalc()">
                     </div>
                     <div style="display:flex; align-items:center; gap:10px; background:#0a0a0a; padding:6px 15px; border-radius:8px; border:1px solid #333;">
-                        <i class="fa-regular fa-calendar" style="color:#00d2ff; font-size:14px;"></i>
+                        <i class="fa-regular fa-calendar" style="color:white; font-size:14px;"></i>
                         <span id="global_date" style="font-weight:bold; font-size:13px; color:white;">--/--/----</span>
-                        <i class="fa-regular fa-clock" style="color:#00d2ff; font-size:14px; margin-left:5px;"></i>
+                        <i class="fa-regular fa-clock" style="color:white; font-size:14px; margin-left:5px;"></i>
                         <span id="global_clock" style="font-weight:bold; font-size:13px; color:white;">--:--:--</span>
                     </div>
                 </div>
@@ -332,6 +332,12 @@
                     </table>
                 </div>
             </div>
+
+            <div id="view-en-contract" class="view-section">
+                <div class="cp-body">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 style="margin:0;"><i class="fa-solid fa-file-contract"></i> Smart EN Contract Generator</h2>
+                    </div>
                     
                     <div class="section-head">1. Contract & Branch</div>
                     <div class="grid-3">
@@ -543,7 +549,7 @@
     </div>
 
     <script>
-        // Force video play and Clock Init
+        // Force video play and Clock Init (CAIRO TIMEZONE)
         document.addEventListener('DOMContentLoaded', () => {
             const vid = document.getElementById('bg-video');
             if(vid) vid.play().catch(e => console.log("Auto-play constrained."));
@@ -647,7 +653,7 @@
 
         // --- 4. ROUTING ---
         function route(viewId, btnEl = null) {
-            document.getElementById('global-rates-panel').style.display = 'flex'; // Force globally visible
+            document.getElementById('global-rates-panel').style.display = 'flex'; // Rates always visible
             document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.side-item, .top-btn').forEach(el => el.classList.remove('active'));
             
@@ -845,15 +851,14 @@
 
         function prepNativeContract() {
             const sel = document.getElementById('con_carSelect');
-            sel.innerHTML = '<option value="">-- Select Car From Fleet --</option>';
+            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
             
-            // Safe mapping to prevent database crashes
             APP_DATA.cars.forEach(c => {
+                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
+                if(!contract.includes('valid') && !contract.includes('ساري')) return; 
                 let pNum = c['رقم اللوحة'] || c['Plate'] || "";
                 let pLet = c['احرف اللوحة'] || "";
-                let opt = document.createElement('option'); 
-                opt.value = c.id; 
-                opt.text = `[#${c.id}] ${c['Model'] || c['الطراز'] || 'Vehicle'} - ${pNum} ${pLet}`;
+                let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${c['Model'] || c['الطراز']} - ${pNum} ${pLet}`;
                 sel.add(opt);
             });
             
@@ -861,12 +866,13 @@
             runContractCalc();
         }
 
+        // --- NEW CLOUD CRM BRAIN (Globally Accessible) ---
         function populateClientList() {
             const list = document.getElementById('client-list');
             if(!list) return;
             list.innerHTML = '';
             
-            // Safe alphabetical sorting
+            // Sort alphabetically safely
             const sortedClients = [...APP_DATA.customers].sort((a, b) => {
                 const nameA = String(a['الاسم الأول'] || '');
                 const nameB = String(b['الاسم الأول'] || '');
@@ -901,7 +907,7 @@
                 if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; }
             }
 
-            if(!selectedId) return; // Do nothing until exact match is clicked
+            if(!selectedId) return;
 
             const c = APP_DATA.customers.find(x => x.id === selectedId);
             if(c) {
@@ -944,13 +950,11 @@
             if (!APP_DATA.user) return false;
             const role = String(APP_DATA.user.role || "").toLowerCase();
             const accessArr = APP_DATA.user.access || [];
-            // Allow if "admin" is anywhere in their role, OR if they have strict permissions
             return role.includes('admin') || accessArr.includes(6) || accessArr.includes(7);
         }
 
         function enableClientEdit() {
             if(!document.getElementById('con_client_id').value) return alert("Select a client from the search bar first to edit.");
-            
             if(!hasCRMAccess()) return alert("Access Denied: You do not have CRM Edit permissions.");
 
             document.querySelectorAll('.crm-fields input').forEach(input => {
@@ -992,7 +996,6 @@
             
             if(!fname || !pass) return alert("First Name and Passport/National ID are required.");
 
-            // CAIRO TIME AUDIT LOGGING
             const cairoTime = new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' });
             const editorName = APP_DATA.user.name || APP_DATA.user.role || "System";
 
@@ -1039,7 +1042,7 @@
                 document.getElementById('btn_save_client').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save';
             }
         }
-            
+
         function conLoadCar() {
             const id = document.getElementById('con_carSelect').value;
             const c = APP_DATA.cars.find(x => x.id === id);
@@ -1058,8 +1061,11 @@
 
         function runContractCalc() {
             try {
-                const rateUsd = conNum('ex_usd') || 50; const rateEur = conNum('ex_eur') || 54;
-                const pStr = document.getElementById('con_p_time').value; const dStr = document.getElementById('con_d_time').value; const mode = document.getElementById('con_mode').value;
+                const rateUsd = parseFloat(document.getElementById('global_usd').value) || 50; 
+                const rateEur = parseFloat(document.getElementById('global_eur').value) || 54;
+                const pStr = document.getElementById('con_p_time').value; 
+                const dStr = document.getElementById('con_d_time').value; 
+                const mode = document.getElementById('con_mode').value;
 
                 let days = 1;
                 if (pStr && dStr) {
@@ -1125,7 +1131,7 @@
             const cid = `BR-${val_branch}-${dStr}-${tStr}`; 
             const today = now.toLocaleDateString('en-GB');
 
-            // DATE/TIME FORMATTER (BIG & BOLD)
+            // DATE/TIME FORMATTER (Standard Clean Font for Print)
             const formatDT = (dtString) => {
                 if(!dtString) return "";
                 const d = new Date(dtString);
@@ -1222,8 +1228,8 @@
                             <tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" align="right">TOTAL CONTRACT VALUE:</td><td align="right">${Math.round(c.totalDue).toLocaleString()} EGP</td></tr>
                             <tr style="background:#f9f9f9;"><td colspan="3" align="center" style="font-size:8.5pt;">
                                 <strong>Live Exchange Rates Applied:</strong> 
-                                <span style="font-size:10pt; font-weight:bold; color:#04509D; margin:0 15px;"><i class="fa-solid fa-dollar-sign"></i> 1 USD = ${c.rateUsd} EGP</span>
-                                <span style="font-size:10pt; font-weight:bold; color:#04509D;"><i class="fa-solid fa-euro-sign"></i> 1 EUR = ${c.rateEur} EGP</span>
+                                <span style="font-size:10pt; font-weight:bold; color:#04509D; margin:0 15px;">1 USD = ${c.rateUsd} EGP</span>
+                                <span style="font-size:10pt; font-weight:bold; color:#04509D;">1 EUR = ${c.rateEur} EGP</span>
                             </td></tr>
                         </table>
                         <div class="${insClass}" style="border:1px solid #000; padding:5px; text-align:center; font-size:9pt; margin-bottom:5px; border-radius:4px;">
