@@ -24,7 +24,7 @@
         #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.4); transition: object-position 0.8s ease-in-out; }
 
         /* Login Screen */
-        #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
         .login-box { background: rgba(15, 15, 15, 0.85); padding: 50px 40px; border-radius: 30px; border: 1px solid var(--glass-border); text-align: center; width: 350px; box-shadow: 0 25px 50px rgba(0,0,0,0.8); }
         .login-box img { height: 75px; margin-bottom: 20px; }
         .login-box input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.9); color: #111; text-align: center; font-weight: bold; box-sizing: border-box; outline: none; }
@@ -95,22 +95,18 @@
         .bal-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 3px; }
         .btn-gen { background: #04509D; color: white; border: 1px solid var(--glass-border); padding: 18px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 25px; transition: 0.3s; text-transform: uppercase; }
         .btn-gen:hover { background: #3a86ff; }
-        
         .btn-final-print { background: var(--success); color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; width: 100%; max-width: 1050px; margin: 0 auto 50px auto; display: block; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); transition: 0.3s; }
         .btn-final-print:hover { background: #219653; transform: scale(1.01); }
 
         /* ================= BULLETPROOF PRINT ENGINE ================= */
-        
-        /* The container holding the A4 pages in the normal dashboard view */
         #contractOutput { display: none; margin: 20px auto; padding-bottom: 20px; align-items: center; flex-direction: column; gap: 20px; }
-
         .a4-page { width: 210mm; height: 296mm; padding: 10mm 15mm; margin: 0 auto; background: white; color: #000; position: relative; box-sizing: border-box; font-family: 'Helvetica', 'Arial', sans-serif; font-size: 9.5pt; line-height: 1.35; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); }
         
         @media print {
             @page { margin: 0; size: A4 portrait; }
             body, html { background: white !important; margin: 0 !important; padding: 0 !important; height: auto !important; width: auto !important; overflow: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
-            /* Hide UI Elements */
+            /* HIDE EVERYTHING EXCEPT THE CONTRACT */
             #login-overlay, .video-wrapper, #data-loader, .navbar, .sidebar, .cp-body, .btn-final-print, .btn-gen { display: none !important; }
             
             /* Free the Workspace */
@@ -120,6 +116,7 @@
             
             /* The Contract Output Container */
             #contractOutput { display: block !important; position: static !important; margin: 0 !important; padding: 0 !important; }
+            #contractOutput * { visibility: visible; }
             
             /* Print Specific Page Styles */
             .a4-page { width: 210mm; height: 296mm; margin: 0 !important; padding: 10mm 15mm !important; border: none !important; box-shadow: none !important; page-break-after: always; page-break-inside: avoid; }
@@ -139,7 +136,7 @@
         .pt th { background: #f0f0f0; text-align: center; font-weight: bold; }
         .terms-grid { font-size: 8.5pt; text-align: justify; column-count: 2; column-gap: 30px; line-height: 1.25; flex-grow: 1; }
         .term-p { margin-bottom: 12px; break-inside: avoid; }
-        .term-h { font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 3px; border-bottom: 1px solid #999; padding-bottom: 2px; font-size: 9pt; color: #04509D; }
+        .term-h { font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 3px; border-bottom: 1px solid #999; padding-bottom: 2px; font-size: 9.5pt; color: #04509D; }
         .car-img-container { width: 100%; aspect-ratio: 960/618; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
         .car-img-container img { width: 100%; height: 100%; object-fit: contain; }
         .tire-img-wrapper { display: flex; align-items: center; gap: 5px; justify-content: center; margin-top: 2px; }
@@ -388,6 +385,12 @@
                     </div>
                     
                     <div class="grid-4">
+                        <div><label class="contract-label">First Name</label><input type="text" class="contract-input" id="con_fname" placeholder="First"></div>
+                        <div><label class="contract-label">Surname</label><input type="text" class="contract-input" id="con_sname" placeholder="Last"></div>
+                        <div><label class="contract-label">Passport / ID</label><input type="text" class="contract-input" id="con_pass"></div>
+                        <div><label class="contract-label">Nationality</label><input type="text" class="contract-input" id="con_nation" placeholder="Country"></div>
+                    </div>
+                    <div class="grid-4">
                         <div><label class="contract-label">Phone</label>
                             <div class="phone-group"><input type="text" class="contract-input" id="con_ph_code" value="+20" placeholder="+20"><input type="text" class="contract-input" id="con_phone" placeholder="1XXXXXXXXX"></div>
                         </div>
@@ -514,10 +517,10 @@
                         </div>
                     </div>
 
-                   <button class="btn-gen" onclick="executeENContract()"><i class="fa-solid fa-eye"></i> 1. GENERATE PREVIEW</button>
+                    <button class="btn-gen" onclick="executeENContract()"><i class="fa-solid fa-eye"></i> 1. GENERATE PREVIEW</button>
                 </div>
                 
-                <div id="contractOutput" style="display:none; margin-top:20px; padding-bottom:50px;"></div>
+                <div id="contractOutput" style="display:none; margin-top:20px; padding-bottom:50px; display:flex; flex-direction:column; gap:20px; align-items:center;"></div>
                 <button id="btnRealPrint" onclick="window.print()" class="btn-final-print" style="margin-bottom:50px;"><i class="fa-solid fa-print"></i> 2. CONFIRM & SAVE PDF</button>
             </div>
 
@@ -623,7 +626,6 @@
             const eSnap = await db.collection('car_expenses').get();
             eSnap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
 
-            // NEW: SYNC CRM CUSTOMERS
             document.getElementById('loader-text').innerText = "Syncing CRM...";
             const custSnap = await db.collection('customers').get();
             custSnap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
@@ -881,55 +883,15 @@
             if(c) {
                 document.getElementById('con_fname').value = c['الاسم الأول'] || '';
                 document.getElementById('con_sname').value = c['الاسم الأخير'] || '';
-                
-                // Smart Passport vs ID logic
                 const passVal = (c['رقم جواز السفر'] && c['رقم جواز السفر'].length > 2) ? c['رقم جواز السفر'] : (c['الرقم القومى'] || '');
                 document.getElementById('con_pass').value = passVal;
-                
                 document.getElementById('con_phone').value = c['رقم التليفون'] || '';
-                
                 let email = c['عنوان البريد الإلكتروني'] || '';
                 document.getElementById('con_email').value = (email === '-') ? '' : email;
-                
                 document.getElementById('con_lic').value = c['رقم رخصة القيادة'] || '';
                 document.getElementById('con_addr').value = c['العنوان'] || '';
                 document.getElementById('con_nation').value = c['رمز الدولة'] || '';
             }
-        }
-
-        function autoFillClient() {
-            const searchVal = document.getElementById('crm_search').value;
-            if(!searchVal) return;
-            
-            const list = document.getElementById('client-list');
-            let selectedId = null;
-            for(let opt of list.options) {
-                if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; }
-            }
-
-            if(!selectedId) return;
-
-            const c = APP_DATA.customers.find(x => x.id === selectedId);
-            if(c) {
-                document.getElementById('con_fname').value = c['الاسم الأول'] || '';
-                document.getElementById('con_sname').value = c['الاسم الأخير'] || '';
-                
-                // If they have a passport, use it. Otherwise use National ID.
-                document.getElementById('con_pass').value = (c['رقم جواز السفر'] && c['رقم جواز السفر'].length > 2) ? c['رقم جواز السفر'] : (c['الرقم القومى'] || '');
-                
-                // Strip the country code out if it exists, otherwise just paste it
-                let rawPhone = c['رقم التليفون'] || '';
-                document.getElementById('con_phone').value = rawPhone;
-                
-                let email = c['عنوان البريد الإلكتروني'] || '';
-                document.getElementById('con_email').value = (email === '-') ? '' : email;
-                
-                document.getElementById('con_lic').value = c['رقم رخصة القيادة'] || '';
-                document.getElementById('con_addr').value = c['العنوان'] || '';
-                document.getElementById('con_nation').value = c['رمز الدولة'] || '';
-            }
-        }
-            runContractCalc();
         }
 
         function conLoadCar() {
@@ -946,6 +908,7 @@
         }
 
         function conNum(id) { const el = document.getElementById('con_'+id); return el ? parseFloat(el.value) || 0 : 0; }
+        function conVal(id) { const el = document.getElementById('con_'+id); return el ? el.value : ""; }
 
         function runContractCalc() {
             try {
@@ -983,7 +946,6 @@
                 let totalDepPaid = Math.round(conNum('pay_dep_egp') + (conNum('pay_dep_usd') * rateUsd) + (conNum('pay_dep_eur') * rateEur) + conNum('pay_dep_card'));
                 let depPending = reqDep - totalDepPaid;
 
-                // Update UI
                 document.getElementById('con_c_days').innerText = days;
                 document.getElementById('con_c_rent').innerText = Math.round(totalRentOnly).toLocaleString();
                 document.getElementById('con_c_fees').innerText = Math.round(fee_d + fee_c).toLocaleString();
@@ -1014,10 +976,10 @@
             let now = new Date();
             let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0');
             let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-            const cid = `BR-${val_branch}-${dStr}-${tStr}`; // Perfect sequential ID based on timestamp
+            const cid = `BR-${val_branch}-${dStr}-${tStr}`; 
             const today = now.toLocaleDateString('en-GB');
 
-            // --- DATE/TIME FORMATTER (BIG & BOLD) ---
+            // DATE/TIME FORMATTER (BIG & BOLD)
             const formatDT = (dtString) => {
                 if(!dtString) return "";
                 const d = new Date(dtString);
@@ -1050,7 +1012,6 @@
             const simpleInsText = { "Basic": "Basic Insurance: 100% Client Liability for Damages.", "Intermediate": "Intermediate: 70% Client Liability / 30% Company Coverage.", "Full Protection": "Full Protection: Zero Deductible (Subject to caps)." };
             const extHtml = conVal('type') === 'Extension' ? `<div style="font-size:10pt; font-weight:bold; margin-top:3px;">(EXTENSION TO ${conVal('prevCon')})</div>` : '';
 
-            // HARDCODED IMAGES (Fixes the 2-click bug)
             const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png";
             const carSrc = "https://brothersegy.com/wp-content/uploads/2026/02/car-template.png";
 
@@ -1062,7 +1023,7 @@
 
             // --- PAGE 1: CONTRACT ---
             html += `
-            <div class="a4-page">
+            <div class="a4-page" id="printPage1">
                 <div class="watermark"><img src="${logoSrc}"></div>
                 <div class="page-content">
                     <div class="doc-head">
@@ -1365,20 +1326,13 @@
             document.getElementById('contractOutput').innerHTML = html;
             document.getElementById('contractOutput').style.display = "flex";
             
-            // This is the crucial fix for the Preview & Scroll
             const printBtn = document.getElementById('btnRealPrint');
             if(printBtn) printBtn.style.display = "block";
             
-            // Scroll to the preview smoothly within the workspace
             setTimeout(() => {
                 const ws = document.getElementById('main-workspace');
                 const out = document.getElementById('contractOutput');
-                if (ws && out) {
-                    ws.scrollTo({
-                        top: out.offsetTop - 80, // Accounts for navbar
-                        behavior: 'smooth'
-                    });
-                }
+                if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); }
             }, 100);
         }
     </script>
