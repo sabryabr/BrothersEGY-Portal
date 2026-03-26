@@ -368,13 +368,13 @@
                         <div><label class="contract-label">Ins. Fee (Daily)</label><input type="number" class="contract-input" id="con_rateIns" value="0" oninput="runContractCalc()"></div>
                     </div>
 
-                    <div class="section-head">3. Client & Dates (Auto-fill CRM Coming Soon)</div>
-                    <div class="grid-4">
-                        <div><label class="contract-label">First Name</label><input type="text" class="contract-input" id="con_fname" placeholder="First"></div>
-                        <div><label class="contract-label">Surname</label><input type="text" class="contract-input" id="con_sname" placeholder="Last"></div>
-                        <div><label class="contract-label">Passport / ID</label><input type="text" class="contract-input" id="con_pass"></div>
-                        <div><label class="contract-label">Nationality</label><input type="text" class="contract-input" id="con_nation" placeholder="Country"></div>
+                    <div class="section-head">3. Client & Dates (Live CRM Connected)</div>
+                    <div style="margin-bottom: 15px; background:rgba(46, 204, 113, 0.1); border:1px solid var(--success); padding:10px; border-radius:8px;">
+                        <label class="contract-label" style="color:var(--success);"><i class="fa-solid fa-magnifying-glass"></i> Search Existing Client Database</label>
+                        <input list="client-list" id="crm_search" class="contract-input" placeholder="Type Name or Passport/National ID..." onchange="autoFillClient()" style="border-color:var(--success);">
+                        <datalist id="client-list"></datalist>
                     </div>
+                    
                     <div class="grid-4">
                         <div><label class="contract-label">Phone</label>
                             <div class="phone-group"><input type="text" class="contract-input" id="con_ph_code" value="+20" placeholder="+20"><input type="text" class="contract-input" id="con_phone" placeholder="1XXXXXXXXX"></div>
@@ -541,7 +541,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        const APP_DATA = { cars: [], bookings: [], car_expenses: [], user: null, liveRates: { usd: 50, eur: 54 } };
+        const APP_DATA = { cars: [], bookings: [], car_expenses: [], customers: [], user: null, liveRates: { usd: 50, eur: 54 } };
 
         // --- 2. AUTHENTICATION ---
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
@@ -609,6 +609,11 @@
             document.getElementById('loader-text').innerText = "Syncing Financials...";
             const eSnap = await db.collection('car_expenses').get();
             eSnap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
+
+            // NEW: SYNC CRM CUSTOMERS
+            document.getElementById('loader-text').innerText = "Syncing CRM...";
+            const custSnap = await db.collection('customers').get();
+            custSnap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
         }
 
         function parseCurrency(val) { return parseFloat(String(val).replace(/[^0-9.-]+/g,"")) || 0; }
@@ -824,6 +829,56 @@
                     sel.add(opt);
                 });
             }
+            function populateClientList() {
+            const list = document.getElementById('client-list');
+            list.innerHTML = '';
+            APP_DATA.customers.forEach(c => {
+                const fName = c['الاسم الأول'] || '';
+                const lName = c['الاسم الأخير'] || '';
+                const pass = c['رقم جواز السفر'] || c['الرقم القومى'] || '';
+                const fullName = `${fName} ${lName}`.trim();
+                
+                if(fullName) {
+                    let opt = document.createElement('option');
+                    opt.value = `${fullName} | ${pass}`;
+                    opt.setAttribute('data-id', c.id);
+                    list.appendChild(opt);
+                }
+            });
+        }
+
+        function autoFillClient() {
+            const searchVal = document.getElementById('crm_search').value;
+            if(!searchVal) return;
+            
+            const list = document.getElementById('client-list');
+            let selectedId = null;
+            for(let opt of list.options) {
+                if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; }
+            }
+
+            if(!selectedId) return;
+
+            const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(c) {
+                document.getElementById('con_fname').value = c['الاسم الأول'] || '';
+                document.getElementById('con_sname').value = c['الاسم الأخير'] || '';
+                
+                // If they have a passport, use it. Otherwise use National ID.
+                document.getElementById('con_pass').value = (c['رقم جواز السفر'] && c['رقم جواز السفر'].length > 2) ? c['رقم جواز السفر'] : (c['الرقم القومى'] || '');
+                
+                // Strip the country code out if it exists, otherwise just paste it
+                let rawPhone = c['رقم التليفون'] || '';
+                document.getElementById('con_phone').value = rawPhone;
+                
+                let email = c['عنوان البريد الإلكتروني'] || '';
+                document.getElementById('con_email').value = (email === '-') ? '' : email;
+                
+                document.getElementById('con_lic').value = c['رقم رخصة القيادة'] || '';
+                document.getElementById('con_addr').value = c['العنوان'] || '';
+                document.getElementById('con_nation').value = c['رمز الدولة'] || '';
+            }
+        }
             runContractCalc();
         }
 
