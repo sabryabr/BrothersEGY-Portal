@@ -206,9 +206,26 @@
                 <button class="top-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
             </div>
             <div style="display:flex; align-items:center; gap:15px;">
-                <div style="text-align:right; font-size:12px; color:#aaa; margin-right:10px;">Role<br><b id="display-role" style="color:var(--accent); font-size:14px;">-</b></div>
-                <button onclick="route('home')" title="Return Home" style="background:var(--primary); border:none; color:white; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
-                <button onclick="location.reload()" title="Secure Logout" style="background:#e74c3c; color:white; border:none; width:40px; height:40px; border-radius:10px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:8px; background:#0a0a0a; padding:6px 12px; border-radius:8px; border:1px solid #333;">
+                        <i class="fa-solid fa-dollar-sign" style="color:var(--success); font-size:14px;"></i>
+                        <input type="number" id="global_usd" value="50.00" style="width:50px; height:20px; background:transparent; border:none; color:white; font-weight:bold; font-size:14px; text-align:center; padding:0; outline:none;" oninput="if(typeof runContractCalc === 'function') runContractCalc()">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; background:#0a0a0a; padding:6px 12px; border-radius:8px; border:1px solid #333;">
+                        <i class="fa-solid fa-euro-sign" style="color:var(--success); font-size:14px;"></i>
+                        <input type="number" id="global_eur" value="54.00" style="width:50px; height:20px; background:transparent; border:none; color:white; font-weight:bold; font-size:14px; text-align:center; padding:0; outline:none;" oninput="if(typeof runContractCalc === 'function') runContractCalc()">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; background:#0a0a0a; padding:6px 15px; border-radius:8px; border:1px solid #333;">
+                        <i class="fa-regular fa-calendar" style="color:var(--primary); font-size:14px;"></i>
+                        <span id="global_date" style="font-weight:bold; font-size:13px; color:white;">--/--/----</span>
+                        <i class="fa-regular fa-clock" style="color:var(--primary); font-size:14px; margin-left:5px;"></i>
+                        <span id="global_clock" style="font-weight:bold; font-size:13px; color:white;">--:--:--</span>
+                    </div>
+                </div>
+
+                <div style="text-align:right; font-size:11px; color:#aaa; margin-left:10px; line-height:1.2;">Role<br><b id="display-role" style="color:var(--accent); font-size:13px;">-</b></div>
+                <button onclick="route('home')" title="Return Home" style="background:var(--primary); border:none; color:white; width:35px; height:35px; border-radius:8px; cursor:pointer;"><i class="fa-solid fa-house"></i></button>
+                <button onclick="location.reload()" title="Secure Logout" style="background:#e74c3c; color:white; border:none; width:35px; height:35px; border-radius:8px; cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
             </div>
         </nav>
 
@@ -315,28 +332,6 @@
                     </table>
                 </div>
             </div>
-
-            <div id="view-en-contract" class="view-section">
-                <div class="cp-body">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h2 style="margin:0;"><i class="fa-solid fa-file-contract"></i> Smart EN Contract Generator</h2>
-                        <div style="display:flex; gap:15px; align-items:center;">
-                            <div style="display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.6); padding:5px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2);">
-                                <i class="fa-solid fa-dollar-sign" style="color:var(--success); font-size:16px;"></i>
-                                <input type="number" id="con_ex_usd" value="50.00" style="width:60px; height:24px; background:transparent; border:none; color:white; font-weight:800; font-size:16px; text-align:center; padding:0; outline:none;" oninput="runContractCalc()">
-                            </div>
-                            <div style="display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.6); padding:5px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2);">
-                                <i class="fa-solid fa-euro-sign" style="color:var(--success); font-size:16px;"></i>
-                                <input type="number" id="con_ex_eur" value="54.00" style="width:60px; height:24px; background:transparent; border:none; color:white; font-weight:800; font-size:16px; text-align:center; padding:0; outline:none;" oninput="runContractCalc()">
-                            </div>
-                            <div style="display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.6); padding:5px 15px; border-radius:8px; border:1px solid rgba(255,255,255,0.2);">
-                                <i class="fa-regular fa-calendar" style="color:var(--primary); font-size:16px;"></i>
-                                <span id="con_date" style="font-weight:bold; font-size:14px; color:#ddd;">--/--/----</span>
-                                <i class="fa-regular fa-clock" style="color:var(--primary); font-size:16px; margin-left:5px;"></i>
-                                <span id="con_clock" style="font-family:monospace; font-size:16px; font-weight:900; color:white;">--:--:--</span>
-                            </div>
-                        </div>
-                    </div>
                     
                     <div class="section-head">1. Contract & Branch</div>
                     <div class="grid-3">
@@ -377,26 +372,38 @@
                         <div><label class="contract-label">Ins. Fee (Daily)</label><input type="number" class="contract-input" id="con_rateIns" value="0" oninput="runContractCalc()"></div>
                     </div>
 
-                    <div class="section-head">3. Client & Dates (Live CRM Connected)</div>
-                    <div style="margin-bottom: 15px; background:rgba(46, 204, 113, 0.1); border:1px solid var(--success); padding:10px; border-radius:8px;">
-                        <label class="contract-label" style="color:var(--success);"><i class="fa-solid fa-magnifying-glass"></i> Search Existing Client Database</label>
-                        <input list="client-list" id="crm_search" class="contract-input" placeholder="Type Name or Passport/National ID..." onchange="autoFillClient()" style="border-color:var(--success);">
-                        <datalist id="client-list"></datalist>
+                    <div class="section-head">3. Client & Dates (Strict CRM Connected)</div>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background:rgba(4, 80, 157, 0.1); border:1px solid var(--primary); padding:10px; border-radius:8px;">
+                        <div style="flex-grow:1;">
+                            <label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-address-book"></i> Select Existing Client</label>
+                            <select id="crm_select" class="contract-input" style="border-color:var(--primary);" onchange="autoFillClient()">
+                                <option value="">-- Choose Client --</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; gap:5px; margin-top:15px;">
+                            <button onclick="clearClientForm()" style="background:#2ecc71; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-plus"></i> New</button>
+                            <button onclick="enableClientEdit()" style="background:#f39c12; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-pen"></i> Edit</button>
+                            <button onclick="saveClientToFirebase()" style="background:#e74c3c; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-cloud-arrow-up"></i> Save to DB</button>
+                        </div>
                     </div>
                     
-                    <div class="grid-4">
-                        <div><label class="contract-label">First Name</label><input type="text" class="contract-input" id="con_fname" placeholder="First"></div>
-                        <div><label class="contract-label">Surname</label><input type="text" class="contract-input" id="con_sname" placeholder="Last"></div>
-                        <div><label class="contract-label">Passport / ID</label><input type="text" class="contract-input" id="con_pass"></div>
-                        <div><label class="contract-label">Nationality</label><input type="text" class="contract-input" id="con_nation" placeholder="Country"></div>
+                    <input type="hidden" id="con_client_id" value="">
+                    <div style="font-size:11px; color:#aaa; margin-bottom:10px; text-align:right;">CRM ID: <span id="display_client_id" style="color:var(--success); font-weight:bold;">UNSAVED</span></div>
+                    
+                    <div class="grid-4 crm-fields">
+                        <div><label class="contract-label">First Name *</label><input type="text" class="contract-input" id="con_fname" readonly></div>
+                        <div><label class="contract-label">Surname *</label><input type="text" class="contract-input" id="con_sname" readonly></div>
+                        <div><label class="contract-label">Passport / National ID *</label><input type="text" class="contract-input" id="con_pass" readonly></div>
+                        <div><label class="contract-label">Nationality</label><input type="text" class="contract-input" id="con_nation" readonly></div>
                     </div>
-                    <div class="grid-4">
-                        <div><label class="contract-label">Phone</label>
-                            <div class="phone-group"><input type="text" class="contract-input" id="con_ph_code" value="+20" placeholder="+20"><input type="text" class="contract-input" id="con_phone" placeholder="1XXXXXXXXX"></div>
+                    <div class="grid-4 crm-fields">
+                        <div><label class="contract-label">Phone *</label>
+                            <div class="phone-group"><input type="text" class="contract-input" id="con_ph_code" value="+20" readonly><input type="text" class="contract-input" id="con_phone" readonly></div>
                         </div>
-                        <div><label class="contract-label">Email Address</label><input type="email" class="contract-input" id="con_email" placeholder="client@mail.com"></div>
-                        <div><label class="contract-label">Driver License</label><input type="text" class="contract-input" id="con_lic" placeholder="Main License"></div>
-                        <div><label class="contract-label">Address</label><input type="text" class="contract-input" id="con_addr" placeholder="Local Address"></div>
+                        <div><label class="contract-label">Email Address</label><input type="email" class="contract-input" id="con_email" readonly></div>
+                        <div><label class="contract-label">Driver License</label><input type="text" class="contract-input" id="con_lic" readonly></div>
+                        <div><label class="contract-label">Address</label><input type="text" class="contract-input" id="con_addr" readonly></div>
                     </div>
 
                     <div class="grid-2" style="margin-top:10px;">
@@ -542,8 +549,8 @@
             if(vid) vid.play().catch(e => console.log("Auto-play constrained."));
             
             setInterval(() => { 
-                const clk = document.getElementById('con_clock');
-                const dt = document.getElementById('con_date');
+                const clk = document.getElementById('global_clock');
+                const dt = document.getElementById('global_date');
                 if (clk) {
                     const now = new Date();
                     clk.innerText = now.toLocaleTimeString('en-US');
@@ -607,8 +614,8 @@
                 if(d.rates.EGP) {
                     APP_DATA.liveRates.usd = d.rates.EGP;
                     APP_DATA.liveRates.eur = d.rates.EGP / d.rates.EUR;
-                    document.getElementById('con_ex_usd').value = APP_DATA.liveRates.usd.toFixed(2);
-                    document.getElementById('con_ex_eur').value = APP_DATA.liveRates.eur.toFixed(2);
+                    document.getElementById('global_usd').value = APP_DATA.liveRates.usd.toFixed(2);
+                    document.getElementById('global_eur').value = APP_DATA.liveRates.eur.toFixed(2);
                 }
             } catch(e) { console.log("Rate API blocked. Using defaults."); }
         }
@@ -845,46 +852,45 @@
                 });
             }
             
-            // 1. LOAD CRM CLIENTS INTO THE SEARCH BAR
-            const list = document.getElementById('client-list');
-            if(list && list.options.length === 0) {
-                APP_DATA.customers.forEach(c => {
-                    const fName = c['الاسم الأول'] || '';
-                    const lName = c['الاسم الأخير'] || '';
-                    const pass = c['رقم جواز السفر'] || c['الرقم القومى'] || '';
-                    const fullName = `${fName} ${lName}`.trim();
-                    
-                    if(fullName) {
-                        let opt = document.createElement('option');
-                        opt.value = `${fullName} | ${pass}`;
-                        opt.setAttribute('data-id', c.id);
-                        list.appendChild(opt);
-                    }
-                });
-            }
+        function populateClientList() {
+            const sel = document.getElementById('crm_select');
+            sel.innerHTML = '<option value="">-- Choose Client --</option>';
             
-            runContractCalc();
+            // Sort alphabetically by first name
+            const sortedClients = [...APP_DATA.customers].sort((a, b) => (a['الاسم الأول'] || '').localeCompare(b['الاسم الأول'] || ''));
+            
+            sortedClients.forEach(c => {
+                const fName = c['الاسم الأول'] || '';
+                const lName = c['الاسم الأخير'] || '';
+                const pass = c['رقم جواز السفر'] || c['الرقم القومى'] || '';
+                const fullName = `${fName} ${lName}`.trim();
+                
+                if(fullName) {
+                    let opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.text = `${fullName} | ID/Pass: ${pass}`;
+                    sel.add(opt);
+                }
+            });
         }
 
-        // 2. THE AUTO-FILL BRAIN (Now Globally Accessible)
         function autoFillClient() {
-            const searchVal = document.getElementById('crm_search').value;
-            if(!searchVal) return;
+            const selectedId = document.getElementById('crm_select').value;
+            lockClientForm(); // Lock it when viewing
             
-            const list = document.getElementById('client-list');
-            let selectedId = null;
-            for(let opt of list.options) {
-                if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; }
+            if(!selectedId) {
+                clearClientForm();
+                return;
             }
-
-            if(!selectedId) return;
 
             const c = APP_DATA.customers.find(x => x.id === selectedId);
             if(c) {
+                document.getElementById('con_client_id').value = c.id;
+                document.getElementById('display_client_id').innerText = c.id;
+                
                 document.getElementById('con_fname').value = c['الاسم الأول'] || '';
                 document.getElementById('con_sname').value = c['الاسم الأخير'] || '';
-                const passVal = (c['رقم جواز السفر'] && c['رقم جواز السفر'].length > 2) ? c['رقم جواز السفر'] : (c['الرقم القومى'] || '');
-                document.getElementById('con_pass').value = passVal;
+                document.getElementById('con_pass').value = (c['رقم جواز السفر'] && c['رقم جواز السفر'].length > 2) ? c['رقم جواز السفر'] : (c['الرقم القومى'] || '');
                 document.getElementById('con_phone').value = c['رقم التليفون'] || '';
                 let email = c['عنوان البريد الإلكتروني'] || '';
                 document.getElementById('con_email').value = (email === '-') ? '' : email;
@@ -894,6 +900,84 @@
             }
         }
 
+        function enableClientEdit() {
+            document.querySelectorAll('.crm-fields input').forEach(input => {
+                input.removeAttribute('readonly');
+                input.style.border = "1px solid var(--accent)";
+            });
+            document.getElementById('display_client_id').innerText += " (EDITING...)";
+        }
+
+        function clearClientForm() {
+            document.getElementById('crm_select').value = "";
+            document.getElementById('con_client_id').value = "";
+            document.getElementById('display_client_id').innerText = "NEW (UNSAVED)";
+            document.querySelectorAll('.crm-fields input').forEach(input => {
+                input.value = "";
+                input.removeAttribute('readonly');
+                input.style.border = "1px solid var(--success)";
+            });
+            document.getElementById('con_ph_code').value = "+20";
+        }
+
+        function lockClientForm() {
+            document.querySelectorAll('.crm-fields input').forEach(input => {
+                input.setAttribute('readonly', 'true');
+                input.style.border = "1px solid rgba(255,255,255,0.2)";
+            });
+        }
+
+        async function saveClientToFirebase() {
+            if(!APP_DATA.user.access.includes(6) && !APP_DATA.user.access.includes(7)) return alert("Access Denied: You do not have CRM Edit permissions.");
+            
+            const fname = document.getElementById('con_fname').value.trim();
+            const pass = document.getElementById('con_pass').value.trim();
+            
+            if(!fname || !pass) return alert("First Name and Passport/ID are required to save a client.");
+
+            const clientData = {
+                "الاسم الأول": fname,
+                "الاسم الأخير": document.getElementById('con_sname').value.trim(),
+                "رقم جواز السفر": pass,
+                "الرقم القومى": pass, // Fallback
+                "رقم التليفون": document.getElementById('con_phone').value.trim(),
+                "عنوان البريد الإلكتروني": document.getElementById('con_email').value.trim(),
+                "رقم رخصة القيادة": document.getElementById('con_lic').value.trim(),
+                "العنوان": document.getElementById('con_addr').value.trim(),
+                "رمز الدولة": document.getElementById('con_nation').value.trim(),
+                "_sys_updated": Date.now()
+            };
+
+            const existingId = document.getElementById('con_client_id').value;
+
+            try {
+                document.getElementById('display_client_id').innerText = "SAVING TO CLOUD...";
+                if(existingId) {
+                    // Update existing
+                    await db.collection('customers').doc(existingId).update(clientData);
+                    alert("Client Updated Successfully!");
+                } else {
+                    // Create new
+                    const docRef = await db.collection('customers').add(clientData);
+                    document.getElementById('con_client_id').value = docRef.id;
+                    document.getElementById('display_client_id').innerText = docRef.id;
+                    
+                    // Add to local cache so it appears in dropdown immediately
+                    APP_DATA.customers.push({ id: docRef.id, ...clientData });
+                    alert("New Client Saved to Database!");
+                }
+                
+                lockClientForm();
+                populateClientList();
+                document.getElementById('crm_select').value = document.getElementById('con_client_id').value;
+                document.getElementById('display_client_id').innerText = document.getElementById('con_client_id').value + " (SAVED)";
+
+            } catch(e) {
+                console.error(e);
+                alert("Error saving client: " + e.message);
+            }
+        }
+            
         function conLoadCar() {
             const id = document.getElementById('con_carSelect').value;
             const c = APP_DATA.cars.find(x => x.id === id);
@@ -984,7 +1068,7 @@
                 if(!dtString) return "";
                 const d = new Date(dtString);
                 if(isNaN(d)) return dtString;
-                return `<span style="font-size:10.5pt; font-weight:800;">${d.toLocaleDateString('en-GB')}</span> <br> <span style="font-size:12pt; font-weight:900; color:#04509D;">🕒 ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}</span>`;
+                return `<b>${d.toLocaleDateString('en-GB')}</b> &nbsp; ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}`;
             };
 
             const buildPayStr = (pfx) => {
