@@ -838,7 +838,13 @@
             "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.`
         };
 
+        // 5. NATIVE EN CONTRACT ENGINE & CALCULATIONS
         function prepNativeContract() {
+            // Clock/Rate Init (Reading from new global navbar inputs)
+            const rtU = parseFloat(document.getElementById('global_usd').value) || 50;
+            const rtE = parseFloat(document.getElementById('global_eur').value) || 54;
+            
+            // Populate Car Dropdown
             const sel = document.getElementById('con_carSelect');
             if(sel.options.length === 1) { 
                 sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
@@ -852,8 +858,20 @@
                 });
             }
             
+            // Populate CRM strictly
+            populateClientList();
+            
+            // Initialize form state
+            document.getElementById('display_client_id').innerText = "NEW (UNSAVED)";
+            document.getElementById('crm_select').value = "";
+            clearClientForm(); 
+            runContractCalc();
+        } // <--- This } WAS MISSING and caused the login crash!
+
+        // --- NEW CLOUD CRM BRAIN (Globally Accessible) ---
         function populateClientList() {
             const sel = document.getElementById('crm_select');
+            if(!sel) return;
             sel.innerHTML = '<option value="">-- Choose Client --</option>';
             
             // Sort alphabetically by first name
@@ -876,7 +894,7 @@
 
         function autoFillClient() {
             const selectedId = document.getElementById('crm_select').value;
-            lockClientForm(); // Lock it when viewing
+            lockClientForm(); // Lock it when viewing existing
             
             if(!selectedId) {
                 clearClientForm();
@@ -901,9 +919,13 @@
         }
 
         function enableClientEdit() {
+            if(!APP_DATA.user.access.includes(6) && !APP_DATA.user.access.includes(7)) return alert("Access Denied: You do not have CRM Edit permissions.");
+            
             document.querySelectorAll('.crm-fields input').forEach(input => {
-                input.removeAttribute('readonly');
-                input.style.border = "1px solid var(--accent)";
+                if(input.id !== 'con_ph_code') { // Don't make country code editable here
+                    input.removeAttribute('readonly');
+                    input.style.border = "1px solid var(--accent)";
+                }
             });
             document.getElementById('display_client_id').innerText += " (EDITING...)";
         }
@@ -913,11 +935,13 @@
             document.getElementById('con_client_id').value = "";
             document.getElementById('display_client_id').innerText = "NEW (UNSAVED)";
             document.querySelectorAll('.crm-fields input').forEach(input => {
-                input.value = "";
-                input.removeAttribute('readonly');
-                input.style.border = "1px solid var(--success)";
+                if(input.id !== 'con_ph_code') {
+                    input.value = "";
+                    input.removeAttribute('readonly');
+                    input.style.border = "1px solid var(--success)";
+                }
             });
-            document.getElementById('con_ph_code').value = "+20";
+            document.getElementById('con_ph_code').value = "+20"; // Reset to default
         }
 
         function lockClientForm() {
@@ -933,7 +957,7 @@
             const fname = document.getElementById('con_fname').value.trim();
             const pass = document.getElementById('con_pass').value.trim();
             
-            if(!fname || !pass) return alert("First Name and Passport/ID are required to save a client.");
+            if(!fname || !pass) return alert("First Name and Passport/National ID are required to save a client.");
 
             const clientData = {
                 "الاسم الأول": fname,
@@ -956,6 +980,11 @@
                     // Update existing
                     await db.collection('customers').doc(existingId).update(clientData);
                     alert("Client Updated Successfully!");
+                    
+                    // Update local cache
+                    const idx = APP_DATA.customers.findIndex(x => x.id === existingId);
+                    if(idx !== -1) APP_DATA.customers[idx] = { id: existingId, ...clientData };
+                    
                 } else {
                     // Create new
                     const docRef = await db.collection('customers').add(clientData);
@@ -975,6 +1004,7 @@
             } catch(e) {
                 console.error(e);
                 alert("Error saving client: " + e.message);
+                document.getElementById('display_client_id').innerText = "ERROR SAVING";
             }
         }
             
