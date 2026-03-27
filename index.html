@@ -179,11 +179,12 @@
         .status-maint { background: #2d3436 !important; color: white !important; }
 
         /* Perfect Arabic Formatting */
-        .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 15px; font-weight: 700; color: white; direction: rtl; }
-        .color-dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); flex-shrink: 0; }
+        .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; }
+        .color-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
 
         /* Continuous Mini-Gantt Timeline */
-        .gantt-wrapper { position: relative; width: 100%; min-width: 350px; height: 24px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; border: 1px solid var(--glass-border); overflow: hidden; display: flex; align-items: center; }
+        /* REMOVED overflow: hidden; so tooltips can be seen! */
+        .gantt-wrapper { position: relative; width: 100%; min-width: 350px; height: 24px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; border: 1px solid var(--glass-border); display: flex; align-items: center; }
         .gantt-today-line { position: absolute; left: 16.66%; top: 0; bottom: 0; width: 2px; background: var(--success); z-index: 5; box-shadow: 0 0 8px var(--success); }
         .gantt-today-label { position: absolute; left: calc(16.66% + 4px); top: -18px; font-size: 10px; color: var(--success); font-weight: bold; z-index: 5; }
         .gantt-bar { position: absolute; height: 16px; border-radius: 4px; cursor: pointer; transition: 0.2s; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -300,12 +301,31 @@
                     <div class="legend-item"><div class="legend-color status-backsoon"></div> Back Soon (<24h)</div>
                 </div>
 
-                <div class="filter-row">
-                    <select id="radar-status-filter" onchange="buildRadar()">
-                        <option value="active">Active Fleet Only</option>
-                        <option value="all">All Registered Vehicles</option>
-                    </select>
-                    <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="margin-bottom:0;">
+                <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Timeline Month</label>
+                        <select id="radar-month" class="contract-input" onchange="buildRadar()" style="height: 48px; font-weight:bold;">
+                            <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+                            <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+                            <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+                            <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Timeline Year</label>
+                        <input type="number" id="radar-year" value="2026" onchange="buildRadar()" class="contract-input" style="height: 48px; font-weight:bold; text-align:center;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Fleet Status</label>
+                        <select id="radar-status-filter" class="contract-input" onchange="buildRadar()" style="height: 48px; font-weight:bold;">
+                            <option value="active">Active Fleet Only</option>
+                            <option value="all">All Registered Vehicles</option>
+                        </select>
+                    </div>
+                    <div style="flex: 2;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search / Filter</label>
+                        <input type="text" class="contract-input" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="height: 48px; margin-bottom:0;">
+                    </div>
                 </div>
                 <div class="table-responsive" style="overflow: visible;">
                     <table class="data-table">
@@ -745,16 +765,27 @@
             const body = document.getElementById('radar-body');
             body.innerHTML = '';
             
-            // Strictly use Africa/Cairo time for accurate timeline calculation
+            // Set up Time
             const nowString = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
             const now = new Date(nowString);
             
+            // Auto-select current month if it's the first load
+            const monthEl = document.getElementById('radar-month');
+            if(!monthEl.hasAttribute('data-init')) {
+                monthEl.value = now.getMonth();
+                document.getElementById('radar-year').value = now.getFullYear();
+                monthEl.setAttribute('data-init', 'true');
+            }
+
             const filter = document.getElementById('radar-status-filter').value;
+            let targetMonth = parseInt(document.getElementById('radar-month').value);
+            let targetYear = parseInt(document.getElementById('radar-year').value);
+            
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
-            // Define 30 Day Window (-5 Days to +25 Days)
-            const windowStart = new Date(now); windowStart.setDate(now.getDate() - 5); windowStart.setHours(0,0,0,0);
-            const windowEnd = new Date(now); windowEnd.setDate(now.getDate() + 25); windowEnd.setHours(23,59,59,999);
+            // Define the visual Timeline Window strictly to the selected Month
+            const windowStart = new Date(targetYear, targetMonth, 1, 0, 0, 0); 
+            const windowEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59); // Last day of chosen month
             const totalWindowMs = windowEnd - windowStart;
 
             APP_DATA.cars.forEach(c => {
@@ -762,28 +793,32 @@
                 const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
 
-                // 1. PERFECT ARABIC CAR IDENTITY
+                // 1. PERFECT ARABIC CAR IDENTITY 
                 let rawPlate = String(c['Plate'] || c['plate'] || c['رقم اللوحة'] || "").trim();
                 let rawLetters = String(c['احرف اللوحة'] || "").trim();
-                let cModel = c['الطراز'] || c['Model'] || 'Unknown';
+                let cBrand = c['النوع'] || c['Type'] || c['الماركة'] || '';
+                let cModel = c['الطراز'] || c['Model'] || '';
+                let carName = `${cBrand} ${cModel}`.trim() || 'Unknown';
                 let cYear = c['سنة الصنع'] || '';
                 let colorHex = getCarColorHex(c['Color'] || c['اللون']);
                 
+                // Using dir="rtl" natively fixes the bracket and number inversion logic
                 const carHTML = `
                     <div class="arabic-car-title">
-                        <span>[${c.id}] ${cModel} (${cYear}) | ${rawLetters} ${rawPlate}</span>
+                        <div dir="rtl" style="text-align:right; width:100%;">
+                            [${c.id}] ${carName} (${cYear}) | ${rawLetters} ${rawPlate}
+                        </div>
                         <div class="color-dot" style="background: ${colorHex};"></div>
                     </div>`;
 
                 // 2. FETCH & SORT BOOKINGS
-                let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id && new Date(b['بداية التعاقد']).getFullYear() >= 2026);
+                let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id && new Date(b['بداية التعاقد']).getFullYear() >= 2025);
                 carBookings.sort((a,b) => new Date(a['بداية التعاقد']) - new Date(b['بداية التعاقد']));
 
-                // 3. DETERMINE CURRENT LIVE STATUS
+                // 3. DETERMINE CURRENT LIVE STATUS (Based on NOW, not the calendar view)
                 let masterStatusClass = "status-ready";
                 let masterStatusText = "متاح (READY)";
                 let assignmentText = '<span style="color:#666">Idle</span>';
-                
                 let currentActiveBooking = null;
                 let nextFutureBooking = null;
 
@@ -817,26 +852,30 @@
                 }
 
                 // 4. GENERATE CONTINUOUS TIMELINE
-                let timelineHTML = `<div class="gantt-wrapper"><div class="gantt-today-line"></div>`;
+                let timelineHTML = `<div class="gantt-wrapper">`;
+                
+                // Add vertical "Today" line only if viewing the current actual month/year
+                if (now >= windowStart && now <= windowEnd) {
+                    let todayPercent = ((now - windowStart) / totalWindowMs) * 100;
+                    timelineHTML += `<div class="gantt-today-line" style="left: ${todayPercent}%;"></div>`;
+                }
                 
                 for (let b of carBookings) {
                     let bStart = new Date(b['بداية التعاقد']);
                     let bEnd = new Date(b['نهاية التعاقد']);
                     
-                    // Does this booking overlap our 30-day window?
+                    // Does this booking overlap the selected Month?
                     if (bEnd > windowStart && bStart < windowEnd) {
-                        // Clamp dates to fit within the visible window box
                         let renderStart = bStart < windowStart ? windowStart : bStart;
                         let renderEnd = bEnd > windowEnd ? windowEnd : bEnd;
                         
-                        // Calculate exact percentages
                         let leftPercent = ((renderStart - windowStart) / totalWindowMs) * 100;
                         let widthPercent = ((renderEnd - renderStart) / totalWindowMs) * 100;
                         
-                        // Determine Color
                         const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
                         let barClass = "status-paid";
                         
+                        // Determine Color Context
                         if (bStart <= now && bEnd >= now) {
                             barClass = ((bEnd - now) / 3600000 <= 24) ? "status-backsoon" : "status-rented";
                         } else if (bStart > now) {
@@ -844,7 +883,7 @@
                             else if (paid === 0) barClass = "status-pending";
                             else if (paid < total) barClass = "status-partial";
                         } else {
-                            barClass = "status-ready"; // Past bookings fade to grey
+                            barClass = "status-ready"; // Grey out past bookings
                         }
 
                         let hoverText = `
@@ -854,8 +893,9 @@
                             <b>Value:</b> ${total.toLocaleString()} EGP | <b>Paid:</b> ${paid.toLocaleString()} EGP
                         `;
 
+                        // We use both the custom Tooltip AND the native title attribute as a foolproof backup
                         timelineHTML += `
-                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%;">
+                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%;" title="Client: ${b['اسم العميل']} | Value: ${total} EGP">
                                 <div class="tooltip">${hoverText}</div>
                             </div>
                         `;
@@ -863,13 +903,13 @@
                 }
                 timelineHTML += `</div>`; // Close Wrapper
 
-                // 5. INJECT ROW
+                // 5. INJECT ROW WITH BORDERS TO PREVENT BLEED
                 const row = body.insertRow();
                 row.innerHTML = `
-                    <td style="text-align: right;">${carHTML}</td>
-                    <td style="text-align: center;"><span class="badge ${masterStatusClass}">${masterStatusText}</span></td>
-                    <td style="padding: 10px 20px;">${timelineHTML}</td>
-                    <td style="font-size:12px;">${assignmentText}</td>
+                    <td style="text-align: right; border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td>
+                    <td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}">${masterStatusText}</span></td>
+                    <td style="padding: 10px 20px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
+                    <td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>
                 `;
             });
 
