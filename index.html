@@ -167,6 +167,32 @@
         .rec-amount-lbl { font-weight: bold; color: #555; font-size: 10pt; text-transform: uppercase; }
         .rec-amount-val { font-size: 18pt; font-weight: bold; color: #000; }
         .rec-sig-line { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 9pt; font-weight: bold; }
+        /* ================= FLEET CONTROL TOWER CSS ================= */
+        .status-ready { background: #95a5a6 !important; color: white !important; }
+        .status-proposed { background: #e84393 !important; color: white !important; }
+        .status-pending { background: #74b9ff !important; color: #111 !important; }
+        .status-partial { background: #f1c40f !important; color: #111 !important; }
+        .status-paid { background: #0984e3 !important; color: white !important; }
+        .status-rented { background: #e74c3c !important; color: white !important; }
+        .status-backsoon { background: #e67e22 !important; color: white !important; }
+        .status-goingsoon { background: #9b59b6 !important; color: white !important; }
+        .status-maint { background: #2d3436 !important; color: white !important; }
+
+        .plate-box { display: flex; justify-content: flex-end; align-items: center; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 16px; font-weight: 700; color: white; }
+        .plate-letters { color: var(--accent); letter-spacing: 1px; }
+        .plate-numbers { letter-spacing: 3px; }
+
+        .gantt-container { display: flex; gap: 2px; width: 250px; height: 20px; align-items: center; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 6px; border: 1px solid var(--glass-border); }
+        .gantt-day { flex: 1; height: 100%; border-radius: 2px; position: relative; cursor: crosshair; transition: transform 0.1s; }
+        .gantt-day:hover { transform: scale(1.2); z-index: 10; outline: 1px solid white; }
+        
+        /* Custom Tooltip */
+        .gantt-day .tooltip { visibility: hidden; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 200px; background: rgba(0,0,0,0.9); color: white; padding: 8px 12px; border-radius: 6px; font-size: 11px; font-weight: normal; border: 1px solid var(--primary); z-index: 999; text-align: left; line-height: 1.4; box-shadow: 0 10px 20px rgba(0,0,0,0.5); pointer-events: none; }
+        .gantt-day:hover .tooltip { visibility: visible; }
+        
+        .legend-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; background: rgba(0,0,0,0.4); border-radius: 10px; border: 1px solid var(--glass-border); margin-bottom: 20px; font-size: 11px; font-weight: bold; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 14px; height: 14px; border-radius: 3px; }
     </style>
 </head>
 <body>
@@ -250,24 +276,41 @@
             </div>
 
             <div id="view-radar" class="view-section">
-                <h2>🛰️ Fleet Operations Radar</h2>
-                <div class="metrics-grid">
-                    <div class="m-card"><label>Active Rentals</label><div class="val" id="r-rented">0</div></div>
-                    <div class="m-card"><label>Available Fleet</label><div class="val" id="r-avail">0</div></div>
-                    <div class="m-card"><label>Upcoming Bookings</label><div class="val" id="r-future" style="color:var(--accent)">0</div></div>
-                    <div class="m-card"><label>Tracked Cars</label><div class="val" id="r-total" style="color:white">0</div></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2>🛰️ Control Tower (Fleet Radar)</h2>
+                    <button onclick="alert('Car history log & edit UI coming in Phase 3!')" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:6px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-clock-rotate-left"></i> Fleet History & Edits</button>
                 </div>
+                
+                <div class="metrics-grid" style="grid-template-columns: repeat(5, 1fr);">
+                    <div class="m-card"><label>Ready (Available)</label><div class="val" id="ct-ready" style="color:#95a5a6">0</div></div>
+                    <div class="m-card"><label>Currently Rented</label><div class="val" id="ct-rented" style="color:#e74c3c">0</div></div>
+                    <div class="m-card"><label>Going Soon (<24h)</label><div class="val" id="ct-going" style="color:#9b59b6">0</div></div>
+                    <div class="m-card"><label>Back Soon (<24h)</label><div class="val" id="ct-back" style="color:#e67e22">0</div></div>
+                    <div class="m-card"><label>Pending Confirmed</label><div class="val" id="ct-pending" style="color:#74b9ff">0</div></div>
+                </div>
+
+                <div class="legend-row">
+                    <div class="legend-item"><div class="legend-color status-ready"></div> Ready / Available</div>
+                    <div class="legend-item"><div class="legend-color status-proposed"></div> Proposed</div>
+                    <div class="legend-item"><div class="legend-color status-pending"></div> Confirmed (Unpaid)</div>
+                    <div class="legend-item"><div class="legend-color status-partial"></div> Confirmed (Partial Pay)</div>
+                    <div class="legend-item"><div class="legend-color status-paid"></div> Confirmed (Fully Paid)</div>
+                    <div class="legend-item"><div class="legend-color status-rented"></div> Rented (Active)</div>
+                    <div class="legend-item"><div class="legend-color status-goingsoon"></div> Going Soon (<24h)</div>
+                    <div class="legend-item"><div class="legend-color status-backsoon"></div> Back Soon (<24h)</div>
+                    <div class="legend-item"><div class="legend-color status-maint"></div> Maintenance</div>
+                </div>
+
                 <div class="filter-row">
                     <select id="radar-status-filter" onchange="buildRadar()">
                         <option value="active">Active Fleet Only</option>
                         <option value="all">All Registered Vehicles</option>
-                        <option value="archive">Archived / Stopped</option>
                     </select>
                     <input type="text" class="search-bar" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="margin-bottom:0;">
                 </div>
                 <div class="table-responsive">
                     <table class="data-table">
-                        <thead><tr><th>Vehicle ID & Specs</th><th>Plate Identity</th><th>Status</th><th>Current Assignment</th><th>Financial State</th></tr></thead>
+                        <thead><tr><th>Vehicle Details</th><th>Plate Identity</th><th>Live Status</th><th>30-Day Timeline (-5 to +25 Days)</th><th>Assignment Info</th></tr></thead>
                         <tbody id="radar-body"></tbody>
                     </table>
                 </div>
@@ -683,51 +726,121 @@
             body.innerHTML = '';
             const now = new Date();
             const filter = document.getElementById('radar-status-filter').value;
-            let cRent = 0, cAvail = 0, cFuture = 0, cTotal = 0;
+            
+            let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
             APP_DATA.cars.forEach(c => {
-                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
-                const isActive = contract.includes('valid') || contract.includes('ساري');
+                const contractStr = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
+                const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
-                if(filter === 'archive' && isActive) return;
-                cTotal++;
 
-                let rawPlate = c['Plate'] || c['plate'] || c['رقم اللوحة'] || "";
-                let rawLetters = c['احرف اللوحة'] || "";
-                const plateHTML = `<span style="font-size:20px; font-weight:800; color:white; letter-spacing:2px;">${rawPlate}</span> <span style="color:var(--accent); font-size:16px; margin-left:8px; font-weight:600;">${rawLetters}</span>`;
+                // 1. FORMAT PLATE IDENTITY PERFECTLY
+                let rawPlate = String(c['Plate'] || c['plate'] || c['رقم اللوحة'] || "").trim();
+                let rawLetters = String(c['احرف اللوحة'] || "").trim();
+                const plateHTML = `<div class="plate-box"><span class="plate-letters">${rawLetters}</span> | <span class="plate-numbers">${rawPlate}</span></div>`;
 
-                let status = '<span class="badge bg-green">AVAILABLE</span>';
-                let bookingInfo = '<span style="color:#666">No Active Contract</span>';
-                let finBadge = '<span class="badge" style="background:#333">NO DATA</span>';
-                let isRented = false;
+                // Fetch and sort bookings for this car
+                let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id && new Date(b['بداية التعاقد']).getFullYear() >= 2026);
+                carBookings.sort((a,b) => new Date(a['بداية التعاقد']) - new Date(b['بداية التعاقد']));
 
-                APP_DATA.bookings.forEach(b => {
-                    if(b['كود السيارة'] == c.id) {
-                        const start = new Date(b['بداية التعاقد']);
-                        const end = new Date(b['نهاية التعاقد']);
-                        const isLegacy = start.getFullYear() < 2026;
+                // 2. DETERMINE MASTER STATUS
+                let masterStatusClass = "status-ready";
+                let masterStatusText = "READY";
+                let assignmentText = '<span style="color:#666">Idle</span>';
+                let currentActiveBooking = null;
+                let nextFutureBooking = null;
 
-                        if (now >= start && now <= end && !isLegacy) {
-                            isRented = true;
-                            status = '<span class="badge bg-red">RENTED</span>';
-                            bookingInfo = `<b style="color:var(--accent)">${b['اسم العميل']}</b><br><span style="color:#888; font-size:11px;">Ends: ${b['نهاية التعاقد'].split(' ')[0]}</span>`;
+                for (let b of carBookings) {
+                    const start = new Date(b['بداية التعاقد']);
+                    const end = new Date(b['نهاية التعاقد']);
+                    
+                    if (now >= start && now <= end) {
+                        currentActiveBooking = b; break;
+                    }
+                    if (start > now && !nextFutureBooking) {
+                        nextFutureBooking = b; // First future booking found
+                    }
+                }
+
+                if (currentActiveBooking) {
+                    const end = new Date(currentActiveBooking['نهاية التعاقد']);
+                    const hoursLeft = (end - now) / 3600000;
+                    if (hoursLeft <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "BACK SOON"; counts.back++; }
+                    else { masterStatusClass = "status-rented"; masterStatusText = "RENTED"; counts.rented++; }
+                    assignmentText = `<b style="color:var(--accent)">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
+                } else if (nextFutureBooking) {
+                    const start = new Date(nextFutureBooking['بداية التعاقد']);
+                    const hoursUntil = (start - now) / 3600000;
+                    const paid = parseCurrency(nextFutureBooking['المدفوع EGP']);
+                    const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
+
+                    if (hoursUntil <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "GOING SOON"; counts.going++; }
+                    else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "PENDING"; counts.pending++; }
+                    else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "PARTIAL PAY"; counts.pending++; }
+                    else { masterStatusClass = "status-paid"; masterStatusText = "FULLY PAID"; counts.pending++; }
+                    
+                    assignmentText = `Next: <b style="color:#fff">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
+                } else {
+                    counts.ready++;
+                }
+
+                // 3. GENERATE 30-DAY TIMELINE (-5 days to +25 days)
+                let timelineHTML = `<div class="gantt-container">`;
+                for(let i = -5; i <= 24; i++) {
+                    let checkDate = new Date(now);
+                    checkDate.setDate(now.getDate() + i);
+                    checkDate.setHours(0,0,0,0);
+                    
+                    let dayClass = "status-ready"; // default grey
+                    let hoverText = `${checkDate.toLocaleDateString('en-GB')}<br>No Assignments`;
+                    
+                    // Check if this specific day falls within any booking for this car
+                    for (let b of carBookings) {
+                        let bStart = new Date(b['بداية التعاقد']); bStart.setHours(0,0,0,0);
+                        let bEnd = new Date(b['نهاية التعاقد']); bEnd.setHours(23,59,59,999);
+                        
+                        if (checkDate >= bStart && checkDate <= bEnd) {
                             const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
-                            if(paid >= total) finBadge = '<span class="badge bg-green">PAID</span>';
-                            else finBadge = `<span class="badge bg-orange">DEBT: ${(total-paid).toLocaleString()}</span>`;
-                        } else if (start > now && !isRented) {
-                            status = '<span class="badge bg-orange" style="color:var(--primary); border-color:var(--primary)">UPCOMING</span>';
-                            bookingInfo = `Starts: ${b['بداية التعاقد'].split(' ')[0]}`;
+                            
+                            // Determine block color based on payment status
+                            if (checkDate < now.setHours(0,0,0,0)) dayClass = "status-rented"; // Past is red
+                            else if (paid === 0) dayClass = "status-pending";
+                            else if (paid < total) dayClass = "status-partial";
+                            else dayClass = "status-paid";
+                            
+                            hoverText = `<b style='color:var(--accent)'>${b['اسم العميل']}</b><hr style='border:none; border-top:1px solid #333; margin:4px 0;'>${b['بداية التعاقد'].split(' ')[0]} to ${b['نهاية التعاقد'].split(' ')[0]}<br>Total: ${total} EGP | Paid: ${paid} EGP`;
+                            break;
                         }
                     }
-                });
+                    
+                    // Highlight "Today" border slightly
+                    const borderStyle = (i === 0) ? "border-right: 2px solid white; z-index: 5;" : "";
+                    
+                    timelineHTML += `<div class="gantt-day ${dayClass}" style="${borderStyle}"><div class="tooltip">${hoverText}</div></div>`;
+                }
+                timelineHTML += `</div>`;
 
-                if(status.includes('RENTED')) cRent++; else if(status.includes('AVAILABLE')) cAvail++; else if(status.includes('UPCOMING')) cFuture++;
-
+                // 4. INJECT ROW
                 const row = body.insertRow();
-                row.innerHTML = `<td><div style="font-weight:800; font-size:15px; color:var(--primary);">#${c.id}</div><div style="font-weight:600;">${c['Type'] || ''} ${c['Model'] || ''}</div><div style="font-size:11px; color:#888;">${c['سنة الصنع'] || ''} | ${c['Color'] || ''}</div></td><td style="direction:rtl; text-align:right;">${plateHTML}</td><td>${status}</td><td>${bookingInfo}</td><td>${finBadge}</td>`;
+                row.innerHTML = `
+                    <td>
+                        <div style="font-weight:800; font-size:14px; color:var(--primary);">#${c.id}</div>
+                        <div style="font-weight:600; font-size:13px;">${c['Type'] || ''} ${c['Model'] || ''}</div>
+                        <div style="font-size:10px; color:#888;">${c['سنة الصنع'] || ''} | <span style="color:#ddd">${c['Color'] || 'Color N/A'}</span></div>
+                    </td>
+                    <td>${plateHTML}</td>
+                    <td><span class="badge ${masterStatusClass}">${masterStatusText}</span></td>
+                    <td>${timelineHTML}</td>
+                    <td style="font-size:12px;">${assignmentText}</td>
+                `;
             });
 
-            document.getElementById('r-rented').innerText = cRent; document.getElementById('r-avail').innerText = cAvail; document.getElementById('r-future').innerText = cFuture; document.getElementById('r-total').innerText = cTotal;
+            // Update Top KPIs
+            document.getElementById('ct-ready').innerText = counts.ready;
+            document.getElementById('ct-rented').innerText = counts.rented;
+            document.getElementById('ct-going').innerText = counts.going;
+            document.getElementById('ct-back').innerText = counts.back;
+            document.getElementById('ct-pending').innerText = counts.pending;
         }
 
         function buildOrderBook() {
