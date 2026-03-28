@@ -708,22 +708,56 @@
             } catch(e) { console.log("Rate API blocked. Using defaults."); }
         }
 
-        // --- 3. DATA ENGINE ---
-        async function loadCloudData() {
-            const cSnap = await db.collection('fleet').get();
-            cSnap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
+        // --- 3. REAL-TIME DATA ENGINE ---
+        function loadCloudData() {
+            return new Promise((resolve) => {
+                let loaded = { fleet: false, bookings: false, expenses: false, customers: false };
+                const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers) resolve(); };
 
-            document.getElementById('loader-text').innerText = "Syncing Orders...";
-            const bSnap = await db.collection('bookings').get();
-            bSnap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
+                // Live Sync Fleet
+                db.collection('fleet').onSnapshot(snap => {
+                    APP_DATA.cars = [];
+                    snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
+                    if(document.getElementById('view-radar').style.display === 'block') buildRadar();
+                    loaded.fleet = true; checkDone();
+                });
 
-            document.getElementById('loader-text').innerText = "Syncing Financials...";
-            const eSnap = await db.collection('car_expenses').get();
-            eSnap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
+                // Live Sync Orders
+                db.collection('bookings').onSnapshot(snap => {
+                    APP_DATA.bookings = [];
+                    snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
+                    if(document.getElementById('view-radar').style.display === 'block') buildRadar();
+                    loaded.bookings = true; checkDone();
+                });
 
-            document.getElementById('loader-text').innerText = "Syncing CRM...";
-            const custSnap = await db.collection('customers').get();
-            custSnap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
+                // Live Sync Financials
+                db.collection('car_expenses').onSnapshot(snap => {
+                    APP_DATA.car_expenses = [];
+                    snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
+                    loaded.expenses = true; checkDone();
+                });
+
+                // Live Sync CRM
+                db.collection('customers').onSnapshot(snap => {
+                    APP_DATA.customers = [];
+                    snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
+                    if(document.getElementById('view-en-contract').style.display === 'block') populateClientList();
+                    loaded.customers = true; checkDone();
+                });
+            });
+        }
+
+        // Custom UI Notification to replace ugly browser alerts
+        function showToast(msg) {
+            let t = document.getElementById('custom-toast');
+            if(!t) {
+                t = document.createElement('div'); t.id = 'custom-toast';
+                t.style.cssText = 'position:fixed; bottom:30px; right:30px; background:var(--primary); color:white; padding:15px 25px; border-radius:8px; z-index:99999; box-shadow:0 10px 30px rgba(0,0,0,0.5); font-weight:bold; transition:0.3s; transform:translateY(100px); opacity:0;';
+                document.body.appendChild(t);
+            }
+            t.innerText = msg;
+            t.style.transform = 'translateY(0)'; t.style.opacity = '1';
+            setTimeout(() => { t.style.transform = 'translateY(100px)'; t.style.opacity = '0'; }, 3000);
         }
 
         function parseCurrency(val) { return parseFloat(String(val).replace(/[^0-9.-]+/g,"")) || 0; }
@@ -789,32 +823,49 @@
             
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
-            const windowStart = new Date(targetYear, targetMonth, 1, 0, 0, 0); 
-            const windowEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+            // EXPANDED TO 3 MONTHS for smooth Drag & Pan
+            const windowStart = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0); 
+            const windowEnd = new Date(targetYear, targetMonth + 2, 0, 23, 59, 59);
             const totalWindowMs = windowEnd - windowStart;
+
+            // Generate Sync Header Line
+            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:20px; cursor:grab;"><div class="gantt-wrapper" style="border:none; background:transparent;">`;
+            if (now >= windowStart && now <= windowEnd) {
+                let todayPercent = ((now - windowStart) / totalWindowMs) * 100;
+                headerTimeline += `<div class="gantt-today-line" style="left: ${todayPercent}%;"><div class="gantt-today-label" style="top:-5px;">TODAY</div></div>`;
+            }
+            headerTimeline += `</div></div>`;
+            
+            // Replace Table Header Dynamically to insert Sync Bar
+            document.querySelector('#view-radar thead').innerHTML = `
+                <tr>
+                    <th style="width: 30%; text-align: right;">السيارة (Vehicle Identity)</th>
+                    <th style="width: 10%; text-align: center;">الحالة (Status)</th>
+                    <th style="width: 45%; text-align: center; padding:5px 0;">
+                        <div style="margin-bottom:5px;">📅 3-Month Timeline <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to pan)</span></div>
+                        ${headerTimeline}
+                    </th>
+                    <th style="width: 15%;">Assignment Info</th>
+                </tr>`;
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
 
-                // 1. PERFECT ARABIC FORMATTING (RTL Enforced)
-                let rawPlate = String(c['Plate'] || c['plate'] || c['رقم اللوحة'] || "").trim();
-                let rawLetters = String(c['احرف اللوحة'] || "").trim();
-                let cBrand = c['النوع'] || c['Type'] || c['الماركة'] || '';
-                let cModel = c['الطراز'] || c['Model'] || '';
-                let carName = `${cBrand} ${cModel}`.trim() || 'Unknown';
+                // 1. PERFECT CAR IDENTITY (Only single Plate field as requested)
+                let singlePlate = String(c['Plate'] || c['plate'] || "").trim();
+                let carName = `${c['النوع'] || c['Type'] || ''} ${c['الطراز'] || c['Model'] || ''}`.trim() || 'Unknown';
                 let cYear = c['سنة الصنع'] || '';
                 let colorName = c['Color'] || c['اللون'] || 'Unknown';
                 let colorHex = getCarColorHex(colorName);
                 
-                // Constructing EXACTLY as requested: Name (Year) Letters | Numbers [ID]
                 const carHTML = `
                     <div class="arabic-car-title">
-                        <span class="clickable-obj" title="Edit Car Info" onclick="alert('Car Editor UI Opening for ID: ${c.id}')">${carName} (${cYear})</span>
-                        <span style="color:var(--accent); margin:0 5px;">${rawLetters} | ${rawPlate}</span>
-                        <span dir="ltr" style="color:#aaa;">[${c.id}]</span>
-                        <div class="color-dot clickable-obj" title="Color: ${colorName}" style="background: ${colorHex}; margin-right:8px;" onclick="alert('License/Insurance UI Opening for ID: ${c.id}')"></div>
+                        <div dir="rtl" style="text-align:right; width:100%;">
+                            <span class="clickable-obj" onclick="showToast('Vehicle Edit Modal Coming in Phase 3')">${carName} (${cYear}) | ${singlePlate} [${c.id}]</span>
+                        </div>
+                        <div class="color-dot clickable-obj" title="Color: ${colorName}" style="background: ${colorHex}; margin-right:8px;" onclick="showToast('Docs/Insurance Details Coming in Phase 3')"></div>
                     </div>`;
 
                 let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id && new Date(b['بداية التعاقد']).getFullYear() >= 2025);
@@ -835,7 +886,7 @@
                     const end = new Date(currentActiveBooking['نهاية التعاقد']);
                     if ((end - now) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK SOON)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="alert('Opening Client Profile: ${currentActiveBooking['اسم العميل']}')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Profile UI Coming Soon')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']);
                     const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
@@ -843,21 +894,20 @@
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `Next: <b class="clickable-obj" style="color:#fff" onclick="alert('Opening Client Profile')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
+                    assignmentText = `Next: <b class="clickable-obj" style="color:#fff" onclick="showToast('Client Profile UI Coming Soon')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
                 } else { counts.ready++; }
 
-                // 4. GENERATE CONTINUOUS TIMELINE WITH OVERLAP SPLITTING
+                // 4. GENERATE CONTINUOUS TIMELINE WITH SPLIT CONFLICTS
                 let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper">`;
                 if (now >= windowStart && now <= windowEnd) {
                     let todayPercent = ((now - windowStart) / totalWindowMs) * 100;
-                    timelineHTML += `<div class="gantt-today-line" style="left: ${todayPercent}%;"><div class="gantt-today-label">TODAY</div></div>`;
+                    timelineHTML += `<div class="gantt-today-line" style="left: ${todayPercent}%;"></div>`;
                 }
                 
-                let occupiedLevels = []; // Used to track overlapping blocks
+                let occupiedLevels = [];
 
                 for (let b of carBookings) {
                     let bStart = new Date(b['بداية التعاقد']); let bEnd = new Date(b['نهاية التعاقد']);
-                    
                     if (bEnd > windowStart && bStart < windowEnd) {
                         let renderStart = bStart < windowStart ? windowStart : bStart;
                         let renderEnd = bEnd > windowEnd ? windowEnd : bEnd;
@@ -875,20 +925,14 @@
                             if (((bStart - now) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
                             else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending (Unpaid)"; }
                             else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
-                        } else {
-                            barClass = "status-ready"; statusTxt = "Archived";
-                        }
+                        } else { barClass = "status-ready"; statusTxt = "Archived"; }
 
-                        // Overlap Split Logic: Prioritize Paid on Top
-                        let topOffset = "8px"; // Center default
+                        let topOffset = "8px"; 
                         if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
-                            // Conflict detected! Split it.
-                            if(barClass === "status-paid") topOffset = "0px"; // Paid goes top
-                            else topOffset = "16px"; // Unpaid goes bottom
+                            if(barClass === "status-paid") topOffset = "0px"; else topOffset = "16px";
                         }
-                        occupiedLevels.push(renderEnd); // Record this block's end time
+                        occupiedLevels.push(renderEnd); 
 
-                        // Rich Arabic Tooltip
                         let hoverText = `
                             <div style="text-align:right; font-family:'Cairo', sans-serif;">
                                 <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
@@ -903,13 +947,13 @@
                         `;
 
                         timelineHTML += `
-                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" onclick="alert('Opening Order UI for Booking ID: ${b.id}')">
+                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" onclick="showToast('Order Edit Modal Coming in Phase 3 for Order #${b.id}')">
                                 <div class="tooltip">${hoverText}</div>
                             </div>
                         `;
                     }
                 }
-                timelineHTML += `</div></div>`; // Close wrapper and viewport
+                timelineHTML += `</div></div>`;
 
                 const row = body.insertRow();
                 row.innerHTML = `
@@ -926,8 +970,7 @@
             document.getElementById('ct-back').innerText = counts.back;
             document.getElementById('ct-pending').innerText = counts.pending;
             
-            // Re-initialize drag scrolling after building
-            initDragScroll();
+            initDragScroll(); // Attach sync listeners to the new rows
         }
 
         function buildOrderBook() {
@@ -1687,30 +1730,51 @@
                 if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); }
             }, 100);
         }
-        // --- DRAG TO SCROLL TIMELINES ---
+        // --- SYNCHRONIZED MASTER DRAG-TO-SCROLL ---
         function initDragScroll() {
             const sliders = document.querySelectorAll('.drag-scroll');
-            sliders.forEach(slider => {
-                let isDown = false;
-                let startX;
-                let scrollLeft;
+            let isDown = false;
+            let startX;
+            let scrollLeft;
 
+            sliders.forEach(slider => {
+                // Drag tracking
                 slider.addEventListener('mousedown', (e) => {
                     isDown = true;
-                    slider.style.cursor = 'grabbing';
+                    sliders.forEach(s => s.style.cursor = 'grabbing');
                     startX = e.pageX - slider.offsetLeft;
                     scrollLeft = slider.scrollLeft;
                 });
-                slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; });
-                slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; });
+                slider.addEventListener('mouseleave', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
+                slider.addEventListener('mouseup', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
+                
+                // Pan left/right
                 slider.addEventListener('mousemove', (e) => {
                     if (!isDown) return;
                     e.preventDefault();
                     const x = e.pageX - slider.offsetLeft;
-                    const walk = (x - startX) * 2; // Scroll-fast multiplier
-                    slider.scrollLeft = scrollLeft - walk;
+                    const walk = (x - startX) * 1.5; // Drag speed multiplier
+                    
+                    // Move EVERY slider on the screen in sync
+                    sliders.forEach(s => s.scrollLeft = scrollLeft - walk);
+                });
+
+                // Mouse wheel / trackpad sync
+                slider.addEventListener('scroll', (e) => {
+                    sliders.forEach(s => {
+                        if (s !== slider) s.scrollLeft = slider.scrollLeft;
+                    });
                 });
             });
+
+            // Auto-center the view to "Today" on first load
+            setTimeout(() => {
+                const viewport = document.querySelector('.gantt-viewport');
+                if(viewport) {
+                    const centerPoint = (viewport.scrollWidth - viewport.clientWidth) / 2;
+                    sliders.forEach(s => s.scrollLeft = centerPoint);
+                }
+            }, 100);
         }
     </script>
 </body>
