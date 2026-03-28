@@ -182,23 +182,25 @@
         .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
         .color-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
 
-        /* Infinite Drag Timeline */
-        .gantt-viewport { width: 100%; overflow: hidden; cursor: grab; background: rgba(0,0,0,0.2); border-radius: 6px; position: relative; }
+        /* Rolling 90-Day Timeline */
+        .radar-fixed-table { table-layout: fixed; width: 100%; }
+        .gantt-viewport { width: 100%; overflow: hidden; cursor: grab; background: rgba(0,0,0,0.3); border-radius: 6px; position: relative; border: 1px solid var(--glass-border); }
         .gantt-viewport:active { cursor: grabbing; }
-        .gantt-wrapper { position: relative; height: 32px; display: flex; align-items: center; }
+        .gantt-wrapper { position: relative; height: 45px; display: flex; align-items: center; }
         
-        .gantt-bar { position: absolute; height: 16px; border-radius: 4px; cursor: pointer; transition: 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-        .gantt-bar:hover { filter: brightness(1.3); outline: 1px solid white; z-index: 50; }
+        .gantt-bar { position: absolute; height: 16px; border-radius: 4px; cursor: pointer; transition: 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); margin-top: 8px; }
+        .gantt-bar:hover { filter: brightness(1.3); outline: 1px solid white; z-index: 50 !important; }
         
         /* The Global Live Time Pointer */
-        .live-time-pointer { position: absolute; top: 0; bottom: 0; width: 2px; background: #00e5ff; z-index: 100; box-shadow: 0 0 10px #00e5ff; pointer-events: none; }
+        .live-time-pointer { position: absolute; top: 0; bottom: 0; width: 2px; background: #00ffcc; z-index: 100; box-shadow: 0 0 10px #00ffcc; pointer-events: none; }
+        .live-time-label { position: absolute; top: 18px; left: 4px; font-size: 9px; color: #00ffcc; font-weight: bold; background: rgba(0,0,0,0.8); padding: 2px 4px; border-radius: 4px; }
         
         /* Clickable Elements */
         .clickable-obj { cursor: pointer; transition: 0.2s; }
         .clickable-obj:hover { opacity: 0.7; transform: scale(1.05); color: #00d2ff !important; }
 
-        /* Global Float Tooltip (Escapes the table traps) */
-        #global-tooltip { position: fixed; visibility: hidden; opacity: 0; background: rgba(15, 20, 25, 0.98); color: white; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid var(--primary); z-index: 999999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.9); pointer-events: none; transition: opacity 0.1s ease-out; width: max-content; min-width: 220px; }
+        /* Super Global Tooltip (Escapes all traps) */
+        #global-tooltip { position: fixed; visibility: hidden; opacity: 0; background: rgba(15, 20, 25, 0.98); color: white; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid var(--primary); z-index: 999999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.9); pointer-events: none; transition: opacity 0.1s ease-out; width: max-content; min-width: 220px; top: 0; left: 0; }
         
     </style>
 </head>
@@ -805,34 +807,46 @@
             const filter = document.getElementById('radar-status-filter').value;
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
-            // Dynamic Header with Timeline Scale
-            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:20px;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">`;
-            headerTimeline += `<div class="live-time-pointer"></div></div></div>`;
-            
-            const radarHead = document.getElementById('radar-head');
-            if(radarHead) {
-                radarHead.innerHTML = `
-                    <tr>
-                        <th style="width: 30%; text-align: right;">السيارة (Vehicle Identity)</th>
-                        <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                        <th style="width: 45%; text-align: center; padding:5px 0;">
-                            <div style="margin-bottom:5px;">📅 Infinite Timeline <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>
-                            ${headerTimeline}
-                        </th>
-                        <th style="width: 15%;">Assignment Info</th>
-                    </tr>`;
+            // Rolling 90-Day Window: -30 Days to +60 Days
+            const T_START = nowMs - (30 * 24 * 60 * 60 * 1000);
+            const T_END = nowMs + (60 * 24 * 60 * 60 * 1000);
+            const T_TOTAL_MS = T_END - T_START;
+
+            // Generate Timeline Axis (Markers every 5 days)
+            let axisHTML = `<div style="position:absolute; top:0; left:0; width:100%; height:16px; border-bottom:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.5); z-index:1;">`;
+            for(let i=0; i<=90; i+=5) {
+                let d = new Date(T_START + (i * 86400000));
+                let pct = (i / 90) * 100;
+                axisHTML += `<div style="position:absolute; left:${pct}%; top:2px; font-size:9px; color:#aaa; border-left:1px solid rgba(255,255,255,0.3); padding-left:4px;">${d.toLocaleDateString('en-GB', {month:'short', day:'numeric'})}</div>`;
             }
+            axisHTML += `</div>`;
+
+            // Dynamic Header
+            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:30px; border:none;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">`;
+            headerTimeline += `${axisHTML}<div class="live-time-pointer" style="left:33.33%;"><div class="live-time-label">LIVE</div></div></div></div>`;
+            
+            // Fixed width table to prevent stretching!
+            const radarTable = document.querySelector('#view-radar .data-table');
+            if (radarTable) radarTable.classList.add('radar-fixed-table');
+
+            document.getElementById('radar-head').innerHTML = `
+                <tr>
+                    <th style="width: 28%; text-align: right;">السيارة (Vehicle Identity)</th>
+                    <th style="width: 10%; text-align: center;">الحالة (Status)</th>
+                    <th style="width: 47%; text-align: center; padding:5px 0;">
+                        <div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>
+                        ${headerTimeline}
+                    </th>
+                    <th style="width: 15%;">Assignment Info</th>
+                </tr>`;
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
 
-                // 1. PERFECT ARABIC FORMATTING EXACTLY AS REQUESTED
-                let p1 = [c['Field_28'], c['Field_27'], c['Field_26'], c['رقم اللوحة']].filter(Boolean).join(" ");
-                let p2 = [c['Field_24'], c['Field_23'], c['احرف اللوحة']].filter(Boolean).join(" ");
-                let fullPlate = `${p1} | ${p2}`.trim();
-                
+                // 1. PERFECT ARABIC FORMATTING
+                let singlePlate = String(c['Plate'] || c['plate'] || c['رقم اللوحة'] || "").trim();
                 let carName = `${c['النوع'] || c['Type'] || ''} ${c['الطراز'] || c['Model'] || ''}`.trim() || 'Unknown';
                 let cYear = c['سنة الصنع'] || '';
                 let colorName = c['اللون'] || c['Color'] || 'Unknown';
@@ -840,8 +854,8 @@
                 
                 const carHTML = `
                     <div class="arabic-car-title">
-                        <span class="clickable-obj" onclick="showToast('Edit UI for Car ID: ${c.id}')">${carName} (${cYear}) ${fullPlate} [${c.id}]</span>
-                        <div class="color-dot clickable-obj" title="${colorName}" style="background: ${colorHex}; margin-right:5px;" onclick="showToast('Insurance/Docs UI for ID: ${c.id}')"></div>
+                        <span class="clickable-obj" onclick="showToast('Edit UI for Car ID: ${c.id}')">${carName} (${cYear}) | ${singlePlate} [${c.id}]</span>
+                        <div class="color-dot clickable-obj" title="اللون: ${colorName}" style="background: ${colorHex}; margin-right:5px;" onclick="showToast('Insurance/Docs UI for ID: ${c.id}')"></div>
                     </div>`;
 
                 let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id);
@@ -859,13 +873,13 @@
 
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
-                    if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK SOON)"; counts.back++; }
+                    if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
                     assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Details')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']).getTime();
                     const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
-                    if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING SOON)"; counts.going++; }
+                    if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
@@ -873,7 +887,9 @@
                 } else { counts.ready++; }
 
                 // 4. GENERATE HOUR-PERFECT TIMELINE BLOCKS
-                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;"><div class="live-time-pointer"></div>`;
+                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}`;
+                timelineHTML += `<div class="live-time-pointer" style="left: 33.33%;"></div>`;
+                
                 let occupiedLevels = [];
 
                 for (let b of carBookings) {
@@ -900,29 +916,29 @@
                         } else { barClass = "status-ready"; statusTxt = "Archived"; }
 
                         // Split Overlap Logic
-                        let topOffset = "8px"; 
+                        let topOffset = "10px"; 
                         if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
-                            if(barClass === "status-paid") topOffset = "0px"; else topOffset = "16px";
+                            if(barClass === "status-paid") topOffset = "2px"; else topOffset = "20px";
                         }
                         occupiedLevels.push(renderEnd); 
 
                         let hoverText = `
-                            <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
-                            <span style='font-size:10px; color:#aaa;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
-                            <hr style='border:none; border-top:1px solid #444; margin:8px 0;'>
-                            <div style="margin-bottom:4px;"><span style="color:#888;">الحالة:</span> <span class="badge ${barClass}" style="font-size:9px;">${statusTxt}</span></div>
-                            <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
-                            <div style="margin-bottom:6px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
-                            <div style="margin-bottom:2px;"><span style="color:#888;">إجمالي القيمة:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
-                            <div><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
+                            <div style="text-align:right; font-family:'Cairo', sans-serif;">
+                                <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
+                                <span style='font-size:10px; color:#aaa;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
+                                <hr style='border:none; border-top:1px solid #444; margin:8px 0;'>
+                                <div style="margin-bottom:4px;"><span style="color:#888;">الحالة:</span> <span class="badge ${barClass}" style="font-size:9px;">${statusTxt}</span></div>
+                                <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
+                                <div style="margin-bottom:6px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
+                                <div style="margin-bottom:2px;"><span style="color:#888;">إجمالي القيمة:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
+                                <div><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
+                            </div>
                         `;
 
-                        // Using the new Global Hover Engine
+                        // Using pure data attributes for the hover engine
                         timelineHTML += `
                             <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" 
-                                 onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText)}')" 
-                                 onmousemove="moveGanttTooltip(event)" 
-                                 onmouseleave="hideGanttTooltip()"
+                                 data-info="${hoverText.replace(/"/g, '&quot;')}"
                                  onclick="showToast('Order Edit UI for ID: ${b.id}')">
                             </div>
                         `;
@@ -934,7 +950,7 @@
                 row.innerHTML = `
                     <td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td>
                     <td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}">${masterStatusText}</span></td>
-                    <td style="padding: 10px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
+                    <td style="padding: 10px 15px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
                     <td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>
                 `;
             });
@@ -946,8 +962,7 @@
             if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
             
             initDragScroll(); 
-            updateLivePointer(); 
-            setTimeout(scrollToToday, 200); // Snap to Today on load
+            setTimeout(scrollToToday, 100); 
         }
 
         function buildOrderBook() {
@@ -1753,35 +1768,43 @@
                 }
             }, 100);
         }
-        
-        // --- THE MASTER TIMELINE CONSTANTS (3 Years of Scrollable Canvas) ---
-        const T_START = new Date("2025-01-01T00:00:00").getTime();
-        const T_END = new Date("2027-12-31T23:59:59").getTime();
-        const T_TOTAL_MS = T_END - T_START;
-        const T_WIDTH_PX = 26280; // Exactly 24 pixels per day (1px per hour)
 
-        // --- GLOBAL TOOLTIP ENGINE ---
-        function showGanttTooltip(e, encodedHTML) {
-            let t = document.getElementById('global-tooltip');
-            if(!t) {
-                t = document.createElement('div'); t.id = 'global-tooltip';
-                document.body.appendChild(t);
+        // --- 90-DAY ROLLING TIMELINE CONFIG ---
+        const T_WIDTH_PX = 2160; // 90 days * 24px per day
+
+        // --- BULLETPROOF GLOBAL TOOLTIP ENGINE ---
+        document.addEventListener('mouseover', function(e) {
+            let bar = e.target.closest('.gantt-bar');
+            if (bar) {
+                let t = document.getElementById('global-tooltip');
+                if(!t) {
+                    t = document.createElement('div'); t.id = 'global-tooltip';
+                    document.body.appendChild(t);
+                }
+                t.innerHTML = bar.getAttribute('data-info');
+                t.style.visibility = 'visible'; t.style.opacity = '1';
             }
-            t.innerHTML = decodeURIComponent(encodedHTML);
-            t.style.visibility = 'visible'; t.style.opacity = '1';
-            moveGanttTooltip(e);
-        }
-        function moveGanttTooltip(e) {
+        });
+        
+        document.addEventListener('mousemove', function(e) {
             let t = document.getElementById('global-tooltip');
-            if(t) { t.style.left = (e.clientX + 15) + 'px'; t.style.top = (e.clientY + 15) + 'px'; }
-        }
-        function hideGanttTooltip() {
-            let t = document.getElementById('global-tooltip');
-            if(t) { t.style.opacity = '0'; t.style.visibility = 'hidden'; }
-        }
+            if (t && t.style.visibility === 'visible') {
+                // Adjust to prevent tooltip from going off-screen
+                let x = e.clientX + 15; let y = e.clientY + 15;
+                if (x + t.offsetWidth > window.innerWidth) x = e.clientX - t.offsetWidth - 15;
+                t.style.left = x + 'px'; t.style.top = y + 'px';
+            }
+        });
+        
+        document.addEventListener('mouseout', function(e) {
+            let bar = e.target.closest('.gantt-bar');
+            if (bar) {
+                let t = document.getElementById('global-tooltip');
+                if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; }
+            }
+        });
 
-        // --- SYNCHRONIZED DRAGGING & LIVE POINTER ---
-        let currentScrollOffset = 0;
+        // --- SYNCHRONIZED DRAGGING ---
         function initDragScroll() {
             const sliders = document.querySelectorAll('.drag-scroll');
             let isDown = false; let startX; let scrollLeft;
@@ -1796,27 +1819,19 @@
                     if (!isDown) return;
                     e.preventDefault();
                     const walk = (e.pageX - slider.offsetLeft - startX) * 1.5; 
-                    currentScrollOffset = scrollLeft - walk;
+                    let currentScrollOffset = scrollLeft - walk;
                     sliders.forEach(s => s.scrollLeft = currentScrollOffset);
                 });
             });
         }
 
+        // Center the view on "Today"
         function scrollToToday() {
-            const cairoNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })).getTime();
-            const percent = (cairoNow - T_START) / T_TOTAL_MS;
-            const targetPx = (percent * T_WIDTH_PX) - 300; // Center it
+            // Today is 30 days into our 90-day window (33.33%)
+            const targetPx = (T_WIDTH_PX * 0.3333) - 250; 
             document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx);
         }
 
-        function updateLivePointer() {
-            const cairoNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })).getTime();
-            const percent = ((cairoNow - T_START) / T_TOTAL_MS) * 100;
-            document.querySelectorAll('.live-time-pointer').forEach(ptr => {
-                ptr.style.left = percent + '%';
-            });
-        }
-        setInterval(updateLivePointer, 60000); // Update pointer every minute
     </script>
 </body>
 </html>
