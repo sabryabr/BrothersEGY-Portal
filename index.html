@@ -21,7 +21,7 @@
         
         /* Video Background */
         .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; pointer-events: none; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.4); transition: object-position 0.8s ease-in-out; }
+        #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); transition: object-position 0.8s ease-in-out; }
 
         /* Login Screen */
         #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
@@ -182,17 +182,26 @@
         .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; }
         .color-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
 
-        /* Continuous Mini-Gantt Timeline */
-        /* REMOVED overflow: hidden; so tooltips can be seen! */
-        .gantt-wrapper { position: relative; width: 100%; min-width: 350px; height: 24px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; border: 1px solid var(--glass-border); display: flex; align-items: center; }
+        /* Continuous Interactive Mini-Gantt Timeline */
+        .gantt-viewport { width: 100%; overflow-x: hidden; cursor: grab; background: rgba(0,0,0,0.2); border-radius: 6px; }
+        .gantt-viewport:active { cursor: grabbing; }
+        .gantt-wrapper { position: relative; width: 150%; min-width: 600px; height: 32px; display: flex; align-items: center; border: 1px solid var(--glass-border); border-radius: 6px; }
         .gantt-today-line { position: absolute; left: 16.66%; top: 0; bottom: 0; width: 2px; background: var(--success); z-index: 5; box-shadow: 0 0 8px var(--success); }
-        .gantt-today-label { position: absolute; left: calc(16.66% + 4px); top: -18px; font-size: 10px; color: var(--success); font-weight: bold; z-index: 5; }
-        .gantt-bar { position: absolute; height: 16px; border-radius: 4px; cursor: pointer; transition: 0.2s; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .gantt-bar:hover { transform: scaleY(1.2); z-index: 20; filter: brightness(1.2); outline: 1px solid white; }
+        .gantt-today-label { position: absolute; left: calc(16.66% + 4px); top: 2px; font-size: 9px; color: var(--success); font-weight: bold; z-index: 5; }
         
-        /* Tooltip */
-        .gantt-bar .tooltip { visibility: hidden; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 250px; background: rgba(0,0,0,0.9); color: white; padding: 10px; border-radius: 6px; font-size: 12px; font-weight: normal; border: 1px solid var(--primary); z-index: 999; text-align: center; line-height: 1.4; box-shadow: 0 10px 20px rgba(0,0,0,0.8); pointer-events: none; }
+        .gantt-bar { position: absolute; height: 14px; border-radius: 4px; cursor: pointer; transition: 0.2s; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .gantt-bar:hover { transform: scaleY(1.3); z-index: 30 !important; filter: brightness(1.2); outline: 1px solid white; }
+        
+        /* Advanced Tooltip */
+        .gantt-bar .tooltip { visibility: hidden; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); width: max-content; min-width: 200px; background: rgba(15, 20, 25, 0.95); color: white; padding: 12px; border-radius: 8px; font-size: 12px; font-weight: normal; border: 1px solid var(--primary); z-index: 999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.8); pointer-events: none; }
         .gantt-bar:hover .tooltip { visibility: visible; }
+        
+        /* Clickable Elements */
+        .clickable-obj { cursor: pointer; transition: 0.2s; }
+        .clickable-obj:hover { opacity: 0.7; transform: scale(1.05); }
+        
+        /* Strict RTL Layout for Cars */
+        .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
         
         .legend-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; padding: 12px; background: rgba(0,0,0,0.4); border-radius: 10px; border: 1px solid var(--glass-border); margin-bottom: 20px; font-size: 11px; font-weight: bold; color: #ddd; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
@@ -332,9 +341,8 @@
                         <thead><tr>
                             <th style="width: 30%; text-align: right;">السيارة (Vehicle Identity)</th>
                             <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                            <th style="width: 45%; text-align: center; position:relative;">
-                                📅 30-Day Timeline <span style="font-size:9px; color:#888; font-weight:normal;">(-5 to +25 Days)</span>
-                                <div class="gantt-today-label">Today</div>
+                            <th style="width: 45%; text-align: center;">
+                                📅 Timeline <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Click & Drag to Pan) <i class="fa-solid fa-arrows-left-right"></i></span>
                             </th>
                             <th style="width: 15%;">Assignment Info</th>
                         </tr></thead>
@@ -765,11 +773,9 @@
             const body = document.getElementById('radar-body');
             body.innerHTML = '';
             
-            // Set up Time
             const nowString = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
             const now = new Date(nowString);
             
-            // Auto-select current month if it's the first load
             const monthEl = document.getElementById('radar-month');
             if(!monthEl.hasAttribute('data-init')) {
                 monthEl.value = now.getMonth();
@@ -783,9 +789,8 @@
             
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
-            // Define the visual Timeline Window strictly to the selected Month
             const windowStart = new Date(targetYear, targetMonth, 1, 0, 0, 0); 
-            const windowEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59); // Last day of chosen month
+            const windowEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
             const totalWindowMs = windowEnd - windowStart;
 
             APP_DATA.cars.forEach(c => {
@@ -793,78 +798,66 @@
                 const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
 
-                // 1. PERFECT ARABIC CAR IDENTITY 
+                // 1. PERFECT ARABIC FORMATTING (RTL Enforced)
                 let rawPlate = String(c['Plate'] || c['plate'] || c['رقم اللوحة'] || "").trim();
                 let rawLetters = String(c['احرف اللوحة'] || "").trim();
                 let cBrand = c['النوع'] || c['Type'] || c['الماركة'] || '';
                 let cModel = c['الطراز'] || c['Model'] || '';
                 let carName = `${cBrand} ${cModel}`.trim() || 'Unknown';
                 let cYear = c['سنة الصنع'] || '';
-                let colorHex = getCarColorHex(c['Color'] || c['اللون']);
+                let colorName = c['Color'] || c['اللون'] || 'Unknown';
+                let colorHex = getCarColorHex(colorName);
                 
-                // Using dir="rtl" natively fixes the bracket and number inversion logic
+                // Constructing EXACTLY as requested: Name (Year) Letters | Numbers [ID]
                 const carHTML = `
                     <div class="arabic-car-title">
-                        <div dir="rtl" style="text-align:right; width:100%;">
-                            [${c.id}] ${carName} (${cYear}) | ${rawLetters} ${rawPlate}
-                        </div>
-                        <div class="color-dot" style="background: ${colorHex};"></div>
+                        <span class="clickable-obj" title="Edit Car Info" onclick="alert('Car Editor UI Opening for ID: ${c.id}')">${carName} (${cYear})</span>
+                        <span style="color:var(--accent); margin:0 5px;">${rawLetters} | ${rawPlate}</span>
+                        <span dir="ltr" style="color:#aaa;">[${c.id}]</span>
+                        <div class="color-dot clickable-obj" title="Color: ${colorName}" style="background: ${colorHex}; margin-right:8px;" onclick="alert('License/Insurance UI Opening for ID: ${c.id}')"></div>
                     </div>`;
 
-                // 2. FETCH & SORT BOOKINGS
                 let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id && new Date(b['بداية التعاقد']).getFullYear() >= 2025);
                 carBookings.sort((a,b) => new Date(a['بداية التعاقد']) - new Date(b['بداية التعاقد']));
 
-                // 3. DETERMINE CURRENT LIVE STATUS (Based on NOW, not the calendar view)
                 let masterStatusClass = "status-ready";
                 let masterStatusText = "متاح (READY)";
                 let assignmentText = '<span style="color:#666">Idle</span>';
-                let currentActiveBooking = null;
-                let nextFutureBooking = null;
+                let currentActiveBooking = null, nextFutureBooking = null;
 
                 for (let b of carBookings) {
-                    const start = new Date(b['بداية التعاقد']);
-                    const end = new Date(b['نهاية التعاقد']);
+                    const start = new Date(b['بداية التعاقد']); const end = new Date(b['نهاية التعاقد']);
                     if (now >= start && now <= end) { currentActiveBooking = b; break; }
                     if (start > now && !nextFutureBooking) { nextFutureBooking = b; }
                 }
 
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']);
-                    const hoursLeft = (end - now) / 3600000;
-                    if (hoursLeft <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK SOON)"; counts.back++; }
+                    if ((end - now) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK SOON)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
-                    assignmentText = `<b style="color:var(--accent)">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="alert('Opening Client Profile: ${currentActiveBooking['اسم العميل']}')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']);
-                    const hoursUntil = (start - now) / 3600000;
-                    const paid = parseCurrency(nextFutureBooking['المدفوع EGP']);
-                    const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
-
-                    if (hoursUntil <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING SOON)"; counts.going++; }
+                    const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
+                    if ((start - now) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING SOON)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    
-                    assignmentText = `Next: <b style="color:#fff">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
-                } else {
-                    counts.ready++;
-                }
+                    assignmentText = `Next: <b class="clickable-obj" style="color:#fff" onclick="alert('Opening Client Profile')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
+                } else { counts.ready++; }
 
-                // 4. GENERATE CONTINUOUS TIMELINE
-                let timelineHTML = `<div class="gantt-wrapper">`;
-                
-                // Add vertical "Today" line only if viewing the current actual month/year
+                // 4. GENERATE CONTINUOUS TIMELINE WITH OVERLAP SPLITTING
+                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper">`;
                 if (now >= windowStart && now <= windowEnd) {
                     let todayPercent = ((now - windowStart) / totalWindowMs) * 100;
-                    timelineHTML += `<div class="gantt-today-line" style="left: ${todayPercent}%;"></div>`;
+                    timelineHTML += `<div class="gantt-today-line" style="left: ${todayPercent}%;"><div class="gantt-today-label">TODAY</div></div>`;
                 }
                 
+                let occupiedLevels = []; // Used to track overlapping blocks
+
                 for (let b of carBookings) {
-                    let bStart = new Date(b['بداية التعاقد']);
-                    let bEnd = new Date(b['نهاية التعاقد']);
+                    let bStart = new Date(b['بداية التعاقد']); let bEnd = new Date(b['نهاية التعاقد']);
                     
-                    // Does this booking overlap the selected Month?
                     if (bEnd > windowStart && bStart < windowEnd) {
                         let renderStart = bStart < windowStart ? windowStart : bStart;
                         let renderEnd = bEnd > windowEnd ? windowEnd : bEnd;
@@ -873,52 +866,68 @@
                         let widthPercent = ((renderEnd - renderStart) / totalWindowMs) * 100;
                         
                         const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
-                        let barClass = "status-paid";
+                        let barClass = "status-paid"; let statusTxt = "Paid";
                         
-                        // Determine Color Context
                         if (bStart <= now && bEnd >= now) {
-                            barClass = ((bEnd - now) / 3600000 <= 24) ? "status-backsoon" : "status-rented";
+                            if (((bEnd - now) / 3600000) <= 24) { barClass = "status-backsoon"; statusTxt = "Back Soon"; }
+                            else { barClass = "status-rented"; statusTxt = "Rented"; }
                         } else if (bStart > now) {
-                            if (((bStart - now) / 3600000) <= 24) barClass = "status-goingsoon";
-                            else if (paid === 0) barClass = "status-pending";
-                            else if (paid < total) barClass = "status-partial";
+                            if (((bStart - now) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
+                            else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending (Unpaid)"; }
+                            else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
                         } else {
-                            barClass = "status-ready"; // Grey out past bookings
+                            barClass = "status-ready"; statusTxt = "Archived";
                         }
 
+                        // Overlap Split Logic: Prioritize Paid on Top
+                        let topOffset = "8px"; // Center default
+                        if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
+                            // Conflict detected! Split it.
+                            if(barClass === "status-paid") topOffset = "0px"; // Paid goes top
+                            else topOffset = "16px"; // Unpaid goes bottom
+                        }
+                        occupiedLevels.push(renderEnd); // Record this block's end time
+
+                        // Rich Arabic Tooltip
                         let hoverText = `
-                            <b style='color:var(--accent); font-size:14px;'>${b['اسم العميل']}</b><hr style='border:none; border-top:1px solid #555; margin:5px 0;'>
-                            <b>Start:</b> ${bStart.toLocaleString('en-GB')}<br>
-                            <b>End:</b> ${bEnd.toLocaleString('en-GB')}<br>
-                            <b>Value:</b> ${total.toLocaleString()} EGP | <b>Paid:</b> ${paid.toLocaleString()} EGP
+                            <div style="text-align:right; font-family:'Cairo', sans-serif;">
+                                <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
+                                <span style='font-size:10px; color:#aaa;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
+                                <hr style='border:none; border-top:1px solid #444; margin:8px 0;'>
+                                <div style="margin-bottom:4px;"><span style="color:#888;">الحالة:</span> <span class="badge ${barClass}" style="font-size:9px;">${statusTxt}</span></div>
+                                <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${bStart.toLocaleDateString('en-GB')} ${bStart.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span></div>
+                                <div style="margin-bottom:6px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${bEnd.toLocaleDateString('en-GB')} ${bEnd.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span></div>
+                                <div style="margin-bottom:2px;"><span style="color:#888;">إجمالي القيمة:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
+                                <div><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
+                            </div>
                         `;
 
-                        // We use both the custom Tooltip AND the native title attribute as a foolproof backup
                         timelineHTML += `
-                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%;" title="Client: ${b['اسم العميل']} | Value: ${total} EGP">
+                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" onclick="alert('Opening Order UI for Booking ID: ${b.id}')">
                                 <div class="tooltip">${hoverText}</div>
                             </div>
                         `;
                     }
                 }
-                timelineHTML += `</div>`; // Close Wrapper
+                timelineHTML += `</div></div>`; // Close wrapper and viewport
 
-                // 5. INJECT ROW WITH BORDERS TO PREVENT BLEED
                 const row = body.insertRow();
                 row.innerHTML = `
-                    <td style="text-align: right; border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td>
+                    <td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td>
                     <td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}">${masterStatusText}</span></td>
-                    <td style="padding: 10px 20px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
+                    <td style="padding: 10px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
                     <td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>
                 `;
             });
 
-            // Update Top KPIs
             document.getElementById('ct-ready').innerText = counts.ready;
             document.getElementById('ct-rented').innerText = counts.rented;
             document.getElementById('ct-going').innerText = counts.going;
             document.getElementById('ct-back').innerText = counts.back;
             document.getElementById('ct-pending').innerText = counts.pending;
+            
+            // Re-initialize drag scrolling after building
+            initDragScroll();
         }
 
         function buildOrderBook() {
@@ -1677,6 +1686,31 @@
                 const out = document.getElementById('contractOutput');
                 if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); }
             }, 100);
+        }
+        // --- DRAG TO SCROLL TIMELINES ---
+        function initDragScroll() {
+            const sliders = document.querySelectorAll('.drag-scroll');
+            sliders.forEach(slider => {
+                let isDown = false;
+                let startX;
+                let scrollLeft;
+
+                slider.addEventListener('mousedown', (e) => {
+                    isDown = true;
+                    slider.style.cursor = 'grabbing';
+                    startX = e.pageX - slider.offsetLeft;
+                    scrollLeft = slider.scrollLeft;
+                });
+                slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; });
+                slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; });
+                slider.addEventListener('mousemove', (e) => {
+                    if (!isDown) return;
+                    e.preventDefault();
+                    const x = e.pageX - slider.offsetLeft;
+                    const walk = (x - startX) * 2; // Scroll-fast multiplier
+                    slider.scrollLeft = scrollLeft - walk;
+                });
+            });
         }
     </script>
 </body>
