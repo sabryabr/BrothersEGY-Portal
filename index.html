@@ -783,19 +783,32 @@
         }
 
         // --- DASHBOARD MODULES (Radar, CRM, Orders, V360, Risk) ---
-        // Helper function to translate Arabic/English colors to Hex
+        // --- 1. ROBUST HELPER: Fuzzy Key Finder (Fixes trailing spaces in Firebase) ---
+        function getSafeVal(obj, searchKeys) {
+            if(!obj) return "";
+            for (let sk of searchKeys) {
+                const target = sk.toLowerCase().trim();
+                const foundKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
+                if (foundKey && obj[foundKey]) return String(obj[foundKey]).trim();
+            }
+            return "";
+        }
+
+        // --- 2. COLOR ENGINE ---
         function getCarColorHex(colorStr) {
             const str = String(colorStr || "").toLowerCase().trim();
             if (str.includes("red") || str.includes("احمر") || str.includes("أحمر")) return "#e74c3c";
-            if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق")) return "#3498db";
+            if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق") || str.includes("كحلي")) return "#3498db";
             if (str.includes("black") || str.includes("اسود") || str.includes("أسود")) return "#2c3e50";
             if (str.includes("silver") || str.includes("فضي")) return "#bdc3c7";
             if (str.includes("white") || str.includes("ابيض") || str.includes("أبيض")) return "#ffffff";
             if (str.includes("grey") || str.includes("gray") || str.includes("رمادي")) return "#7f8c8d";
-            if (str.includes("ashen") || str.includes("فئراني")) return "#95a5a6";
-            return "#2ecc71"; // Default green if unknown
+            if (str.includes("ashen") || str.includes("فئراني") || str.includes("فيراني")) return "#95a5a6";
+            if (str.includes("brown") || str.includes("بني")) return "#8d6e63";
+            return "#2ecc71"; // Default Fallback
         }
 
+        // --- 3. MASTER FLEET RADAR ENGINE ---
         function buildRadar() {
             const body = document.getElementById('radar-body');
             body.innerHTML = '';
@@ -825,44 +838,49 @@
             let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:30px; border:none;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">`;
             headerTimeline += `${axisHTML}<div class="live-time-pointer" style="left:33.33%;"><div class="live-time-label">LIVE</div></div></div></div>`;
             
-            // Fixed width table to prevent stretching!
             const radarTable = document.querySelector('#view-radar .data-table');
             if (radarTable) radarTable.classList.add('radar-fixed-table');
 
             document.getElementById('radar-head').innerHTML = `
                 <tr>
-                    <th style="width: 28%; text-align: right;">السيارة (Vehicle Identity)</th>
+                    <th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th>
                     <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                    <th style="width: 47%; text-align: center; padding:5px 0;">
+                    <th style="width: 48%; text-align: center; padding:5px 0;">
                         <div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>
                         ${headerTimeline}
                     </th>
-                    <th style="width: 15%;">Assignment Info</th>
+                    <th style="width: 17%;">Assignment Info</th>
                 </tr>`;
 
             APP_DATA.cars.forEach(c => {
-                const contractStr = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
+                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
 
                 // 1. PERFECT ARABIC FORMATTING
-                let singlePlate = String(c['Plate'] || c['plate'] || c['رقم اللوحة'] || "").trim();
-                let carName = `${c['النوع'] || c['Type'] || ''} ${c['الطراز'] || c['Model'] || ''}`.trim() || 'Unknown';
-                let cYear = c['سنة الصنع'] || '';
-                let colorName = c['اللون'] || c['Color'] || 'Unknown';
+                let n4 = getSafeVal(c, ['Field_28']), n3 = getSafeVal(c, ['Field_27']), n2 = getSafeVal(c, ['Field_26']), n1 = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                let l3 = getSafeVal(c, ['Field_24']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['احرف اللوحة']);
+                
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
+                let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
+                
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
+                let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
+                let colorName = getSafeVal(c, ['اللون', 'Color']);
                 let colorHex = getCarColorHex(colorName);
                 
                 const carHTML = `
                     <div class="arabic-car-title">
-                        <span class="clickable-obj" onclick="showToast('Edit UI for Car ID: ${c.id}')">${carName} (${cYear}) | ${singlePlate} [${c.id}]</span>
+                        <span class="clickable-obj" onclick="showToast('Edit UI for Car ID: ${c.id}')">${carName} (${cYear}) ${fullPlate} [${c.id}]</span>
                         <div class="color-dot clickable-obj" title="اللون: ${colorName}" style="background: ${colorHex}; margin-right:5px;" onclick="showToast('Insurance/Docs UI for ID: ${c.id}')"></div>
                     </div>`;
 
                 let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id);
-                carBookings.sort((a,b) => new Date(a['بداية التعاقد']) - new Date(b['بداية التعاقد']));
+                carBookings.sort((a,b) => new Date(a['بداية التعاقد']).getTime() - new Date(b['بداية التعاقد']).getTime());
 
                 let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)";
-                let assignmentText = '<span style="color:#666">Idle</span>';
+                let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
                 let currentActiveBooking = null, nextFutureBooking = null;
 
                 for (let b of carBookings) {
@@ -871,19 +889,22 @@
                     if (start > nowMs && !nextFutureBooking) { nextFutureBooking = b; }
                 }
 
+                // Master Status Priority Logic
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
                     if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Details')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Profile: ${currentActiveBooking['اسم العميل']}')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']).getTime();
                     const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
+                    
                     if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `Next: <b class="clickable-obj" style="color:#fff" onclick="showToast('Client Details')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
+                    
+                    assignmentText = `<span style="color:#888; font-size:10px;">Next:</span> <b class="clickable-obj" style="color:#fff" onclick="showToast('Client Profile')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else { counts.ready++; }
 
                 // 4. GENERATE HOUR-PERFECT TIMELINE BLOCKS
@@ -901,7 +922,7 @@
                         let renderEnd = Math.min(bEnd, T_END);
                         
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100;
-                        let widthPercent = ((renderEnd - renderStart) / T_TOTAL_MS) * 100;
+                        let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); // Minimum width to be visible
                         
                         const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
                         let barClass = "status-paid"; let statusTxt = "Paid";
@@ -913,33 +934,42 @@
                             if (((bStart - nowMs) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
                             else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending (Unpaid)"; }
                             else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
-                        } else { barClass = "status-ready"; statusTxt = "Archived"; }
+                        } else { barClass = "status-ready"; statusTxt = "Archived (Past)"; }
 
-                        // Split Overlap Logic
-                        let topOffset = "10px"; 
+                        // Stack Overlapping Orders Visually
+                        let topOffset = "14px"; 
                         if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
-                            if(barClass === "status-paid") topOffset = "2px"; else topOffset = "20px";
+                            if(barClass === "status-paid") topOffset = "4px"; else topOffset = "24px";
                         }
                         occupiedLevels.push(renderEnd); 
 
+                        // RICH HOVER DATA
                         let hoverText = `
                             <div style="text-align:right; font-family:'Cairo', sans-serif;">
-                                <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
-                                <span style='font-size:10px; color:#aaa;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
-                                <hr style='border:none; border-top:1px solid #444; margin:8px 0;'>
-                                <div style="margin-bottom:4px;"><span style="color:#888;">الحالة:</span> <span class="badge ${barClass}" style="font-size:9px;">${statusTxt}</span></div>
-                                <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
-                                <div style="margin-bottom:6px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
-                                <div style="margin-bottom:2px;"><span style="color:#888;">إجمالي القيمة:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
-                                <div><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span>
+                                    <span style='font-size:11px; color:#aaa;'>Order #${b.id}</span>
+                                </div>
+                                <b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br>
+                                <span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
+                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
+                                <div style="margin-bottom:6px;"><span style="color:#888;">من:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
+                                <div style="margin-bottom:10px;"><span style="color:#888;">إلى:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
+                                <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                        <span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between;">
+                                        <span style="color:#888;">المدفوع:</span> <b style="color:${paid < total ? 'var(--accent)' : 'var(--success)'}">${paid.toLocaleString()} EGP</b>
+                                    </div>
+                                </div>
                             </div>
                         `;
 
-                        // Using pure data attributes for the hover engine
                         timelineHTML += `
                             <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" 
                                  data-info="${hoverText.replace(/"/g, '&quot;')}"
-                                 onclick="showToast('Order Edit UI for ID: ${b.id}')">
+                                 onclick="showToast('Opening Edit Panel for Order #${b.id}')">
                             </div>
                         `;
                     }
@@ -949,7 +979,7 @@
                 const row = body.insertRow();
                 row.innerHTML = `
                     <td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td>
-                    <td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}">${masterStatusText}</span></td>
+                    <td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}" style="width:100%; display:block; box-sizing:border-box;">${masterStatusText}</span></td>
                     <td style="padding: 10px 15px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
                     <td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>
                 `;
@@ -962,8 +992,9 @@
             if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
             
             initDragScroll(); 
-            setTimeout(scrollToToday, 100); 
+            setTimeout(scrollToToday, 50); 
         }
+        
 
         function buildOrderBook() {
             const body = document.getElementById('orders-body');
