@@ -295,15 +295,15 @@
                     <div class="m-card"><label>Pending Confirmed</label><div class="val" id="ct-pending" style="color:#74b9ff">0</div></div>
                 </div>
 
-                <div class="legend-row">
-                    <div class="legend-item"><div class="legend-color status-ready"></div> Ready / Available</div>
-                    <div class="legend-item"><div class="legend-color status-proposed"></div> Proposed</div>
-                    <div class="legend-item"><div class="legend-color status-pending"></div> Confirmed (Unpaid)</div>
-                    <div class="legend-item"><div class="legend-color status-partial"></div> Confirmed (Partial Pay)</div>
-                    <div class="legend-item"><div class="legend-color status-paid"></div> Confirmed (Fully Paid)</div>
-                    <div class="legend-item"><div class="legend-color status-rented"></div> Rented (Active)</div>
-                    <div class="legend-item"><div class="legend-color status-goingsoon"></div> Going Soon (<24h)</div>
-                    <div class="legend-item"><div class="legend-color status-backsoon"></div> Back Soon (<24h)</div>
+                <div class="legend-row" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; padding: 12px; background: rgba(0,0,0,0.4); border-radius: 10px; border: 1px solid var(--glass-border); margin-bottom: 20px; font-size: 11px; font-weight: bold; color: #ddd;">
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-ready" style="width: 14px; height: 14px; border-radius: 3px; background: #7f8c8d;"></div> Ready / Available</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-proposed" style="width: 14px; height: 14px; border-radius: 3px; background: #e84393;"></div> Proposed</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-pending" style="width: 14px; height: 14px; border-radius: 3px; background: #74b9ff;"></div> Confirmed (Unpaid)</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-partial" style="width: 14px; height: 14px; border-radius: 3px; background: #f1c40f;"></div> Confirmed (Partial Pay)</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-paid" style="width: 14px; height: 14px; border-radius: 3px; background: #0984e3;"></div> Confirmed (Fully Paid)</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-rented" style="width: 14px; height: 14px; border-radius: 3px; background: #e74c3c;"></div> Rented (Active)</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-goingsoon" style="width: 14px; height: 14px; border-radius: 3px; background: #9b59b6;"></div> Going Soon (<24h)</div>
+                    <div class="legend-item" style="display: flex; align-items: center; gap: 6px;"><div class="legend-color status-backsoon" style="width: 14px; height: 14px; border-radius: 3px; background: #e67e22;"></div> Back Soon (<24h)</div>
                 </div>
 
                 <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
@@ -923,9 +923,16 @@
                         let renderEnd = Math.min(bEnd, T_END);
                         
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100;
-                        let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); // Minimum width to be visible
+                        let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
-                        const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                        const paid = parseCurrency(b['المدفوع EGP']); 
+                        const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                        const debt = Math.max(0, total - paid); // Calculate remaining debt
+                        
+                        // Safely fetch Deposit and Insurance
+                        const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
+                        const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
+                        
                         let barClass = "status-paid"; let statusTxt = "Paid";
                         
                         if (bStart <= nowMs && bEnd >= nowMs) {
@@ -944,7 +951,7 @@
                         }
                         occupiedLevels.push(renderEnd); 
 
-                        // RICH HOVER DATA
+                        // UPGRADED RICH HOVER DATA
                         let hoverText = `
                             <div style="text-align:right; font-family:'Cairo', sans-serif;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -954,15 +961,28 @@
                                 <b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br>
                                 <span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
                                 <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
+                                
                                 <div style="margin-bottom:6px;"><span style="color:#888;">من:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
                                 <div style="margin-bottom:10px;"><span style="color:#888;">إلى:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
+                                
                                 <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
                                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                        <span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b>
+                                        <span style="color:#888;">الإجمالي (Total):</span> <b style="color:white">${total.toLocaleString()} EGP</b>
                                     </div>
-                                    <div style="display:flex; justify-content:space-between;">
-                                        <span style="color:#888;">المدفوع:</span> <b style="color:${paid < total ? 'var(--accent)' : 'var(--success)'}">${paid.toLocaleString()} EGP</b>
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                        <span style="color:#888;">المدفوع (Paid):</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b>
                                     </div>
+                                    <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed #555;">
+                                        <span style="color:#888;">المتبقي (Debt):</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b>
+                                    </div>
+                                </div>
+                                
+                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                    <span style="color:#888;">الوديعة (Deposit):</span> <b style="color:var(--accent)">${deposit.toLocaleString()} EGP</b>
+                                </div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <span style="color:#888;">التأمين (Insurance):</span> <b style="color:white">${insPack}</b>
                                 </div>
                             </div>
                         `;
