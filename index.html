@@ -179,33 +179,27 @@
         .status-maint { background: #2d3436 !important; color: white !important; }
 
         /* Perfect Arabic Formatting */
-        .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; }
+        .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
         .color-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
 
-        /* Continuous Interactive Mini-Gantt Timeline */
-        .gantt-viewport { width: 100%; overflow-x: hidden; cursor: grab; background: rgba(0,0,0,0.2); border-radius: 6px; }
+        /* Infinite Drag Timeline */
+        .gantt-viewport { width: 100%; overflow: hidden; cursor: grab; background: rgba(0,0,0,0.2); border-radius: 6px; position: relative; }
         .gantt-viewport:active { cursor: grabbing; }
-        .gantt-wrapper { position: relative; width: 150%; min-width: 600px; height: 32px; display: flex; align-items: center; border: 1px solid var(--glass-border); border-radius: 6px; }
-        .gantt-today-line { position: absolute; left: 16.66%; top: 0; bottom: 0; width: 2px; background: var(--success); z-index: 5; box-shadow: 0 0 8px var(--success); }
-        .gantt-today-label { position: absolute; left: calc(16.66% + 4px); top: 2px; font-size: 9px; color: var(--success); font-weight: bold; z-index: 5; }
+        .gantt-wrapper { position: relative; height: 32px; display: flex; align-items: center; }
         
-        .gantt-bar { position: absolute; height: 14px; border-radius: 4px; cursor: pointer; transition: 0.2s; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-        .gantt-bar:hover { transform: scaleY(1.3); z-index: 30 !important; filter: brightness(1.2); outline: 1px solid white; }
+        .gantt-bar { position: absolute; height: 16px; border-radius: 4px; cursor: pointer; transition: 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .gantt-bar:hover { filter: brightness(1.3); outline: 1px solid white; z-index: 50; }
         
-        /* Advanced Tooltip */
-        .gantt-bar .tooltip { visibility: hidden; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); width: max-content; min-width: 200px; background: rgba(15, 20, 25, 0.95); color: white; padding: 12px; border-radius: 8px; font-size: 12px; font-weight: normal; border: 1px solid var(--primary); z-index: 999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.8); pointer-events: none; }
-        .gantt-bar:hover .tooltip { visibility: visible; }
+        /* The Global Live Time Pointer */
+        .live-time-pointer { position: absolute; top: 0; bottom: 0; width: 2px; background: #00e5ff; z-index: 100; box-shadow: 0 0 10px #00e5ff; pointer-events: none; }
         
         /* Clickable Elements */
         .clickable-obj { cursor: pointer; transition: 0.2s; }
-        .clickable-obj:hover { opacity: 0.7; transform: scale(1.05); }
+        .clickable-obj:hover { opacity: 0.7; transform: scale(1.05); color: #00d2ff !important; }
+
+        /* Global Float Tooltip (Escapes the table traps) */
+        #global-tooltip { position: fixed; visibility: hidden; opacity: 0; background: rgba(15, 20, 25, 0.98); color: white; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid var(--primary); z-index: 999999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.9); pointer-events: none; transition: opacity 0.1s ease-out; width: max-content; min-width: 220px; }
         
-        /* Strict RTL Layout for Cars */
-        .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
-        
-        .legend-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; padding: 12px; background: rgba(0,0,0,0.4); border-radius: 10px; border: 1px solid var(--glass-border); margin-bottom: 20px; font-size: 11px; font-weight: bold; color: #ddd; }
-        .legend-item { display: flex; align-items: center; gap: 6px; }
-        .legend-color { width: 14px; height: 14px; border-radius: 3px; }
     </style>
 </head>
 <body>
@@ -310,30 +304,19 @@
                     <div class="legend-item"><div class="legend-color status-backsoon"></div> Back Soon (<24h)</div>
                 </div>
 
-                <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: flex-end;">
-                    <div style="flex: 1;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Timeline Month</label>
-                        <select id="radar-month" class="contract-input" onchange="buildRadar()" style="height: 48px; font-weight:bold;">
-                            <option value="0">January</option><option value="1">February</option><option value="2">March</option>
-                            <option value="3">April</option><option value="4">May</option><option value="5">June</option>
-                            <option value="6">July</option><option value="7">August</option><option value="8">September</option>
-                            <option value="9">October</option><option value="10">November</option><option value="11">December</option>
-                        </select>
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Timeline Year</label>
-                        <input type="number" id="radar-year" value="2026" onchange="buildRadar()" class="contract-input" style="height: 48px; font-weight:bold; text-align:center;">
-                    </div>
-                    <div style="flex: 1;">
+                <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
+                    <button onclick="scrollToToday()" style="background:#00d2ff; color:#000; border:none; padding:12px 20px; border-radius:8px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; height:44px;"><i class="fa-solid fa-location-crosshairs"></i> Reset to Live Time</button>
+                    
+                    <div style="flex: 1; margin-left:15px;">
                         <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Fleet Status</label>
-                        <select id="radar-status-filter" class="contract-input" onchange="buildRadar()" style="height: 48px; font-weight:bold;">
+                        <select id="radar-status-filter" class="contract-input" onchange="buildRadar()" style="height: 44px; font-weight:bold;">
                             <option value="active">Active Fleet Only</option>
                             <option value="all">All Registered Vehicles</option>
                         </select>
                     </div>
                     <div style="flex: 2;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search / Filter</label>
-                        <input type="text" class="contract-input" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="height: 48px; margin-bottom:0;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search Database</label>
+                        <input type="text" class="contract-input" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="height: 44px; margin-bottom:0;">
                     </div>
                 </div>
                 <div class="table-responsive" style="overflow: visible;">
@@ -353,19 +336,27 @@
 
             <div id="view-orders" class="view-section">
                 <h2>📋 Master Order Book</h2>
-                <div class="filter-row">
-                    <select id="order-period-filter" onchange="buildOrderBook()">
-                        <option value="all">All Time History</option>
-                        <option value="this_month">This Month</option>
-                        <option value="last_month">Last Month</option>
-                        <option value="this_year">This Year</option>
-                    </select>
-                    <input type="text" class="search-bar" id="search-orders" placeholder="Search Order # or Customer..." onkeyup="searchTable('orders-body', 'search-orders')" style="margin-bottom:0;">
+                <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
+                    <button onclick="scrollToToday()" style="background:#00d2ff; color:#000; border:none; padding:12px 20px; border-radius:8px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-location-crosshairs"></i> Reset to Live Time</button>
+                    
+                    <div style="flex: 1; margin-left:15px;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Fleet Status</label>
+                        <select id="radar-status-filter" class="contract-input" onchange="buildRadar()" style="height: 44px; font-weight:bold;">
+                            <option value="active">Active Fleet Only</option>
+                            <option value="all">All Registered Vehicles</option>
+                        </select>
+                    </div>
+                    <div style="flex: 2;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search Database</label>
+                        <input type="text" class="contract-input" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="height: 44px; margin-bottom:0;">
+                    </div>
                 </div>
-                <div class="table-responsive">
+                
+                <div class="table-responsive" style="overflow: visible;">
                     <table class="data-table">
-                        <thead><tr><th>Order #</th><th>Customer</th><th>Car</th><th>Period</th><th>Grand Total</th><th>Paid</th><th>Status</th></tr></thead>
-                        <tbody id="orders-body"></tbody>
+                        <thead id="radar-head">
+                            </thead>
+                        <tbody id="radar-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -807,126 +798,108 @@
             const body = document.getElementById('radar-body');
             body.innerHTML = '';
             
-            const nowString = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
-            const now = new Date(nowString);
+            const cairoNowStr = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
+            const now = new Date(cairoNowStr);
+            const nowMs = now.getTime();
             
-            const monthEl = document.getElementById('radar-month');
-            if(!monthEl.hasAttribute('data-init')) {
-                monthEl.value = now.getMonth();
-                document.getElementById('radar-year').value = now.getFullYear();
-                monthEl.setAttribute('data-init', 'true');
-            }
-
             const filter = document.getElementById('radar-status-filter').value;
-            let targetMonth = parseInt(document.getElementById('radar-month').value);
-            let targetYear = parseInt(document.getElementById('radar-year').value);
-            
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
-            // EXPANDED TO 3 MONTHS for smooth Drag & Pan
-            const windowStart = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0); 
-            const windowEnd = new Date(targetYear, targetMonth + 2, 0, 23, 59, 59);
-            const totalWindowMs = windowEnd - windowStart;
-
-            // Generate Sync Header Line
-            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:20px; cursor:grab;"><div class="gantt-wrapper" style="border:none; background:transparent;">`;
-            if (now >= windowStart && now <= windowEnd) {
-                let todayPercent = ((now - windowStart) / totalWindowMs) * 100;
-                headerTimeline += `<div class="gantt-today-line" style="left: ${todayPercent}%;"><div class="gantt-today-label" style="top:-5px;">TODAY</div></div>`;
-            }
-            headerTimeline += `</div></div>`;
+            // Dynamic Header with Timeline Scale
+            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:20px;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">`;
+            headerTimeline += `<div class="live-time-pointer"></div></div></div>`;
             
-            // Replace Table Header Dynamically to insert Sync Bar
-            document.querySelector('#view-radar thead').innerHTML = `
-                <tr>
-                    <th style="width: 30%; text-align: right;">السيارة (Vehicle Identity)</th>
-                    <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                    <th style="width: 45%; text-align: center; padding:5px 0;">
-                        <div style="margin-bottom:5px;">📅 3-Month Timeline <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to pan)</span></div>
-                        ${headerTimeline}
-                    </th>
-                    <th style="width: 15%;">Assignment Info</th>
-                </tr>`;
+            const radarHead = document.getElementById('radar-head');
+            if(radarHead) {
+                radarHead.innerHTML = `
+                    <tr>
+                        <th style="width: 30%; text-align: right;">السيارة (Vehicle Identity)</th>
+                        <th style="width: 10%; text-align: center;">الحالة (Status)</th>
+                        <th style="width: 45%; text-align: center; padding:5px 0;">
+                            <div style="margin-bottom:5px;">📅 Infinite Timeline <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>
+                            ${headerTimeline}
+                        </th>
+                        <th style="width: 15%;">Assignment Info</th>
+                    </tr>`;
+            }
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
                 if(filter === 'active' && !isActive) return;
 
-                // 1. PERFECT CAR IDENTITY (Only single Plate field as requested)
-                let singlePlate = String(c['Plate'] || c['plate'] || "").trim();
+                // 1. PERFECT ARABIC FORMATTING EXACTLY AS REQUESTED
+                let p1 = [c['Field_28'], c['Field_27'], c['Field_26'], c['رقم اللوحة']].filter(Boolean).join(" ");
+                let p2 = [c['Field_24'], c['Field_23'], c['احرف اللوحة']].filter(Boolean).join(" ");
+                let fullPlate = `${p1} | ${p2}`.trim();
+                
                 let carName = `${c['النوع'] || c['Type'] || ''} ${c['الطراز'] || c['Model'] || ''}`.trim() || 'Unknown';
                 let cYear = c['سنة الصنع'] || '';
-                let colorName = c['Color'] || c['اللون'] || 'Unknown';
+                let colorName = c['اللون'] || c['Color'] || 'Unknown';
                 let colorHex = getCarColorHex(colorName);
                 
                 const carHTML = `
                     <div class="arabic-car-title">
-                        <div dir="rtl" style="text-align:right; width:100%;">
-                            <span class="clickable-obj" onclick="showToast('Vehicle Edit Modal Coming in Phase 3')">${carName} (${cYear}) | ${singlePlate} [${c.id}]</span>
-                        </div>
-                        <div class="color-dot clickable-obj" title="Color: ${colorName}" style="background: ${colorHex}; margin-right:8px;" onclick="showToast('Docs/Insurance Details Coming in Phase 3')"></div>
+                        <span class="clickable-obj" onclick="showToast('Edit UI for Car ID: ${c.id}')">${carName} (${cYear}) ${fullPlate} [${c.id}]</span>
+                        <div class="color-dot clickable-obj" title="${colorName}" style="background: ${colorHex}; margin-right:5px;" onclick="showToast('Insurance/Docs UI for ID: ${c.id}')"></div>
                     </div>`;
 
-                let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id && new Date(b['بداية التعاقد']).getFullYear() >= 2025);
+                let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id);
                 carBookings.sort((a,b) => new Date(a['بداية التعاقد']) - new Date(b['بداية التعاقد']));
 
-                let masterStatusClass = "status-ready";
-                let masterStatusText = "متاح (READY)";
+                let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)";
                 let assignmentText = '<span style="color:#666">Idle</span>';
                 let currentActiveBooking = null, nextFutureBooking = null;
 
                 for (let b of carBookings) {
-                    const start = new Date(b['بداية التعاقد']); const end = new Date(b['نهاية التعاقد']);
-                    if (now >= start && now <= end) { currentActiveBooking = b; break; }
-                    if (start > now && !nextFutureBooking) { nextFutureBooking = b; }
+                    const start = new Date(b['بداية التعاقد']).getTime(); const end = new Date(b['نهاية التعاقد']).getTime();
+                    if (nowMs >= start && nowMs <= end) { currentActiveBooking = b; break; }
+                    if (start > nowMs && !nextFutureBooking) { nextFutureBooking = b; }
                 }
 
                 if (currentActiveBooking) {
-                    const end = new Date(currentActiveBooking['نهاية التعاقد']);
-                    if ((end - now) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK SOON)"; counts.back++; }
+                    const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
+                    if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK SOON)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Profile UI Coming Soon')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Details')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${currentActiveBooking['نهاية التعاقد'].split(' ')[0]}</span>`;
                 } else if (nextFutureBooking) {
-                    const start = new Date(nextFutureBooking['بداية التعاقد']);
+                    const start = new Date(nextFutureBooking['بداية التعاقد']).getTime();
                     const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
-                    if ((start - now) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING SOON)"; counts.going++; }
+                    if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING SOON)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `Next: <b class="clickable-obj" style="color:#fff" onclick="showToast('Client Profile UI Coming Soon')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
+                    assignmentText = `Next: <b class="clickable-obj" style="color:#fff" onclick="showToast('Client Details')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${nextFutureBooking['بداية التعاقد'].split(' ')[0]}</span>`;
                 } else { counts.ready++; }
 
-                // 4. GENERATE CONTINUOUS TIMELINE WITH SPLIT CONFLICTS
-                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper">`;
-                if (now >= windowStart && now <= windowEnd) {
-                    let todayPercent = ((now - windowStart) / totalWindowMs) * 100;
-                    timelineHTML += `<div class="gantt-today-line" style="left: ${todayPercent}%;"></div>`;
-                }
-                
+                // 4. GENERATE HOUR-PERFECT TIMELINE BLOCKS
+                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;"><div class="live-time-pointer"></div>`;
                 let occupiedLevels = [];
 
                 for (let b of carBookings) {
-                    let bStart = new Date(b['بداية التعاقد']); let bEnd = new Date(b['نهاية التعاقد']);
-                    if (bEnd > windowStart && bStart < windowEnd) {
-                        let renderStart = bStart < windowStart ? windowStart : bStart;
-                        let renderEnd = bEnd > windowEnd ? windowEnd : bEnd;
+                    let bStart = new Date(b['بداية التعاقد']).getTime(); 
+                    let bEnd = new Date(b['نهاية التعاقد']).getTime();
+                    
+                    if (bEnd > T_START && bStart < T_END) {
+                        let renderStart = Math.max(bStart, T_START);
+                        let renderEnd = Math.min(bEnd, T_END);
                         
-                        let leftPercent = ((renderStart - windowStart) / totalWindowMs) * 100;
-                        let widthPercent = ((renderEnd - renderStart) / totalWindowMs) * 100;
+                        let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100;
+                        let widthPercent = ((renderEnd - renderStart) / T_TOTAL_MS) * 100;
                         
                         const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
                         let barClass = "status-paid"; let statusTxt = "Paid";
                         
-                        if (bStart <= now && bEnd >= now) {
-                            if (((bEnd - now) / 3600000) <= 24) { barClass = "status-backsoon"; statusTxt = "Back Soon"; }
+                        if (bStart <= nowMs && bEnd >= nowMs) {
+                            if (((bEnd - nowMs) / 3600000) <= 24) { barClass = "status-backsoon"; statusTxt = "Back Soon"; }
                             else { barClass = "status-rented"; statusTxt = "Rented"; }
-                        } else if (bStart > now) {
-                            if (((bStart - now) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
+                        } else if (bStart > nowMs) {
+                            if (((bStart - nowMs) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
                             else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending (Unpaid)"; }
                             else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
                         } else { barClass = "status-ready"; statusTxt = "Archived"; }
 
+                        // Split Overlap Logic
                         let topOffset = "8px"; 
                         if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
                             if(barClass === "status-paid") topOffset = "0px"; else topOffset = "16px";
@@ -934,21 +907,23 @@
                         occupiedLevels.push(renderEnd); 
 
                         let hoverText = `
-                            <div style="text-align:right; font-family:'Cairo', sans-serif;">
-                                <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
-                                <span style='font-size:10px; color:#aaa;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
-                                <hr style='border:none; border-top:1px solid #444; margin:8px 0;'>
-                                <div style="margin-bottom:4px;"><span style="color:#888;">الحالة:</span> <span class="badge ${barClass}" style="font-size:9px;">${statusTxt}</span></div>
-                                <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${bStart.toLocaleDateString('en-GB')} ${bStart.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span></div>
-                                <div style="margin-bottom:6px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${bEnd.toLocaleDateString('en-GB')} ${bEnd.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span></div>
-                                <div style="margin-bottom:2px;"><span style="color:#888;">إجمالي القيمة:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
-                                <div><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
-                            </div>
+                            <b style='color:var(--accent); font-size:14px;'>العميل: ${b['اسم العميل']}</b><br>
+                            <span style='font-size:10px; color:#aaa;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
+                            <hr style='border:none; border-top:1px solid #444; margin:8px 0;'>
+                            <div style="margin-bottom:4px;"><span style="color:#888;">الحالة:</span> <span class="badge ${barClass}" style="font-size:9px;">${statusTxt}</span></div>
+                            <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
+                            <div style="margin-bottom:6px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
+                            <div style="margin-bottom:2px;"><span style="color:#888;">إجمالي القيمة:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
+                            <div><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
                         `;
 
+                        // Using the new Global Hover Engine
                         timelineHTML += `
-                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" onclick="showToast('Order Edit Modal Coming in Phase 3 for Order #${b.id}')">
-                                <div class="tooltip">${hoverText}</div>
+                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" 
+                                 onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText)}')" 
+                                 onmousemove="moveGanttTooltip(event)" 
+                                 onmouseleave="hideGanttTooltip()"
+                                 onclick="showToast('Order Edit UI for ID: ${b.id}')">
                             </div>
                         `;
                     }
@@ -964,13 +939,15 @@
                 `;
             });
 
-            document.getElementById('ct-ready').innerText = counts.ready;
-            document.getElementById('ct-rented').innerText = counts.rented;
-            document.getElementById('ct-going').innerText = counts.going;
-            document.getElementById('ct-back').innerText = counts.back;
-            document.getElementById('ct-pending').innerText = counts.pending;
+            if(document.getElementById('ct-ready')) document.getElementById('ct-ready').innerText = counts.ready; 
+            if(document.getElementById('ct-rented')) document.getElementById('ct-rented').innerText = counts.rented;
+            if(document.getElementById('ct-going')) document.getElementById('ct-going').innerText = counts.going; 
+            if(document.getElementById('ct-back')) document.getElementById('ct-back').innerText = counts.back;
+            if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
             
-            initDragScroll(); // Attach sync listeners to the new rows
+            initDragScroll(); 
+            updateLivePointer(); 
+            setTimeout(scrollToToday, 200); // Snap to Today on load
         }
 
         function buildOrderBook() {
@@ -1776,6 +1753,70 @@
                 }
             }, 100);
         }
+        
+        // --- THE MASTER TIMELINE CONSTANTS (3 Years of Scrollable Canvas) ---
+        const T_START = new Date("2025-01-01T00:00:00").getTime();
+        const T_END = new Date("2027-12-31T23:59:59").getTime();
+        const T_TOTAL_MS = T_END - T_START;
+        const T_WIDTH_PX = 26280; // Exactly 24 pixels per day (1px per hour)
+
+        // --- GLOBAL TOOLTIP ENGINE ---
+        function showGanttTooltip(e, encodedHTML) {
+            let t = document.getElementById('global-tooltip');
+            if(!t) {
+                t = document.createElement('div'); t.id = 'global-tooltip';
+                document.body.appendChild(t);
+            }
+            t.innerHTML = decodeURIComponent(encodedHTML);
+            t.style.visibility = 'visible'; t.style.opacity = '1';
+            moveGanttTooltip(e);
+        }
+        function moveGanttTooltip(e) {
+            let t = document.getElementById('global-tooltip');
+            if(t) { t.style.left = (e.clientX + 15) + 'px'; t.style.top = (e.clientY + 15) + 'px'; }
+        }
+        function hideGanttTooltip() {
+            let t = document.getElementById('global-tooltip');
+            if(t) { t.style.opacity = '0'; t.style.visibility = 'hidden'; }
+        }
+
+        // --- SYNCHRONIZED DRAGGING & LIVE POINTER ---
+        let currentScrollOffset = 0;
+        function initDragScroll() {
+            const sliders = document.querySelectorAll('.drag-scroll');
+            let isDown = false; let startX; let scrollLeft;
+
+            sliders.forEach(slider => {
+                slider.addEventListener('mousedown', (e) => {
+                    isDown = true; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft;
+                });
+                slider.addEventListener('mouseleave', () => { isDown = false; });
+                slider.addEventListener('mouseup', () => { isDown = false; });
+                slider.addEventListener('mousemove', (e) => {
+                    if (!isDown) return;
+                    e.preventDefault();
+                    const walk = (e.pageX - slider.offsetLeft - startX) * 1.5; 
+                    currentScrollOffset = scrollLeft - walk;
+                    sliders.forEach(s => s.scrollLeft = currentScrollOffset);
+                });
+            });
+        }
+
+        function scrollToToday() {
+            const cairoNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })).getTime();
+            const percent = (cairoNow - T_START) / T_TOTAL_MS;
+            const targetPx = (percent * T_WIDTH_PX) - 300; // Center it
+            document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx);
+        }
+
+        function updateLivePointer() {
+            const cairoNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })).getTime();
+            const percent = ((cairoNow - T_START) / T_TOTAL_MS) * 100;
+            document.querySelectorAll('.live-time-pointer').forEach(ptr => {
+                ptr.style.left = percent + '%';
+            });
+        }
+        setInterval(updateLivePointer, 60000); // Update pointer every minute
     </script>
 </body>
 </html>
