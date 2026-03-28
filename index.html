@@ -801,7 +801,7 @@
             if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق") || str.includes("كحلي")) return "#02006c";
             if (str.includes("black") || str.includes("اسود") || str.includes("أسود")) return "#2c3e50";
             if (str.includes("silver") || str.includes("فضي")) return "#bdc3c7";
-            if (str.includes("light blue") || str.includes("سماوي")) return "#87CEEB";
+            if (str.includes("light blue") || str.includes("سماوي")) return "#20a7db";
             if (str.includes("white") || str.includes("ابيض") || str.includes("أبيض")) return "#ffffff";
             if (str.includes("grey") || str.includes("gray") || str.includes("رمادي")) return "#7f8c8d";
             if (str.includes("ashen") || str.includes("فئراني") || str.includes("فيراني")) return "#95a5a6";
@@ -859,7 +859,7 @@
                 if(filter === 'active' && !isActive) return;
 
                 // 1. PERFECT ARABIC FORMATTING
-                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_28']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_26']);
+                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
                 
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
