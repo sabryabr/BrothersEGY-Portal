@@ -1848,10 +1848,25 @@
         document.addEventListener('mousemove', function(e) {
             let t = document.getElementById('global-tooltip');
             if (t && t.style.visibility === 'visible') {
-                // Adjust to prevent tooltip from going off-screen
-                let x = e.clientX + 15; let y = e.clientY + 15;
-                if (x + t.offsetWidth > window.innerWidth) x = e.clientX - t.offsetWidth - 15;
-                t.style.left = x + 'px'; t.style.top = y + 'px';
+                let tWidth = t.offsetWidth;
+                let tHeight = t.offsetHeight;
+                
+                // Default position: Bottom-Right of the mouse
+                let x = e.clientX + 15; 
+                let y = e.clientY + 15;
+                
+                // If it bleeds off the right edge (with 20px safety buffer), flip to Left
+                if (x + tWidth > window.innerWidth - 20) {
+                    x = e.clientX - tWidth - 15;
+                }
+                
+                // If it bleeds off the bottom edge (with 20px safety buffer), flip UPWARD
+                if (y + tHeight > window.innerHeight - 20) {
+                    y = e.clientY - tHeight - 15;
+                }
+                
+                t.style.left = x + 'px'; 
+                t.style.top = y + 'px';
             }
         });
         
