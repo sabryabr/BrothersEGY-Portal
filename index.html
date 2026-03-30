@@ -748,8 +748,7 @@
                     dt.innerText = now.toLocaleDateString('en-GB', optionsDate);
                 }
             }
-            setInterval(tick, 1000);
-            tick(); 
+            setInterval(tick, 1000); tick(); 
         })();
 
         // --- 1. FIREBASE & GLOBALS ---
@@ -758,7 +757,7 @@
         const db = firebase.firestore();
 
         const APP_DATA = { cars: [], bookings: [], car_expenses: [], customers: [], user: null, liveRates: { usd: 50, eur: 54 } };
-        const T_WIDTH_PX = 2160; // 90 days * 24px per day (For Radar)
+        const T_WIDTH_PX = 2160; 
 
         // --- 2. AUTHENTICATION & DATA LOAD ---
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
@@ -767,10 +766,8 @@
             const user = document.getElementById('user-field').value.toLowerCase().trim();
             const pass = document.getElementById('pass-field').value;
             const status = document.getElementById('login-status');
-            
             if(!user || !pass) return;
-            status.innerText = "AUTHENTICATING...";
-            status.style.color = "var(--primary)";
+            status.innerText = "AUTHENTICATING..."; status.style.color = "var(--primary)";
 
             try {
                 const userDoc = await db.collection("users").doc(user).get();
@@ -778,14 +775,11 @@
                     APP_DATA.user = userDoc.data();
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('data-loader').style.display = 'flex'; 
-                    
                     applyPermissions(APP_DATA.user.access);
                     document.getElementById('display-role').innerText = APP_DATA.user.role || "Executive";
                     document.getElementById('bg-video').style.objectPosition = 'calc(50% + 130px) center';
 
-                    await fetchLiveRates();
-                    await loadCloudData(); 
-                    
+                    await fetchLiveRates(); await loadCloudData(); 
                     document.getElementById('data-loader').style.display = 'none';
                     document.getElementById('app-layout').style.display = 'block';
                 } else { throw new Error("Invalid Credentials"); }
@@ -794,19 +788,15 @@
 
         function applyPermissions(accessArray) {
             const map = {1:'.access-quote', 2:'.access-en', 3:'.access-ar', 4:'.access-rec'};
-            Object.keys(map).forEach(key => {
-                if(accessArray.includes(parseInt(key))) document.querySelectorAll(map[key]).forEach(el => el.style.display = 'block');
-            });
+            Object.keys(map).forEach(key => { if(accessArray.includes(parseInt(key))) document.querySelectorAll(map[key]).forEach(el => el.style.display = 'block'); });
             if(accessArray.includes(7)) document.getElementById('nav-fin').style.display = 'flex';
         }
 
         async function fetchLiveRates() {
             try {
-                const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const d = await r.json();
+                const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD'); const d = await r.json();
                 if(d.rates.EGP) {
-                    APP_DATA.liveRates.usd = d.rates.EGP;
-                    APP_DATA.liveRates.eur = d.rates.EGP / d.rates.EUR;
+                    APP_DATA.liveRates.usd = d.rates.EGP; APP_DATA.liveRates.eur = d.rates.EGP / d.rates.EUR;
                     document.getElementById('global_usd').value = APP_DATA.liveRates.usd.toFixed(2);
                     document.getElementById('global_eur').value = APP_DATA.liveRates.eur.toFixed(2);
                 }
@@ -818,36 +808,17 @@
                 let loaded = { fleet: false, bookings: false, expenses: false, customers: false };
                 const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers) resolve(); };
 
-                db.collection('fleet').onSnapshot(snap => {
-                    APP_DATA.cars = []; snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
-                    if(document.getElementById('view-radar').style.display === 'block') buildRadar();
-                    loaded.fleet = true; checkDone();
-                });
-                db.collection('bookings').onSnapshot(snap => {
-                    APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
-                    if(document.getElementById('view-radar').style.display === 'block') buildRadar();
-                    loaded.bookings = true; checkDone();
-                });
-                db.collection('car_expenses').onSnapshot(snap => {
-                    APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
-                    loaded.expenses = true; checkDone();
-                });
-                db.collection('customers').onSnapshot(snap => {
-                    APP_DATA.customers = []; snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
-                    if(document.getElementById('view-proposal').style.display === 'block') populateClientList();
-                    loaded.customers = true; checkDone();
-                });
+                db.collection('fleet').onSnapshot(snap => { APP_DATA.cars = []; snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.fleet = true; checkDone(); });
+                db.collection('bookings').onSnapshot(snap => { APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.bookings = true; checkDone(); });
+                db.collection('car_expenses').onSnapshot(snap => { APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() })); loaded.expenses = true; checkDone(); });
+                db.collection('customers').onSnapshot(snap => { APP_DATA.customers = []; snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() })); populateClientList(); loaded.customers = true; checkDone(); });
             });
         }
 
         // --- 3. UTILITIES & HELPERS ---
         function showToast(msg) {
             let t = document.getElementById('custom-toast');
-            if(!t) {
-                t = document.createElement('div'); t.id = 'custom-toast';
-                t.style.cssText = 'position:fixed; bottom:30px; right:30px; background:var(--primary); color:white; padding:15px 25px; border-radius:8px; z-index:9999999; box-shadow:0 10px 30px rgba(0,0,0,0.5); font-weight:bold; transition:0.3s; transform:translateY(100px); opacity:0;';
-                document.body.appendChild(t);
-            }
+            if(!t) { t = document.createElement('div'); t.id = 'custom-toast'; t.style.cssText = 'position:fixed; bottom:30px; right:30px; background:var(--primary); color:white; padding:15px 25px; border-radius:8px; z-index:9999999; box-shadow:0 10px 30px rgba(0,0,0,0.5); font-weight:bold; transition:0.3s; transform:translateY(100px); opacity:0;'; document.body.appendChild(t); }
             t.innerText = msg; t.style.transform = 'translateY(0)'; t.style.opacity = '1';
             setTimeout(() => { t.style.transform = 'translateY(100px)'; t.style.opacity = '0'; }, 3000);
         }
@@ -860,7 +831,7 @@
             for (let sk of searchKeys) {
                 const target = sk.toLowerCase().trim();
                 const foundKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
-                if (foundKey && obj[foundKey]) return String(obj[foundKey]).trim();
+                if (foundKey && obj[foundKey] != null) return String(obj[foundKey]).trim();
             }
             return "";
         }
@@ -878,12 +849,27 @@
             return "#2ecc71"; // Default
         }
 
-        // --- 4. ROUTING ---
+        // --- 4. CRM DATALIST & ROUTING ---
+        function populateClientList() {
+            let list = document.getElementById('client-list');
+            if(!list) { list = document.createElement('datalist'); list.id = 'client-list'; document.body.appendChild(list); }
+            list.innerHTML = '';
+            const sortedClients = [...APP_DATA.customers].sort((a, b) => String(a['الاسم الأول']||'').localeCompare(String(b['الاسم الأول']||'')));
+            sortedClients.forEach(c => {
+                const fullName = `${c['الاسم الأول'] || ''} ${c['الاسم الأخير'] || ''}`.trim();
+                if(fullName) {
+                    let opt = document.createElement('option');
+                    opt.value = `${fullName} | ${c['رقم جواز السفر'] || c['الرقم القومى'] || ''}`;
+                    opt.setAttribute('data-id', c.id);
+                    list.appendChild(opt);
+                }
+            });
+        }
+
         function route(viewId, btnEl = null) {
             document.getElementById('global-rates-panel').style.display = 'flex'; 
             document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.side-item, .top-btn').forEach(el => el.classList.remove('active'));
-            
             document.getElementById(`view-${viewId}`).style.display = 'block';
             if(btnEl) btnEl.classList.add('active');
 
@@ -910,23 +896,55 @@
             for (let i = 0; i < rows.length; i++) { rows[i].style.display = rows[i].innerText.toLowerCase().includes(filter) ? "" : "none"; }
         }
 
-        // --- 5. UNIVERSAL EDIT MODAL ENGINE (FULL DATABASE UI) ---
-        function openQuickModal(type, id) {
-            const m = document.getElementById('quick-modal');
-            const title = document.getElementById('qm-title');
-            const body = document.getElementById('qm-body');
-            const footer = document.getElementById('qm-footer');
+        // --- 5. TOOLTIPS & DRAGGING ---
+        function initDragScroll() {
+            const sliders = document.querySelectorAll('.drag-scroll');
+            let isDown = false; let startX; let scrollLeft;
+            sliders.forEach(slider => {
+                slider.addEventListener('mousedown', (e) => { isDown = true; sliders.forEach(s => s.style.cursor = 'grabbing'); startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; });
+                slider.addEventListener('mouseleave', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
+                slider.addEventListener('mouseup', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
+                slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 1.5; sliders.forEach(s => s.scrollLeft = scrollLeft - walk); });
+                slider.addEventListener('scroll', (e) => { sliders.forEach(s => { if (s !== slider) s.scrollLeft = slider.scrollLeft; }); });
+            });
+        }
+        function scrollToToday() { const targetPx = (T_WIDTH_PX * 0.3333) - 250; document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx); }
 
-            let content = '';
-            let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
+        function showGanttTooltip(e, encodedHTML) {
+            let t = document.getElementById('global-tooltip');
+            if(!t) { t = document.createElement('div'); t.id = 'global-tooltip'; document.body.appendChild(t); }
+            t.innerHTML = decodeURIComponent(encodedHTML); t.style.visibility = 'visible'; t.style.opacity = '1';
+            moveGanttTooltip(e);
+        }
+
+        function moveGanttTooltip(e) {
+            let t = document.getElementById('global-tooltip');
+            if (t && t.style.visibility === 'visible') {
+                let tWidth = t.offsetWidth || 250; let tHeight = t.offsetHeight || 150;
+                let x = e.clientX + 15; let y = e.clientY + 15;
+                if (x + tWidth > window.innerWidth - 20) x = e.clientX - tWidth - 15;
+                if (y + tHeight > window.innerHeight - 20) y = e.clientY - tHeight - 15;
+                t.style.left = x + 'px'; t.style.top = y + 'px';
+            }
+        }
+        function hideGanttTooltip() { let t = document.getElementById('global-tooltip'); if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; } }
+
+        document.addEventListener('mouseover', function(e) {
+            let bar = e.target.closest('.gantt-bar');
+            if (bar && bar.hasAttribute('data-info')) showGanttTooltip(e, bar.getAttribute('data-info'));
+        });
+        document.addEventListener('mousemove', function(e) { let bar = e.target.closest('.gantt-bar'); if (bar) moveGanttTooltip(e); });
+        document.addEventListener('mouseout', function(e) { let bar = e.target.closest('.gantt-bar'); if (bar) hideGanttTooltip(); });
+
+        // --- 6. UNIVERSAL EDIT MODAL ENGINE (FULL DATABASE UI) ---
+        function openQuickModal(type, id) {
+            const m = document.getElementById('quick-modal'); const title = document.getElementById('qm-title');
+            const body = document.getElementById('qm-body'); const footer = document.getElementById('qm-footer');
+            let content = ''; let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button><button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
 
             if(type === 'order') {
                 const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {};
-                const total = parseCurrency(b['إجمالي المستحق (Total)']);
-                const paid = parseCurrency(b['المدفوع EGP']);
-                const debt = Math.max(0, total - paid);
-                
+                const total = parseCurrency(b['إجمالي المستحق (Total)']); const paid = parseCurrency(b['المدفوع EGP']); const debt = Math.max(0, total - paid);
                 title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--success);"></i> <span>Financials & Status (Order #${id})</span>`;
                 content = `
                     <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
@@ -935,7 +953,6 @@
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Paid:</span> <b style="color:var(--success);">${paid.toLocaleString()} EGP</b></div>
                         <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:5px; margin-top:5px;"><span style="color:#aaa;">Remaining Debt:</span> <b style="color:var(--danger); font-size:16px;">${debt.toLocaleString()} EGP</b></div>
                     </div>
-                    
                     <div style="border:1px solid var(--glass-border); padding:15px; border-radius:8px; margin-bottom:15px; background:rgba(15,20,25,0.8);">
                         <div style="color:var(--primary); font-size:12px; font-weight:bold; margin-bottom:10px; text-transform:uppercase;">AMOUNT RECEIVED NOW (Add Payment)</div>
                         <div class="grid-4" style="gap:10px; margin-bottom:0;">
@@ -945,21 +962,11 @@
                             <div><label style="font-size:10px; color:#aaa;">Card / Online</label><input type="number" class="contract-input" placeholder="0"></div>
                         </div>
                     </div>
-                    
                     <div class="grid-2">
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label>
-                            <select class="contract-input"><option>Active (نشط)</option><option>Closed (مكتمل)</option><option>Cancelled (ملغي)</option></select>
-                        </div>
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Notes / Disputes</label>
-                            <input type="text" class="contract-input" placeholder="Add payment/dispute notes..." value="${b['ملاحظات'] || ''}">
-                        </div>
+                        <div><label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label><select class="contract-input"><option>Active (نشط)</option><option>Closed (مكتمل)</option><option>Cancelled (ملغي)</option></select></div>
+                        <div><label style="color:var(--primary); font-size:12px; font-weight:bold;">Notes / Disputes</label><input type="text" class="contract-input" placeholder="Add payment/dispute notes..." value="${b['ملاحظات'] || ''}"></div>
                     </div>`;
-                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-pay" onclick="showToast('Phase 3: Payment Logged!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
-            
+                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button><button class="modal-btn modal-btn-pay" onclick="showToast('Phase 3: Payment Logged!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button><button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
             } else if (type === 'client') {
                 const c = APP_DATA.customers.find(x => String(x.id) === String(id) || String(x['الرقم القومى']) === String(id)) || {};
                 title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>Client Profile (ملف العميل)</span>`;
@@ -976,11 +983,7 @@
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Driver License</label><input type="text" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Address</label><input type="text" class="contract-input" value="${c['العنوان'] || ''}"></div>
                     </div>
-                    <div style="margin-bottom:5px;">
-                        <label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Info</label>
-                        <input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes...">
-                    </div>`;
-            
+                    <div style="margin-bottom:5px;"><label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Info</label><input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes..."></div>`;
             } else if (type === 'car') {
                 const car = APP_DATA.cars.find(x => String(x.id) === String(id)) || {};
                 let carName = `${getSafeVal(car, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(car, ['الطراز', 'Model'])}`.trim() || 'Unknown';
@@ -996,65 +999,34 @@
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">VIN / Chassis</label><input type="text" class="contract-input" value="${getSafeVal(car, ['VIN', 'رقم الشاسيه'])}"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Motor No.</label><input type="text" class="contract-input" value="${getSafeVal(car, ['Motor', 'رقم الموتور'])}"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label>
-                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>حوادث (Accident)</option></select>
-                        </div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label><select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>حوادث (Accident)</option></select></div>
                     </div>
                     <div class="grid-2" style="margin-bottom:10px;">
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">License Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Insurance Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}"></div>
                     </div>
-                    <div style="margin-bottom:5px;">
-                        <label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label>
-                        <input type="text" class="contract-input" style="border-color:var(--danger);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc...">
-                    </div>`;
+                    <div style="margin-bottom:5px;"><label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label><input type="text" class="contract-input" style="border-color:var(--danger);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc..."></div>`;
             }
-
-            body.innerHTML = content;
-            footer.innerHTML = buttons;
-            m.classList.add('show');
+            body.innerHTML = content; footer.innerHTML = buttons; m.classList.add('show');
         }
+        function closeQuickModal(e) { if(e && e.target.id !== 'quick-modal') return; document.getElementById('quick-modal').classList.remove('show'); }
 
-        function closeQuickModal(e) {
-            if(e && e.target.id !== 'quick-modal') return;
-            document.getElementById('quick-modal').classList.remove('show');
-        }
-
-        // --- 6. MASTER FLEET RADAR ---
+        // --- 7. MASTER FLEET RADAR ---
         function buildRadar() {
-            const body = document.getElementById('radar-body');
-            if(!body) return;
-            body.innerHTML = '';
-            
-            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
-            const nowMs = now.getTime();
+            const body = document.getElementById('radar-body'); if(!body) return; body.innerHTML = '';
+            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })); const nowMs = now.getTime();
             const filter = document.getElementById('radar-status-filter').value;
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
-
-            const T_START = nowMs - (30 * 24 * 60 * 60 * 1000);
-            const T_END = nowMs + (60 * 24 * 60 * 60 * 1000);
-            const T_TOTAL_MS = T_END - T_START;
+            const T_START = nowMs - (30 * 24 * 60 * 60 * 1000); const T_END = nowMs + (60 * 24 * 60 * 60 * 1000); const T_TOTAL_MS = T_END - T_START;
 
             let axisHTML = `<div style="position:absolute; top:0; left:0; width:100%; height:16px; border-bottom:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.5); z-index:1;">`;
-            for(let i=0; i<=90; i+=5) {
-                let pct = (i / 90) * 100;
-                let d = new Date(T_START + (i * 86400000));
-                axisHTML += `<div style="position:absolute; left:${pct}%; top:2px; font-size:9px; color:#aaa; border-left:1px solid rgba(255,255,255,0.3); padding-left:4px;">${d.toLocaleDateString('en-GB', {month:'short', day:'numeric'})}</div>`;
-            }
+            for(let i=0; i<=90; i+=5) { let pct = (i / 90) * 100; let d = new Date(T_START + (i * 86400000)); axisHTML += `<div style="position:absolute; left:${pct}%; top:2px; font-size:9px; color:#aaa; border-left:1px solid rgba(255,255,255,0.3); padding-left:4px;">${d.toLocaleDateString('en-GB', {month:'short', day:'numeric'})}</div>`; }
             axisHTML += `</div>`;
 
-            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:30px; border:none;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">`;
-            headerTimeline += `${axisHTML}<div class="live-time-pointer" style="left:33.33%;"><div class="live-time-label">LIVE</div></div></div></div>`;
-            
-            const radarTable = document.querySelector('#view-radar .data-table');
-            if (radarTable) radarTable.classList.add('radar-fixed-table');
+            let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:30px; border:none;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left:33.33%;"><div class="live-time-label">LIVE</div></div></div></div>`;
+            const radarTable = document.querySelector('#view-radar .data-table'); if (radarTable) radarTable.classList.add('radar-fixed-table');
 
-            document.getElementById('radar-head').innerHTML = `<tr>
-                <th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th>
-                <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                <th style="width: 48%; text-align: center; padding:5px 0;"><div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>${headerTimeline}</th>
-                <th style="width: 17%;">Assignment Info</th>
-            </tr>`;
+            document.getElementById('radar-head').innerHTML = `<tr><th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th><th style="width: 10%; text-align: center;">الحالة (Status)</th><th style="width: 48%; text-align: center; padding:5px 0;"><div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>${headerTimeline}</th><th style="width: 17%;">Assignment Info</th></tr>`;
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
@@ -1066,16 +1038,14 @@
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
                 
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
-                let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
-                let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
+                let cYear = getSafeVal(c, ['سنة الصنع', 'Year']); let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 
                 const carHTML = `<div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')"><span>${carName} (${cYear}) ${fullPlate} [${c.id}]</span><div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div></div>`;
 
                 let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id));
                 carBookings.sort((a,b) => new Date(a['بداية التعاقد']).getTime() - new Date(b['بداية التعاقد']).getTime());
 
-                let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)";
-                let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
+                let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)"; let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
                 let currentActiveBooking = null, nextFutureBooking = null;
 
                 for (let b of carBookings) {
@@ -1124,42 +1094,18 @@
                             if (((bStart - nowMs) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
                             else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending (Unpaid)"; }
                             else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
-                        } else { barClass = "status-ready"; statusTxt = "Archived"; }
+                        } else { barClass = "status-ready"; statusTxt = "Archived (Past)"; }
 
-                        let topOffset = "14px"; 
-                        if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
-                            if(barClass === "status-paid") topOffset = "4px"; else topOffset = "24px";
-                        }
-                        occupiedLevels.push(renderEnd); 
+                        let topOffset = "14px"; if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) { if(barClass === "status-paid") topOffset = "4px"; else topOffset = "24px"; } occupiedLevels.push(renderEnd); 
 
-                        let hoverText = `
-                            <div style="text-align:right; font-family:'Cairo', sans-serif;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa;'>Order #${b.id}</span></div>
-                                <b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br><span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span><hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="margin-bottom:6px;"><span style="color:#888;">من:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
-                                <div style="margin-bottom:10px;"><span style="color:#888;">إلى:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
-                                <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
-                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888;">المتبقي:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b></div>
-                                </div>
-                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">الوديعة:</span> <b>${depBadge}</b></div>
-                                <div style="display:flex; justify-content:space-between;"><span style="color:#888;">التأمين:</span> <b style="color:white">${insPack}</b></div>
-                            </div>`;
-
+                        let hoverText = `<div style="text-align:right; font-family:'Cairo', sans-serif;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa;'>Order #${b.id}</span></div><b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br><span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span><hr style='border:none; border-top:1px solid #444; margin:10px 0;'><div style="margin-bottom:6px;"><span style="color:#888;">من:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div><div style="margin-bottom:10px;"><span style="color:#888;">إلى:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div><div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div><div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888;">المتبقي:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b></div></div><hr style='border:none; border-top:1px solid #444; margin:10px 0;'><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">الوديعة:</span> <b>${depBadge}</b></div><div style="display:flex; justify-content:space-between;"><span style="color:#888;">التأمين:</span> <b style="color:white">${insPack}</b></div></div>`;
                         timelineHTML += `<div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" data-info="${encodeURIComponent(hoverText).replace(/'/g, "%27")}" onclick="openQuickModal('order', '${b.id}')"></div>`;
                     }
                 }
                 timelineHTML += `</div></div>`;
 
                 const row = body.insertRow();
-                row.innerHTML = `
-                    <td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td>
-                    <td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}" style="width:100%; display:block; box-sizing:border-box;">${masterStatusText}</span></td>
-                    <td style="padding: 10px 15px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td>
-                    <td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>
-                `;
+                row.innerHTML = `<td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td><td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}" style="width:100%; display:block; box-sizing:border-box;">${masterStatusText}</span></td><td style="padding: 10px 15px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td><td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>`;
             });
 
             if(document.getElementById('ct-ready')) document.getElementById('ct-ready').innerText = counts.ready; 
@@ -1168,67 +1114,44 @@
             if(document.getElementById('ct-back')) document.getElementById('ct-back').innerText = counts.back;
             if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
             
-            initDragScroll(); 
-            setTimeout(scrollToToday, 50); 
+            initDragScroll(); setTimeout(scrollToToday, 50); 
         }
 
-        // --- 7. ORDER BOOK ---
+        // --- 8. ORDER BOOK ---
         function buildOrderBook() {
-            const body = document.getElementById('orders-body');
-            const periodFilter = document.getElementById('order-period-filter').value;
-            const now = new Date();
-            body.innerHTML = '';
-            
+            const body = document.getElementById('orders-body'); const periodFilter = document.getElementById('order-period-filter').value; const now = new Date(); body.innerHTML = '';
             APP_DATA.bookings.forEach(b => {
                 if(!b['بداية التعاقد']) return;
                 const start = new Date(b['بداية التعاقد']);
-                
                 if (periodFilter === 'this_month' && (start.getMonth() !== now.getMonth() || start.getFullYear() !== now.getFullYear())) return;
                 if (periodFilter === 'last_month') { const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1); if (start.getMonth() !== lastMonth.getMonth() || start.getFullYear() !== lastMonth.getFullYear()) return; }
                 if (periodFilter === 'this_year' && start.getFullYear() !== now.getFullYear()) return;
 
-                const isLegacy = start.getFullYear() < 2026;
-                const total = parseCurrency(b['إجمالي المستحق (Total)']);
-                let paid = parseCurrency(b['المدفوع EGP']);
+                const isLegacy = start.getFullYear() < 2026; const total = parseCurrency(b['إجمالي المستحق (Total)']); let paid = parseCurrency(b['المدفوع EGP']);
                 let statusBadge = isLegacy ? '<span class="badge bg-green">LEGACY CLOSED</span>' : (paid >= total ? '<span class="badge bg-green">PAID</span>' : '<span class="badge bg-orange">PENDING</span>');
                 if(isLegacy) paid = total;
 
                 const row = body.insertRow();
-                row.innerHTML = `<td><b class="clickable-obj" onclick="openQuickModal('order', '${b.id}')">#${b.id}</b></td><td class="clickable-obj" style="color:var(--accent); font-weight:600;" onclick="openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</td><td class="clickable-obj" onclick="openQuickModal('car', '${b['كود السيارة']}')">Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
+                row.innerHTML = `<td><b class="clickable-obj" onclick="openQuickModal('order', '${b.id}')">#${b.id}</b></td><td class="clickable-obj" style="color:var(--accent); font-weight:600;" onclick="openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل'] || '-'}</td><td class="clickable-obj" onclick="openQuickModal('car', '${b['كود السيارة']}')">Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
             });
         }
 
-        // --- 8. VEHICLE 360 (MULTI-SELECT & LEDGER) ---
+        // --- 9. VEHICLE 360 MULTI-SELECT & LEDGER ---
         let selectedV360Cars = new Set();
         let activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
 
         function toggleV360Dropdown() { document.getElementById('v360-dropdown').classList.toggle('show'); }
-        document.addEventListener('click', function(event) {
-            const container = document.getElementById('v360-container');
-            if (container && !container.contains(event.target)) {
-                const drop = document.getElementById('v360-dropdown');
-                if(drop) drop.classList.remove('show');
-            }
-        });
+        document.addEventListener('click', function(event) { const container = document.getElementById('v360-container'); if (container && !container.contains(event.target)) { const drop = document.getElementById('v360-dropdown'); if(drop) drop.classList.remove('show'); } });
 
         function initV360Chips() {
-            const track = document.getElementById('v360-chip-track');
-            if (!track || track.children.length > 0) return; 
-            
-            track.innerHTML = ''; 
-            selectedV360Cars.clear();
+            const track = document.getElementById('v360-chip-track'); if (!track || track.children.length > 0) return; 
+            track.innerHTML = ''; selectedV360Cars.clear();
 
-            let allChip = document.createElement('div');
-            allChip.className = 'fleet-chip active';
-            allChip.id = 'v360-chip-all';
-            allChip.innerHTML = `<i class="fa-solid fa-car-side"></i> All Fleet (الكل)`;
-            allChip.onclick = () => toggleV360Car('all');
-            track.appendChild(allChip);
+            let allChip = document.createElement('div'); allChip.className = 'fleet-chip active'; allChip.id = 'v360-chip-all'; allChip.innerHTML = `<i class="fa-solid fa-car-side"></i> All Fleet (الكل)`; allChip.onclick = () => toggleV360Car('all'); track.appendChild(allChip);
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
-
                 selectedV360Cars.add(String(c.id)); 
 
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
@@ -1236,311 +1159,145 @@
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
 
-                let carNameAr = `${getSafeVal(c, ['النوع', 'الماركة'])} ${getSafeVal(c, ['الطراز'])}`.trim();
-                let carNameEn = `${getSafeVal(c, ['Type'])} ${getSafeVal(c, ['Model'])}`.trim();
-                let carName = carNameAr || carNameEn || 'Unknown';
-                let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
-                
+                let carNameAr = `${getSafeVal(c, ['النوع', 'الماركة'])} ${getSafeVal(c, ['الطراز'])}`.trim(); let carNameEn = `${getSafeVal(c, ['Type'])} ${getSafeVal(c, ['Model'])}`.trim();
+                let carName = carNameAr || carNameEn || 'Unknown'; let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 let searchIndex = `${carNameAr} ${carNameEn} ${nums} ${lets} ${c.id}`.toLowerCase();
 
-                let div = document.createElement('div');
-                div.className = 'fleet-chip active v360-car-chip';
-                div.setAttribute('data-id', String(c.id));
-                div.setAttribute('data-search', searchIndex);
+                let div = document.createElement('div'); div.className = 'fleet-chip active v360-car-chip'; div.setAttribute('data-id', String(c.id)); div.setAttribute('data-search', searchIndex);
                 div.innerHTML = `<div class="color-dot" style="background:${colorHex}; width:12px; height:12px; border:none;"></div> <span dir="ltr">${carName} | ${fullPlate}</span>`;
-                div.onclick = () => toggleV360Car(String(c.id), div);
-                track.appendChild(div);
+                div.onclick = () => toggleV360Car(String(c.id), div); track.appendChild(div);
             });
-            
-            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
-            document.getElementById('v360-year').value = now.getFullYear();
-            document.getElementById('v360-month').value = (now.getMonth() + 1).toString();
+            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })); document.getElementById('v360-year').value = now.getFullYear(); document.getElementById('v360-month').value = (now.getMonth() + 1).toString();
             buildV360();
         }
 
         function filterV360Cars() {
-            const filter = document.getElementById('v360-text-search').value.toLowerCase().trim();
-            const chips = document.querySelectorAll('.v360-car-chip');
-            if(filter === "") {
-                chips.forEach(chip => chip.style.display = "flex");
-                document.getElementById('v360-chip-all').style.display = "flex";
-            } else {
-                document.getElementById('v360-chip-all').style.display = "none";
-                chips.forEach(chip => {
-                    const text = chip.getAttribute('data-search');
-                    chip.style.display = text.includes(filter) ? "flex" : "none";
-                });
-            }
+            const filter = document.getElementById('v360-text-search').value.toLowerCase().trim(); const chips = document.querySelectorAll('.v360-car-chip');
+            if(filter === "") { chips.forEach(chip => chip.style.display = "flex"); document.getElementById('v360-chip-all').style.display = "flex"; } 
+            else { document.getElementById('v360-chip-all').style.display = "none"; chips.forEach(chip => { const text = chip.getAttribute('data-search'); chip.style.display = text.includes(filter) ? "flex" : "none"; }); }
             buildV360(); 
         }
 
         function toggleV360Car(id, element) {
             if (id === 'all') {
                 const isAllActive = document.getElementById('v360-chip-all').classList.contains('active');
-                if (isAllActive) {
-                    document.getElementById('v360-chip-all').classList.remove('active');
-                    document.querySelectorAll('.v360-car-chip').forEach(el => el.classList.remove('active'));
-                    selectedV360Cars.clear();
-                } else {
-                    document.getElementById('v360-chip-all').classList.add('active');
-                    document.querySelectorAll('.v360-car-chip').forEach(el => { el.classList.add('active'); selectedV360Cars.add(String(el.getAttribute('data-id'))); });
-                }
+                if (isAllActive) { document.getElementById('v360-chip-all').classList.remove('active'); document.querySelectorAll('.v360-car-chip').forEach(el => el.classList.remove('active')); selectedV360Cars.clear(); } 
+                else { document.getElementById('v360-chip-all').classList.add('active'); document.querySelectorAll('.v360-car-chip').forEach(el => { el.classList.add('active'); selectedV360Cars.add(String(el.getAttribute('data-id'))); }); }
             } else {
                 element.classList.toggle('active');
-                if (selectedV360Cars.has(String(id))) selectedV360Cars.delete(String(id));
-                else selectedV360Cars.add(String(id));
-                
+                if (selectedV360Cars.has(String(id))) selectedV360Cars.delete(String(id)); else selectedV360Cars.add(String(id));
                 const totalCars = document.querySelectorAll('.v360-car-chip').length;
-                if (selectedV360Cars.size === totalCars) document.getElementById('v360-chip-all').classList.add('active');
-                else document.getElementById('v360-chip-all').classList.remove('active');
+                if (selectedV360Cars.size === totalCars) document.getElementById('v360-chip-all').classList.add('active'); else document.getElementById('v360-chip-all').classList.remove('active');
             }
             buildV360();
         }
 
-        function toggleV360KPI(typeCode, element) {
-            element.classList.toggle('inactive');
-            if (activeV360Types.has(typeCode)) activeV360Types.delete(typeCode);
-            else activeV360Types.add(typeCode);
-            buildV360();
-        }
+        function toggleV360KPI(typeCode, element) { element.classList.toggle('inactive'); if (activeV360Types.has(typeCode)) activeV360Types.delete(typeCode); else activeV360Types.add(typeCode); buildV360(); }
 
         function resetV360Filters() {
-            document.getElementById('v360-text-search').value = "";
-            filterV360Cars();
-            document.querySelectorAll('.kpi-filter').forEach(el => el.classList.remove('inactive'));
-            activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
-            
-            document.getElementById('v360-chip-all').classList.add('active');
-            document.querySelectorAll('.v360-car-chip').forEach(el => { el.classList.add('active'); selectedV360Cars.add(String(el.getAttribute('data-id'))); });
+            document.getElementById('v360-text-search').value = ""; filterV360Cars(); document.querySelectorAll('.kpi-filter').forEach(el => el.classList.remove('inactive')); activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
+            document.getElementById('v360-chip-all').classList.add('active'); document.querySelectorAll('.v360-car-chip').forEach(el => { el.classList.add('active'); selectedV360Cars.add(String(el.getAttribute('data-id'))); });
             buildV360();
         }
 
         function buildV360() {
-            const monthFilter = document.getElementById('v360-month').value; 
-            const yearFilter = parseInt(document.getElementById('v360-year').value);
-            const searchStr = document.getElementById('v360-text-search').value.toLowerCase().trim();
-            const body = document.getElementById('v360-body'); body.innerHTML = '';
-            
+            const monthFilter = document.getElementById('v360-month').value; const yearFilter = parseInt(document.getElementById('v360-year').value); const searchStr = document.getElementById('v360-text-search').value.toLowerCase().trim(); const body = document.getElementById('v360-body'); body.innerHTML = '';
             let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiMaint = 0, kpiDocs = 0, kpiOther = 0, timeline = [];
 
-            if (selectedV360Cars.size === 0) {
-                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">الرجاء تحديد سيارة واحدة على الأقل من القائمة بالأعلى.</td></tr>`;
-                return;
-            }
+            if (selectedV360Cars.size === 0) { body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">الرجاء تحديد سيارة واحدة على الأقل من القائمة بالأعلى. (Select at least one vehicle)</td></tr>`; return; }
 
             const isDateInFilter = (dateStr) => {
-                if(!dateStr) return false;
-                const d = new Date(dateStr); if(isNaN(d)) return false;
+                if(!dateStr) return false; const d = new Date(dateStr); if(isNaN(d)) return false;
                 if(yearFilter && d.getFullYear() !== yearFilter) return false;
                 if(monthFilter !== 'all' && (d.getMonth() + 1) !== parseInt(monthFilter)) return false;
                 return true;
             };
 
             const getCarDisplay = (cid) => {
-                const c = APP_DATA.cars.find(x => String(x.id) === String(cid));
-                if(!c) return `<span style="color:#888;">[ID: ${cid}]</span>`;
+                const c = APP_DATA.cars.find(x => String(x.id) === String(cid)); if(!c) return `<span style="color:#888;">[ID: ${cid}]</span>`;
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
-                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
-                let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
-                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Vehicle';
-                let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
-                
-                return `<div class="clickable-obj" onclick="openQuickModal('car', '${c.id}')" style="display:flex; flex-direction:column; align-items:flex-end;">
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="color:white; font-weight:bold; font-size:13px;">${carName}</span>
-                                <div class="color-dot" style="background:${colorHex}; width:10px; height:10px;"></div>
-                            </div>
-                            <span style="color:var(--accent); font-size:11px; margin-top:2px;" dir="ltr">${fullPlate} [${c.id}]</span>
-                        </div>`;
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" "); let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Vehicle'; let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
+                return `<div class="clickable-obj" onclick="openQuickModal('car', '${c.id}')" style="display:flex; flex-direction:column; align-items:flex-end;"><div style="display:flex; align-items:center; gap:6px;"><span style="color:white; font-weight:bold; font-size:13px;">${carName}</span><div class="color-dot" style="background:${colorHex}; width:10px; height:10px;"></div></div><span style="color:var(--accent); font-size:11px; margin-top:2px;" dir="ltr">${fullPlate} [${c.id}]</span></div>`;
             };
 
             APP_DATA.bookings.forEach(b => {
-                const cid = String(b['كود السيارة']);
-                if(!selectedV360Cars.has(cid)) return; 
-                const startDate = b['بداية التعاقد']?.split(' ')[0];
-                if(!isDateInFilter(startDate)) return;
+                const cid = String(b['كود السيارة']); if(!selectedV360Cars.has(cid)) return; 
+                const startDate = b['بداية التعاقد']?.split(' ')[0]; if(!isDateInFilter(startDate)) return;
+                const searchData = `${b['اسم العميل']} ${b.id} ${b['كود العميل']}`.toLowerCase(); if(searchStr && !searchData.includes(searchStr)) return;
 
-                const searchData = `${b['اسم العميل']} ${b.id} ${b['كود العميل']}`.toLowerCase();
-                if(searchStr && !searchData.includes(searchStr)) return;
+                const total = parseCurrency(b['إجمالي المستحق (Total)']); const paid = parseCurrency(b['المدفوع EGP']); const debt = Math.max(0, total - paid); const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
+                const insPack = getSafeVal(b, ['نوع التأمين', 'Insurance Package']) || 'Basic'; const baseRent = parseCurrency(b['الايجار اليومى']); const extras = parseCurrency(b['إضافات أخري (ملاّك)']);
 
-                const total = parseCurrency(b['إجمالي المستحق (Total)']); 
-                const paid = parseCurrency(b['المدفوع EGP']);
-                const debt = Math.max(0, total - paid);
-                const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
-                
-                const insPack = getSafeVal(b, ['نوع التأمين', 'Insurance Package']) || 'Basic';
-                const baseRent = parseCurrency(b['الايجار اليومى']);
-                const extras = parseCurrency(b['إضافات أخري (ملاّك)']);
-
-                let hoverText = `
-                    <div style="text-align:right; font-family:'Cairo', sans-serif;">
-                        <b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b><hr style="margin:8px 0; border-top:1px solid #444;">
-                        <div style="margin-bottom:4px;"><span style="color:#888;">العميل:</span> <b style="color:white">${b['اسم العميل']}</b></div>
-                        <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333; margin-top:10px;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b></div>
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
-                            <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b></div>
-                        </div>
-                        <div style="margin-top:10px; font-size:11px; color:#aaa;">
-                            <div><span style="color:#888;">قيمة الإيجار:</span> ${baseRent.toLocaleString()} EGP/Day</div>
-                            <div><span style="color:#888;">باقة التأمين:</span> ${insPack}</div>
-                            <div><span style="color:#888;">إضافات أخرى:</span> ${extras.toLocaleString()} EGP</div>
-                        </div>
-                    </div>`;
+                let hoverText = `<div style="text-align:right; font-family:'Cairo', sans-serif;"><b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b><hr style="margin:8px 0; border-top:1px solid #444;"><div style="margin-bottom:4px;"><span style="color:#888;">العميل:</span> <b style="color:white">${b['اسم العميل']}</b></div><div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333; margin-top:10px;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b></div><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div><div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b></div></div><div style="margin-top:10px; font-size:11px; color:#aaa;"><div><span style="color:#888;">قيمة الإيجار:</span> ${baseRent.toLocaleString()} EGP/Day</div><div><span style="color:#888;">باقة التأمين:</span> ${insPack}</div><div><span style="color:#888;">إضافات أخرى:</span> ${extras.toLocaleString()} EGP</div></div></div>`;
                 const infoIcon = `<i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px; margin-left:8px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText).replace(/'/g, "%27")}')" onmouseleave="hideGanttTooltip()"></i>`;
 
-                if (paid > 0) {
-                    kpiRev += paid;
-                    if(activeV360Types.has('income')) {
-                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
-                    }
-                }
-                if (debt > 0) {
-                    kpiDebt += debt;
-                    if(activeV360Types.has('debt')) {
-                        timeline.push({ typeCode: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--danger)" onclick="openQuickModal('order', '${b.id}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b><div style="display:flex; gap:10px;"><button class="clickable-obj" onclick="openQuickModal('order', '${b.id}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>${infoIcon}</div></div>` });
-                    }
-                }
-                if (deposit > 0) {
-                    kpiDep += deposit;
-                    if(activeV360Types.has('deposit')) {
-                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
-                    }
-                }
+                if (paid > 0) { kpiRev += paid; if(activeV360Types.has('income')) { timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` }); } }
+                if (debt > 0) { kpiDebt += debt; if(activeV360Types.has('debt')) { timeline.push({ typeCode: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--danger)" onclick="openQuickModal('order', '${b.id}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b><div style="display:flex; gap:10px;"><button class="clickable-obj" onclick="openQuickModal('order', '${b.id}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>${infoIcon}</div></div>` }); } }
+                if (deposit > 0) { kpiDep += deposit; if(activeV360Types.has('deposit')) { timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` }); } }
             });
 
             APP_DATA.car_expenses.forEach(e => {
-                const cid = String(e['كود السيارة'] || e['كود السيارة\r'] || "").trim();
-                if(!selectedV360Cars.has(cid)) return;
-                let dateStr = e.Date || `${e['سنة']}-${String(e['شهر']).padStart(2,'0')}-${String(e['يوم']).padStart(2,'0')}`;
-                if(!isDateInFilter(dateStr)) return;
-
-                const details = String(e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || "").toLowerCase();
-                if(searchStr && !details.includes(searchStr)) return;
+                const cid = String(e['كود السيارة'] || e['كود السيارة\r'] || "").trim(); if(!selectedV360Cars.has(cid)) return;
+                let dateStr = e.Date || `${e['سنة']}-${String(e['شهر']).padStart(2,'0')}-${String(e['يوم']).padStart(2,'0')}`; if(!isDateInFilter(dateStr)) return;
+                const details = String(e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || "").toLowerCase(); if(searchStr && !details.includes(searchStr)) return;
 
                 const amt = parseCurrency(e['قيمة المصروف']); 
-                let isMaint = details.includes('صيانة') || details.includes('غيار') || details.includes('زيت');
-                let isDoc = details.includes('تأمين') || details.includes('رخصة') || details.includes('مخالفات') || details.includes('مرور');
-                
+                let isMaint = details.includes('صيانة') || details.includes('غيار') || details.includes('زيت'); let isDoc = details.includes('تأمين') || details.includes('رخصة') || details.includes('مخالفات') || details.includes('مرور');
                 let badge, amtColor, tCode;
-                if(isMaint) { kpiMaint += amt; badge = `<span class="badge bg-red">MAINTENANCE</span>`; amtColor = '#e74c3c'; tCode = 'maint'; } 
-                else if (isDoc) { kpiDocs += amt; badge = `<span class="badge" style="background:#9b59b6; color:white;">DOCS/FINES</span>`; amtColor = '#9b59b6'; tCode = 'docs'; } 
-                else { kpiOther += amt; badge = `<span class="badge" style="background:#e67e22; color:white;">OTHER EXP</span>`; amtColor = '#e67e22'; tCode = 'other'; }
+                if(isMaint) { kpiMaint += amt; badge = `<span class="badge bg-red">MAINTENANCE</span>`; amtColor = '#e74c3c'; tCode = 'maint'; } else if (isDoc) { kpiDocs += amt; badge = `<span class="badge" style="background:#9b59b6; color:white;">DOCS/FINES</span>`; amtColor = '#9b59b6'; tCode = 'docs'; } else { kpiOther += amt; badge = `<span class="badge" style="background:#e67e22; color:white;">OTHER EXP</span>`; amtColor = '#e67e22'; tCode = 'other'; }
 
-                if(activeV360Types.has(tCode)) {
-                    timeline.push({ typeCode: tCode, type: badge, date: dateStr, carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(), desc: `<span class="clickable-obj" style="color:#ddd;" onclick="openQuickModal('car', '${cid}')">${details || 'Expense Record'}</span>` });
-                }
+                if(activeV360Types.has(tCode)) { timeline.push({ typeCode: tCode, type: badge, date: dateStr, carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(), desc: `<span class="clickable-obj" style="color:#ddd;" onclick="openQuickModal('car', '${cid}')">${details || 'Expense Record'}</span>` }); }
             });
 
-            const kpiTotalExp = kpiMaint + kpiDocs + kpiOther;
-            const netCashROI = kpiRev - kpiTotalExp;
-
-            document.getElementById('v-rev').innerText = kpiRev.toLocaleString() + " EGP"; 
-            document.getElementById('v-dep').innerText = kpiDep.toLocaleString() + " EGP"; 
-            document.getElementById('v-debt').innerText = kpiDebt.toLocaleString() + " EGP"; 
-            document.getElementById('v-maint').innerText = kpiMaint.toLocaleString() + " EGP";
-            document.getElementById('v-docs').innerText = kpiDocs.toLocaleString() + " EGP";
-            document.getElementById('v-other').innerText = kpiOther.toLocaleString() + " EGP";
-            document.getElementById('v-exp').innerText = kpiTotalExp.toLocaleString() + " EGP";
-            document.getElementById('v-roi').innerText = netCashROI.toLocaleString() + " EGP";
-            document.getElementById('v-roi').style.color = netCashROI >= 0 ? '#00d2ff' : 'var(--danger)';
+            const kpiTotalExp = kpiMaint + kpiDocs + kpiOther; const netCashROI = kpiRev - kpiTotalExp;
+            document.getElementById('v-rev').innerText = kpiRev.toLocaleString() + " EGP"; document.getElementById('v-dep').innerText = kpiDep.toLocaleString() + " EGP"; document.getElementById('v-debt').innerText = kpiDebt.toLocaleString() + " EGP"; document.getElementById('v-maint').innerText = kpiMaint.toLocaleString() + " EGP"; document.getElementById('v-docs').innerText = kpiDocs.toLocaleString() + " EGP"; document.getElementById('v-other').innerText = kpiOther.toLocaleString() + " EGP"; document.getElementById('v-exp').innerText = kpiTotalExp.toLocaleString() + " EGP"; document.getElementById('v-roi').innerText = netCashROI.toLocaleString() + " EGP"; document.getElementById('v-roi').style.color = netCashROI >= 0 ? '#00d2ff' : 'var(--danger)';
 
             timeline.sort((a,b) => b.sortDate - a.sortDate);
             timeline.forEach(t => { 
-                const row = body.insertRow(); 
-                let displayAmt = t.amt > 0 ? `+${t.amt.toLocaleString()}` : `${t.amt.toLocaleString()}`;
+                const row = body.insertRow(); let displayAmt = t.amt > 0 ? `+${t.amt.toLocaleString()}` : `${t.amt.toLocaleString()}`;
                 row.innerHTML = `<td style="font-weight:bold; font-size:13px; color:#aaa; white-space:nowrap;">${t.date}</td><td>${t.type}</td><td dir="rtl" style="text-align:right; font-family:'Cairo', sans-serif;">${t.carDisplay}</td><td style="line-height:1.4;">${t.desc}</td><td style="font-weight:900; text-align:right; font-size:15px; color:${t.amtColor};">${displayAmt} <span style="font-size:10px;">EGP</span></td>`; 
             });
-            if (timeline.length === 0) body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found.</td></tr>`;
+            if (timeline.length === 0) body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found for these filters.</td></tr>`;
         }
 
-        // --- 9. CRM HUB ---
+        // --- 10. CRM & RISK RADAR ---
         function buildCRM() {
-            const body = document.getElementById('crm-body'); body.innerHTML = '';
-            const clients = {}; let totalDep = 0;
-
+            const body = document.getElementById('crm-body'); body.innerHTML = ''; const clients = {}; let totalDep = 0;
             APP_DATA.bookings.forEach(b => {
-                const name = b['اسم العميل']; if(!name) return;
-                const cid = String(b['كود العميل'] || name); 
+                const name = b['اسم العميل']; if(!name) return; const cid = String(b['كود العميل'] || name); 
                 if(!clients[cid]) clients[cid] = { name: name, trips: 0, spendEGP: 0, spendUSD: 0, deposit: 0 };
-                clients[cid].trips++; 
-                clients[cid].spendEGP += parseCurrency(b['إجمالي المستحق (Total)']); 
-                clients[cid].spendUSD += parseCurrency(b['المدفوع USD']);
-                const dep = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit'])); 
-                clients[cid].deposit += dep; totalDep += dep;
+                clients[cid].trips++; clients[cid].spendEGP += parseCurrency(b['إجمالي المستحق (Total)']); clients[cid].spendUSD += parseCurrency(b['المدفوع USD']);
+                const dep = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit'])); clients[cid].deposit += dep; totalDep += dep;
             });
-
             document.getElementById('crm-total').innerText = Object.keys(clients).length; document.getElementById('crm-dep').innerText = formatEGP(totalDep);
             Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP).forEach(([cid, data]) => {
-                const row = body.insertRow(); 
-                row.innerHTML = `<td class="clickable-obj" style="color:var(--accent); font-weight:bold;" onclick="openQuickModal('client', '${cid}')">${data.name}</td><td>${data.trips}</td><td>${formatEGP(data.spendEGP)}</td><td>$${data.spendUSD.toLocaleString()}</td><td style="color:${data.deposit > 0 ? 'var(--danger)' : 'var(--success)'}">${formatEGP(data.deposit)}</td>`;
+                const row = body.insertRow(); row.innerHTML = `<td class="clickable-obj" style="color:var(--accent); font-weight:bold;" onclick="openQuickModal('client', '${cid}')">${data.name}</td><td>${data.trips}</td><td>${formatEGP(data.spendEGP)}</td><td>$${data.spendUSD.toLocaleString()}</td><td style="color:${data.deposit > 0 ? 'var(--danger)' : 'var(--success)'}">${formatEGP(data.deposit)}</td>`;
             });
         }
 
-        // --- 10. RISK RADAR ---
         function buildRiskRadar() {
             const body = document.getElementById('risk-body'); body.innerHTML = ''; const now = new Date();
             APP_DATA.cars.forEach(c => {
                 const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 if(!contract.includes('valid') && !contract.includes('ساري')) return;
-                
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
                 const name = `<span class="clickable-obj" style="color:#00d2ff; font-weight:bold;" onclick="openQuickModal('car', '${c.id}')">#${c.id} - ${carName}</span>`;
-                
                 const checkRisk = (dateStr, type) => {
-                    if(!dateStr || dateStr.toLowerCase() === 'nan') return;
-                    const d = new Date(dateStr); if(isNaN(d)) return;
-                    const diffDays = Math.ceil((d - now) / (86400000));
-                    if(diffDays > 180) return; 
-                    let badge = '<span class="badge bg-orange">MEDIUM (3-6m)</span>';
-                    if(diffDays <= 90) badge = '<span class="badge bg-red">HIGH (0-3m)</span>';
-                    if(diffDays < 0) badge = '<span class="badge" style="background:#e74c3c; color:white;">EXPIRED</span>';
+                    if(!dateStr || dateStr.toLowerCase() === 'nan') return; const d = new Date(dateStr); if(isNaN(d)) return;
+                    const diffDays = Math.ceil((d - now) / (86400000)); if(diffDays > 180) return; 
+                    let badge = '<span class="badge bg-orange">MEDIUM (3-6m)</span>'; if(diffDays <= 90) badge = '<span class="badge bg-red">HIGH (0-3m)</span>'; if(diffDays < 0) badge = '<span class="badge" style="background:#e74c3c; color:white;">EXPIRED</span>';
                     const row = body.insertRow(); row.innerHTML = `<td>${name}</td><td style="color:#888;">${type}</td><td>${d.toLocaleDateString()}</td><td style="font-weight:bold;">${diffDays} days</td><td>${badge}</td>`;
                 };
                 checkRisk(getSafeVal(c, ['نهاية الترخيص']), 'License'); checkRisk(getSafeVal(c, ['نهاية التأمين']), 'Insurance'); checkRisk(getSafeVal(c, ['نهاية التعاقد']), 'Owner Contract');
             });
         }
 
-        // --- 11. TOOLTIPS & DRAGGING ---
-        function initDragScroll() {
-            const sliders = document.querySelectorAll('.drag-scroll');
-            let isDown = false; let startX; let scrollLeft;
-            sliders.forEach(slider => {
-                slider.addEventListener('mousedown', (e) => { isDown = true; sliders.forEach(s => s.style.cursor = 'grabbing'); startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; });
-                slider.addEventListener('mouseleave', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
-                slider.addEventListener('mouseup', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
-                slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 1.5; sliders.forEach(s => s.scrollLeft = scrollLeft - walk); });
-                slider.addEventListener('scroll', (e) => { sliders.forEach(s => { if (s !== slider) s.scrollLeft = slider.scrollLeft; }); });
-            });
-        }
-
-        function scrollToToday() { const targetPx = (T_WIDTH_PX * 0.3333) - 250; document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx); }
-
-        function showGanttTooltip(e, encodedHTML) {
-            let t = document.getElementById('global-tooltip');
-            if(!t) { t = document.createElement('div'); t.id = 'global-tooltip'; document.body.appendChild(t); }
-            t.innerHTML = decodeURIComponent(encodedHTML); t.style.visibility = 'visible'; t.style.opacity = '1';
-            moveGanttTooltip(e);
-        }
-
-        function moveGanttTooltip(e) {
-            let t = document.getElementById('global-tooltip');
-            if (t && t.style.visibility === 'visible') {
-                let tWidth = t.offsetWidth || 250; let tHeight = t.offsetHeight || 150;
-                let x = e.clientX + 15; let y = e.clientY + 15;
-                if (x + tWidth > window.innerWidth - 20) x = e.clientX - tWidth - 15;
-                if (y + tHeight > window.innerHeight - 20) y = e.clientY - tHeight - 15;
-                t.style.left = x + 'px'; t.style.top = y + 'px';
-            }
-        }
-        function hideGanttTooltip() { let t = document.getElementById('global-tooltip'); if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; } }
-
-        // --- 12. NATIVE PROPOSAL ENGINE (CRM LINKED) ---
+        // --- 11. NATIVE PROPOSAL ENGINE (CRM LINKED) ---
         function prepProposal() {
             populateClientList(); 
-            const sel = document.getElementById('prop_car');
-            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
+            const sel = document.getElementById('prop_car'); sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
@@ -1548,50 +1305,31 @@
                 let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
                 let rate = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
                 let opt = document.createElement('option'); opt.value = c.id; opt.setAttribute('data-rate', rate);
-                opt.text = `[#${c.id}] ${carName} - ${pNum} (${rate} EGP/Day)`;
-                sel.add(opt);
+                opt.text = `[#${c.id}] ${carName} - ${pNum} (${rate} EGP/Day)`; sel.add(opt);
             });
         }
 
         function autoFillPropClient() {
-            const searchVal = document.getElementById('prop_crm_search').value;
-            const list = document.getElementById('client-list');
-            let selectedId = null;
+            const searchVal = document.getElementById('prop_crm_search').value; const list = document.getElementById('client-list'); let selectedId = null;
             for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
-            if(!selectedId) return;
-            const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(!selectedId) return; const c = APP_DATA.customers.find(x => x.id === selectedId);
             if(c) {
-                document.getElementById('prop_client_id').value = c.id;
-                document.getElementById('prop_fname').value = c['الاسم الأول'] || '';
-                document.getElementById('prop_sname').value = c['الاسم الأخير'] || '';
-                document.getElementById('prop_phone').value = c['رقم التليفون'] || '';
-                document.getElementById('prop_email').value = c['عنوان البريد الإلكتروني'] || '';
+                document.getElementById('prop_client_id').value = c.id; document.getElementById('prop_fname').value = c['الاسم الأول'] || '';
+                document.getElementById('prop_sname').value = c['الاسم الأخير'] || ''; document.getElementById('prop_phone').value = c['رقم التليفون'] || ''; document.getElementById('prop_email').value = c['عنوان البريد الإلكتروني'] || '';
             }
         }
 
-        function updatePropRate() {
-            const sel = document.getElementById('prop_car');
-            if(sel.selectedIndex > 0) { document.getElementById('prop_rate').value = sel.options[sel.selectedIndex].getAttribute('data-rate'); runPropCalc(); }
-        }
-
-        function suggestPropInsFee() {
-            const plan = document.getElementById('prop_ins_pack').value; const feeInput = document.getElementById('prop_ins_fee');
-            if (plan === "Basic") feeInput.value = 0; else if (plan === "Intermediate") feeInput.value = 400; else if (plan === "Full Protection") feeInput.value = 900;
-            runPropCalc();
-        }
-
+        function updatePropRate() { const sel = document.getElementById('prop_car'); if(sel.selectedIndex > 0) { document.getElementById('prop_rate').value = sel.options[sel.selectedIndex].getAttribute('data-rate'); runPropCalc(); } }
+        function suggestPropInsFee() { const plan = document.getElementById('prop_ins_pack').value; const feeInput = document.getElementById('prop_ins_fee'); if (plan === "Basic") feeInput.value = 0; else if (plan === "Intermediate") feeInput.value = 400; else if (plan === "Full Protection") feeInput.value = 900; runPropCalc(); }
         function propNum(id) { const el = document.getElementById(id); return el ? parseFloat(el.value) || 0 : 0; }
 
         function runPropCalc() {
-            const sStr = document.getElementById('prop_start').value; const eStr = document.getElementById('prop_end').value;
-            let days = 1;
+            const sStr = document.getElementById('prop_start').value; const eStr = document.getElementById('prop_end').value; let days = 1;
             if (sStr && eStr) { const s = new Date(sStr), e = new Date(eStr); if (e > s) { days = Math.ceil(Math.abs(e - s) / 86400000); if (days < 1) days = 1; } }
             document.getElementById('prop_days_val').value = days + " Days";
 
-            const rate = propNum('prop_rate'); const kmCost = propNum('prop_km_cost'); const insFee = propNum('prop_ins_fee') * days;
-            const delFee = propNum('prop_del'); const seatFee = document.getElementById('prop_chk_seat').checked ? 250 * days : 0; const driverFee = document.getElementById('prop_chk_driver').checked ? 500 * days : 0;
+            const rate = propNum('prop_rate'); const kmCost = propNum('prop_km_cost'); const insFee = propNum('prop_ins_fee') * days; const delFee = propNum('prop_del'); const seatFee = document.getElementById('prop_chk_seat').checked ? 250 * days : 0; const driverFee = document.getElementById('prop_chk_driver').checked ? 500 * days : 0;
             const totalBase = rate * days; const grandTotal = totalBase + kmCost + insFee + delFee + seatFee + driverFee;
-            
             document.getElementById('prop_grand_total').innerText = grandTotal.toLocaleString() + " EGP";
             return { days, rate, kmCost, insFee, delFee, seatFee, driverFee, totalBase, grandTotal };
         }
@@ -1612,128 +1350,46 @@
             if(math.driverFee > 0) table += `<tr><td>Additional Driver</td><td>500 x ${math.days} Days</td><td align="right">${math.driverFee.toLocaleString()}</td></tr>`;
             if(math.delFee > 0) table += `<tr><td>Logistics Fee</td><td>Fixed Fee</td><td align="right">${math.delFee.toLocaleString()}</td></tr>`;
 
-            const insDetailsText = {
-                "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`,
-                "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`,
-                "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.`
-            };
+            const insDetailsText = { "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`, "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`, "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.` };
 
-            const html = `
-            <div class="a4-page" style="display:block;">
-                <div class="page-content">
-                    <div class="doc-head" style="border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px;">
-                        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px;">
-                        <div style="text-align: right;">
-                            <h2 style="margin: 0; color: var(--primary); font-size: 16pt;">PRICE PROPOSAL</h2>
-                            <p style="margin: 0; font-weight: bold; font-size: 10pt;">Ref: ${ref} | Date: ${new Date().toLocaleDateString('en-GB')}</p>
-                        </div>
-                    </div>
-                    <div class="box-section"><span class="bs-title">CLIENT & PERIOD</span>
-                        <table class="pt">
-                            <tr><th width="15%">Client Name</th><td colspan="3">${name}</td></tr>
-                            <tr><th>Phone</th><td>${document.getElementById('prop_phone').value}</td><th>Email</th><td>${document.getElementById('prop_email').value}</td></tr>
-                            <tr><th width="15%">Pickup</th><td width="35%">${document.getElementById('prop_start').value.replace('T', ' ')}</td><th width="15%">Dropoff</th><td width="35%">${document.getElementById('prop_end').value.replace('T', ' ')}</td></tr>
-                            <tr><th>Duration</th><td>${math.days} Days</td><th>KM Allowance</th><td>${totalKM}</td></tr>
-                        </table>
-                    </div>
-                    <div class="box-section"><span class="bs-title">VEHICLE DETAILS</span>
-                        <table class="pt"><tr><th width="15%">Model</th><td colspan="3">${carText}</td></tr></table>
-                    </div>
-                    <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span>
-                        <table class="pt">
-                            <thead><tr><th>Description</th><th>Details</th><th style="text-align:right;">Total (EGP)</th></tr></thead>
-                            <tbody>${table}</tbody>
-                            <tfoot>
-                                <tr style="font-weight:bold; background:#f0f0f0;"><td colspan="2" align="right">TOTAL PROPOSAL VALUE:</td><td align="right">${math.grandTotal.toLocaleString()} EGP</td></tr>
-                                <tr><td colspan="2" align="right">Security Deposit (Held):</td><td align="right">${propNum('prop_dep').toLocaleString()} EGP</td></tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    <div class="box-section"><span class="bs-title">INSURANCE: ${document.getElementById('prop_ins_pack').value.toUpperCase()}</span>
-                        <p style="margin:0; font-size:8.5pt;">${insDetailsText[document.getElementById('prop_ins_pack').value]}</p>
-                    </div>
-                </div>
-            </div>`;
+            const html = `<div class="a4-page" style="display:block;"><div class="page-content"><div class="doc-head" style="border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px;"><img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px;"><div style="text-align: right;"><h2 style="margin: 0; color: var(--primary); font-size: 16pt;">PRICE PROPOSAL</h2><p style="margin: 0; font-weight: bold; font-size: 10pt;">Ref: ${ref} | Date: ${new Date().toLocaleDateString('en-GB')}</p></div></div><div class="box-section"><span class="bs-title">CLIENT & PERIOD</span><table class="pt"><tr><th width="15%">Client Name</th><td colspan="3">${name}</td></tr><tr><th>Phone</th><td>${document.getElementById('prop_phone').value}</td><th>Email</th><td>${document.getElementById('prop_email').value}</td></tr><tr><th width="15%">Pickup</th><td width="35%">${document.getElementById('prop_start').value.replace('T', ' ')}</td><th width="15%">Dropoff</th><td width="35%">${document.getElementById('prop_end').value.replace('T', ' ')}</td></tr><tr><th>Duration</th><td>${math.days} Days</td><th>KM Allowance</th><td>${totalKM}</td></tr></table></div><div class="box-section"><span class="bs-title">VEHICLE DETAILS</span><table class="pt"><tr><th width="15%">Model</th><td colspan="3">${carText}</td></tr></table></div><div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span><table class="pt"><thead><tr><th>Description</th><th>Details</th><th style="text-align:right;">Total (EGP)</th></tr></thead><tbody>${table}</tbody><tfoot><tr style="font-weight:bold; background:#f0f0f0;"><td colspan="2" align="right">TOTAL PROPOSAL VALUE:</td><td align="right">${math.grandTotal.toLocaleString()} EGP</td></tr><tr><td colspan="2" align="right">Security Deposit (Held):</td><td align="right">${propNum('prop_dep').toLocaleString()} EGP</td></tr></tfoot></table></div><div class="box-section"><span class="bs-title">INSURANCE: ${document.getElementById('prop_ins_pack').value.toUpperCase()}</span><p style="margin:0; font-size:8.5pt;">${insDetailsText[document.getElementById('prop_ins_pack').value]}</p></div></div></div>`;
 
-            document.getElementById('proposalOutput').innerHTML = html; document.getElementById('proposalOutput').style.display = 'flex';
-            document.getElementById('btn_print_prop').style.display = 'block';
-            setTimeout(() => { document.getElementById('proposalOutput').scrollIntoView({ behavior: 'smooth' }); }, 100);
+            document.getElementById('proposalOutput').innerHTML = html; document.getElementById('proposalOutput').style.display = 'flex'; document.getElementById('btn_print_prop').style.display = 'block'; setTimeout(() => { document.getElementById('proposalOutput').scrollIntoView({ behavior: 'smooth' }); }, 100);
         }
 
-        // ================= BLOCK 2: NATIVE EN CONTRACT ENGINE =================
-        const termsText = {
-            1: `* <strong>Minimum Age:</strong> You must be 21 years or older.<br>* <strong>License:</strong> Valid ID and Driving License accepted in Egypt are mandatory.<br>* <strong>Authorized Drivers:</strong> Only the person named on the contract may drive. Additional drivers must be approved and listed.`,
-            2: `* <strong>24-Hour Cycle:</strong> Charges based on 24-hour units.<br>* <strong>Rental Cycle:</strong> Charges based on 24-hour units. Every hour is charged from the 1st hour. If the period is exceeded by 5 hours, a full additional day is charged.<br>* <strong>Extensions:</strong> Any extension must be approved by the Company. Unauthorized late returns are charged at a higher local tariff.<br>* <strong>Early Return:</strong> No refunds are issued for vehicles returned early (Non-refundable).`,
-            3: `* <strong>Free Cancellation:</strong> Full refund if cancelled more than 48 hours before pickup.<br>* <strong>Late Cancellation (<48h):</strong> If cancelled less than 48 hours before pickup, 30% of the booking value is retained.<br>* <strong>No Show:</strong> Failure to pick up the car without prior notice results in a 100% forfeiture of the booking amount.`,
-            4: `* <strong>Mileage Limit:</strong> Standard limit is 120 KM/day (unless an Extra KM Package is purchased). Total allowance is summed (Standard 120/Day + Package KM). Extra KM charged upon return.<br>* <strong>Delivery Locations:</strong> Delivery is available to Hotels and Airports. We do not deliver to private accommodation.<br>* <strong>One-Way Rental:</strong> Dropping off at a different branch incurs a specific fee based on distance.`,
-            6: `* <strong>Theft Policy:</strong> Theft is <strong>NOT</strong> covered by insurance. The vehicle is the Lessee's sole responsibility and must be parked in secure locations.`,
-            7: `Insurance is considered <strong>NULL AND VOID</strong> (Lessee pays 100% of all costs) in the following cases:<br>1. Failure to provide an official <strong>Police Report</strong> immediately after an accident.<br>2. Driving under the influence of alcohol or drugs.<br>3. Driving off-road (Safari) or on unpaved roads.<br>4. Driving by an unauthorized person.<br>5. Gross negligence (e.g., failing to engage handbrake).`,
-            8: `The following items are NOT covered by any insurance plan. Lessee agrees to pay:<br>* <strong>Loss of Car Key:</strong> $400 USD (or equivalent EGP).<br>* <strong>License Loss:</strong> $250 USD.<br>* <strong>Spare Tire/Tools:</strong> $300 USD.<br>* <strong>Fire Extinguisher:</strong> $200 USD.<br>* <strong>Tire Damage:</strong> $200 USD per tire.<br>* <strong>Interior Damage:</strong> $100 - $1,000 USD.<br>* <strong>Dirty Return:</strong> Minimum $10 USD (350 EGP).`,
-            9: `* <strong>Deposit Block:</strong> A security amount is blocked/paid at pickup to cover excess liability, fuel, and fines.<br>* <strong>Refund Policy:</strong> Deposit is 100% refundable upon safe return of the vehicle in original condition.<br>* <strong>Refund Method:</strong> Deposit is returned in the same currency mix as received. If paid by Card, it is refunded in EGP CASH to avoid bank delays.<br>* <strong>Release Time:</strong> Released only after the Handover Inspection Report is signed and closed.`,
-            10: `If there is a disagreement regarding the COST or TIME of repair, we follow this strict protocol:<br><strong>Step 1: Independent Evaluation.</strong> The vehicle will be assessed by an authorized, independent Car Service Center. Their quotation is final.<br><strong>Step 2: Liability.</strong> The at-fault party pays the Repair Cost + Lost Rental Days + Inspection Fee.<br><strong>Step 3: Legal.</strong> Unresolved disputes are referred to the Competent Court under Egyptian Law.`,
-            11: `The Lessee is fully responsible for any traffic violations (Speeding, Parking, Radar). The Company reserves the right to charge these costs + administrative fees.`,
-            12: `In case of breakdown, call the Company immediately. Do not attempt unauthorized repairs. If the breakdown is due to Company fault (Battery/Engine), you pay nothing. If due to negligence (e.g., wrong fuel), Lessee pays all costs.`,
-            13: `* <strong>Interior Negligence:</strong> Insurance does NOT cover negligence inside the vehicle (e.g., cigarette burns, stained seats, broken handles).<br>* <strong>Minor Damages:</strong> For small scratches, tire, or glass damage where a Police Report is impractical, the Lessee agrees to pay the repair cost directly to save time.<br>* <strong>Police Report:</strong> If Lessee refuses to settle damages, a Police Report from the accident scene is MANDATORY.`
-        };
-
-        const insDetailsText = {
-            "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`,
-            "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`,
-            "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.`
-        };
-
+        // --- 13. NATIVE EN CONTRACT ENGINE (CRM LINKED) ---
         function prepNativeContract() {
             populateClientList(); 
-            const sel = document.getElementById('con_carSelect');
-            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
-            
+            const sel = document.getElementById('con_carSelect'); sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
                 let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
-                let opt = document.createElement('option'); opt.value = c.id; 
-                opt.text = `[#${c.id}] ${carName} - ${pNum}`;
-                sel.add(opt);
+                let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${carName} - ${pNum}`; sel.add(opt);
             });
             runContractCalc();
         }
 
         function conLoadCar() {
-            const id = document.getElementById('con_carSelect').value;
-            const c = APP_DATA.cars.find(x => String(x.id) === String(id));
+            const id = document.getElementById('con_carSelect').value; const c = APP_DATA.cars.find(x => String(x.id) === String(id));
             if(c) {
                 document.getElementById('con_manModel').value = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 document.getElementById('con_plate').value = `${lets} | ${nums}`.trim();
-                document.getElementById('con_year').value = getSafeVal(c, ['سنة الصنع', 'Year']);
-                document.getElementById('con_vin').value = getSafeVal(c, ['VIN', 'رقم الشاسيه']);
-                document.getElementById('con_motor').value = getSafeVal(c, ['Motor', 'رقم الموتور']);
-                document.getElementById('con_rateRent').value = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
+                document.getElementById('con_year').value = getSafeVal(c, ['سنة الصنع', 'Year']); document.getElementById('con_vin').value = getSafeVal(c, ['VIN', 'رقم الشاسيه']); document.getElementById('con_motor').value = getSafeVal(c, ['Motor', 'رقم الموتور']); document.getElementById('con_rateRent').value = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
                 runContractCalc();
             }
         }
 
         function autoFillConClient() {
-            const searchVal = document.getElementById('con_crm_search').value;
-            const list = document.getElementById('client-list');
-            let selectedId = null;
+            const searchVal = document.getElementById('con_crm_search').value; const list = document.getElementById('client-list'); let selectedId = null;
             for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
-            if(!selectedId) return;
-
-            const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(!selectedId) return; const c = APP_DATA.customers.find(x => x.id === selectedId);
             if(c) {
-                document.getElementById('con_client_id').value = c.id;
-                document.getElementById('con_fname').value = c['الاسم الأول'] || '';
-                document.getElementById('con_sname').value = c['الاسم الأخير'] || '';
-                document.getElementById('con_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || '';
-                document.getElementById('con_phone').value = c['رقم التليفون'] || '';
-                document.getElementById('con_email').value = c['عنوان البريد الإلكتروني'] || '';
-                document.getElementById('con_lic').value = c['رقم رخصة القيادة'] || '';
-                document.getElementById('con_addr').value = c['العنوان'] || '';
-                document.getElementById('con_nation').value = c['رمز الدولة'] || '';
+                document.getElementById('con_client_id').value = c.id; document.getElementById('con_fname').value = c['الاسم الأول'] || ''; document.getElementById('con_sname').value = c['الاسم الأخير'] || ''; document.getElementById('con_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || ''; document.getElementById('con_phone').value = c['رقم التليفون'] || ''; document.getElementById('con_email').value = c['عنوان البريد الإلكتروني'] || ''; document.getElementById('con_lic').value = c['رقم رخصة القيادة'] || ''; document.getElementById('con_addr').value = c['العنوان'] || ''; document.getElementById('con_nation').value = c['رمز الدولة'] || '';
             }
         }
 
@@ -1742,206 +1398,78 @@
 
         function runContractCalc() {
             try {
-                const rateUsd = parseFloat(document.getElementById('global_usd').value) || 50; 
-                const rateEur = parseFloat(document.getElementById('global_eur').value) || 54;
-                const pStr = document.getElementById('con_p_time').value; 
-                const dStr = document.getElementById('con_d_time').value; 
-                const mode = document.getElementById('con_mode').value;
-
-                let days = 1;
-                if (pStr && dStr) {
-                    const p = new Date(pStr), d = new Date(dStr);
-                    if (d > p) { days = Math.ceil(Math.abs(d - p) / 86400000); if (days < 1) days = 1; }
-                }
-
+                const rateUsd = parseFloat(document.getElementById('global_usd').value) || 50; const rateEur = parseFloat(document.getElementById('global_eur').value) || 54;
+                const pStr = document.getElementById('con_p_time').value; const dStr = document.getElementById('con_d_time').value; const mode = document.getElementById('con_mode').value;
+                let days = 1; if (pStr && dStr) { const p = new Date(pStr), d = new Date(dStr); if (d > p) { days = Math.ceil(Math.abs(d - p) / 86400000); if (days < 1) days = 1; } }
                 let mult = (mode === "Monthly") ? ((days / 30).toFixed(1) < 1 ? 1 : parseFloat((days / 30).toFixed(1))) : days;
                 const r = conNum('con_rateRent'), i = conNum('con_rateIns'), fee_d = conNum('con_fee_del'), fee_c = conNum('con_fee_col');
-
                 let adds = 0; let addOnsList = [];
-                const kmSel = document.getElementById('con_km_pkg');
-                const pkgKM = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
+                const kmSel = document.getElementById('con_km_pkg'); const pkgKM = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
                 let kmPackageCost = conNum('con_km_pkg_cost_manual') || (kmSel ? parseFloat(kmSel.value) : 0);
 
-                if (pkgKM === 999999) { adds += (kmPackageCost * days); addOnsList.push(`Unl. KM Package`); } 
-                else if (kmPackageCost > 0) { adds += kmPackageCost; addOnsList.push(`Extra KM Package`); }
-
+                if (pkgKM === 999999) { adds += (kmPackageCost * days); addOnsList.push(`Unl. KM Package`); } else if (kmPackageCost > 0) { adds += kmPackageCost; addOnsList.push(`Extra KM Package`); }
                 if (document.getElementById('con_add_dr').checked) { adds += (conNum('con_rate_dr') * days); addOnsList.push(`Driver`); }
                 if (document.getElementById('con_add_st').checked) { adds += (conNum('con_rate_st') * days); addOnsList.push(`Child Seat`); }
                 let addOnsStr = addOnsList.length > 0 ? addOnsList.join(", ") : "None";
 
                 let totalRentOnly = (mode === "Monthly") ? (r * mult) + (i * days) + adds : ((r + i) * mult) + adds;
                 let totalDue = Math.round(totalRentOnly + fee_d + fee_c);
-
                 let totalRentPaid = Math.round(conNum('con_pay_rent_egp') + (conNum('con_pay_rent_usd') * rateUsd) + (conNum('con_pay_rent_eur') * rateEur) + conNum('con_pay_rent_card'));
                 let rentPending = totalDue - totalRentPaid;
-
                 let reqDep = conNum('con_req_deposit');
                 let totalDepPaid = Math.round(conNum('con_pay_dep_egp') + (conNum('con_pay_dep_usd') * rateUsd) + (conNum('con_pay_dep_eur') * rateEur) + conNum('con_pay_dep_card'));
                 let depPending = reqDep - totalDepPaid;
 
-                document.getElementById('con_c_days').innerText = days;
-                document.getElementById('con_c_rent').innerText = Math.round(totalRentOnly).toLocaleString();
-                document.getElementById('con_c_fees').innerText = Math.round(fee_d + fee_c).toLocaleString();
-                document.getElementById('con_c_total_preview').innerText = totalDue.toLocaleString() + " EGP";
-                document.getElementById('con_val_total_due').innerText = totalDue.toLocaleString();
-                document.getElementById('con_val_total_paid').innerText = totalRentPaid.toLocaleString();
-                document.getElementById('con_val_dep_req').innerText = reqDep.toLocaleString();
-                document.getElementById('con_val_dep_paid').innerText = totalDepPaid.toLocaleString();
+                document.getElementById('con_c_days').innerText = days; document.getElementById('con_c_rent').innerText = Math.round(totalRentOnly).toLocaleString(); document.getElementById('con_c_fees').innerText = Math.round(fee_d + fee_c).toLocaleString(); document.getElementById('con_c_total_preview').innerText = totalDue.toLocaleString() + " EGP"; document.getElementById('con_val_total_due').innerText = totalDue.toLocaleString(); document.getElementById('con_val_total_paid').innerText = totalRentPaid.toLocaleString(); document.getElementById('con_val_dep_req').innerText = reqDep.toLocaleString(); document.getElementById('con_val_dep_paid').innerText = totalDepPaid.toLocaleString();
 
                 let rPenEl = document.getElementById('con_val_rent_pending');
-                if (rentPending > 0) rPenEl.innerHTML = `<span style="color:#e74c3c">${rentPending.toLocaleString()} EGP</span>`;
-                else if (rentPending < 0) rPenEl.innerHTML = `<span style="color:#2ecc71">+${Math.abs(rentPending).toLocaleString()} EGP</span>`;
-                else rPenEl.innerHTML = `<span style="color:white">0 (PAID)</span>`;
+                if (rentPending > 0) rPenEl.innerHTML = `<span style="color:#e74c3c">${rentPending.toLocaleString()} EGP</span>`; else if (rentPending < 0) rPenEl.innerHTML = `<span style="color:#2ecc71">+${Math.abs(rentPending).toLocaleString()} EGP</span>`; else rPenEl.innerHTML = `<span style="color:white">0 (PAID)</span>`;
 
                 let dPenEl = document.getElementById('con_val_dep_pending');
-                if (depPending > 0) dPenEl.innerHTML = `<span style="color:#e74c3c">${depPending.toLocaleString()} EGP</span>`;
-                else if (depPending < 0) dPenEl.innerHTML = `<span style="color:#2ecc71">+${Math.abs(depPending).toLocaleString()} EGP</span>`;
-                else dPenEl.innerHTML = `<span style="color:white">0</span>`;
+                if (depPending > 0) dPenEl.innerHTML = `<span style="color:#e74c3c">${depPending.toLocaleString()} EGP</span>`; else if (depPending < 0) dPenEl.innerHTML = `<span style="color:#2ecc71">+${Math.abs(depPending).toLocaleString()} EGP</span>`; else dPenEl.innerHTML = `<span style="color:white">0</span>`;
 
                 return { days, mult, r, i, adds, fee_d, fee_c, totalDue, mode, totalRentPaid, rentPending, depPending, reqDep, addOnsStr, totalRentOnly, kmPackageCost, rateUsd, rateEur };
             } catch(e) { console.error(e); }
         }
 
         function executeENContract() {
-            const c = runContractCalc();
-            if (c.days === 0) return alert("Please select dates first.");
-            
-            const val_branch = document.getElementById('con_branch').value || "HRG";
-            let now = new Date();
-            let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0');
-            let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-            const cid = `BR-${val_branch}-${dStr}-${tStr}`; 
-            const today = now.toLocaleDateString('en-GB');
+            const c = runContractCalc(); if (!c || c.days === 0) return alert("Please select dates first.");
+            const val_branch = document.getElementById('con_branch').value || "HRG"; let now = new Date(); let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0'); let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            const cid = `BR-${val_branch}-${dStr}-${tStr}`; const today = now.toLocaleDateString('en-GB');
 
-            const formatDT = (dtString) => {
-                if(!dtString) return "";
-                const d = new Date(dtString);
-                if(isNaN(d)) return dtString;
-                return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}`;
-            };
+            const formatDT = (dtString) => { if(!dtString) return ""; const d = new Date(dtString); if(isNaN(d)) return dtString; return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}`; };
 
-            const buildPayStr = (pfx) => {
-                let egp = conNum(pfx + '_egp'), u = conNum(pfx + '_usd'), e = conNum(pfx + '_eur'), card = conNum(pfx + '_card');
-                let total = egp + (u * c.rateUsd) + (e * c.rateEur) + card;
-                let parts = [];
-                if (egp > 0) parts.push(egp + " Cash (EGP)");
-                if (u > 0) parts.push(u + " USD");
-                if (e > 0) parts.push(e + " EUR");
-                if (card > 0) parts.push(card + " Card (EGP)");
-                let detail = parts.length > 0 ? `(${parts.join(' + ')})` : "";
-                return { total: total, text: `<strong>${Math.round(total).toLocaleString()} EGP</strong> <span style="font-size:8.5pt; font-weight:normal;">${detail}</span>`, breakdownDetails: detail };
-            };
+            const buildPayStr = (pfx) => { let egp = conNum(pfx + '_egp'), u = conNum(pfx + '_usd'), e = conNum(pfx + '_eur'), card = conNum(pfx + '_card'); let total = egp + (u * c.rateUsd) + (e * c.rateEur) + card; let parts = []; if (egp > 0) parts.push(egp + " Cash (EGP)"); if (u > 0) parts.push(u + " USD"); if (e > 0) parts.push(e + " EUR"); if (card > 0) parts.push(card + " Card (EGP)"); let detail = parts.length > 0 ? `(${parts.join(' + ')})` : ""; return { total: total, text: `<strong>${Math.round(total).toLocaleString()} EGP</strong> <span style="font-size:8.5pt; font-weight:normal;">${detail}</span>`, breakdownDetails: detail }; };
 
             let rentInfo = buildPayStr('con_pay_rent'); let depInfo = buildPayStr('con_pay_dep');
             let totalDepPaid = conNum('con_pay_dep_egp') + (conNum('con_pay_dep_usd') * c.rateUsd) + (conNum('con_pay_dep_eur') * c.rateEur) + conNum('con_pay_dep_card');
 
-            let rateTxt = c.mode === 'Monthly' ? `${c.r} x ${c.mult} Mo` : `${c.r} x ${c.days} Days`;
-            let base = c.mode === 'Monthly' ? (c.r * c.mult) : (c.r * c.days);
-
-            let pText = conVal('con_p_loc') + (conVal('con_p_addr') ? " (" + conVal('con_p_addr') + ")" : "");
-            let dText = conVal('con_d_loc') + (conVal('con_d_addr') ? " (" + conVal('con_d_addr') + ")" : "");
+            let rateTxt = c.mode === 'Monthly' ? `${c.r} x ${c.mult} Mo` : `${c.r} x ${c.days} Days`; let base = c.mode === 'Monthly' ? (c.r * c.mult) : (c.r * c.days);
+            let pText = conVal('con_p_loc') + (conVal('con_p_addr') ? " (" + conVal('con_p_addr') + ")" : ""); let dText = conVal('con_d_loc') + (conVal('con_d_addr') ? " (" + conVal('con_d_addr') + ")" : "");
 
             const insClass = conVal('con_insPack') === 'Full Protection' ? 'ins-full' : (conVal('con_insPack') === 'Intermediate' ? 'ins-inter' : 'ins-basic');
             const simpleInsText = { "Basic": "Basic Insurance: 100% Client Liability for Damages.", "Intermediate": "Intermediate: 70% Client Liability / 30% Company Coverage.", "Full Protection": "Full Protection: Zero Deductible (Subject to caps)." };
             const extHtml = conVal('con_type') === 'Extension' ? `<div style="font-size:10pt; font-weight:bold; margin-top:3px;">(EXTENSION TO ${conVal('con_prev')})</div>` : '';
 
-            const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png";
-            const carSrc = "https://brothersegy.com/wp-content/uploads/2026/02/car-template.png";
-
-            const kmSel = document.getElementById('con_km_pkg');
-            const pkgKMValue = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
+            const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png"; const carSrc = "https://brothersegy.com/wp-content/uploads/2026/02/car-template.png";
+            const kmSel = document.getElementById('con_km_pkg'); const pkgKMValue = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
             const kmAllowedTotal = pkgKMValue >= 999999 ? "Unlimited" : (120 * c.days + pkgKMValue).toLocaleString() + " KM Total";
 
-            let html = ``;
-
-            // --- PAGE 1: CONTRACT ---
-            html += `
+            let html = `
             <div class="a4-page" id="printPage1">
                 <div class="watermark"><img src="${logoSrc}"></div>
                 <div class="page-content">
-                    <div class="doc-head">
-                        <img src="${logoSrc}" class="logo">
-                        <div style="text-align:center">
-                            <h1 style="margin:0; font-size:18pt; color:#04509D">CAR RENTAL AGREEMENT</h1>
-                            <div style="font-weight:bold; font-size:12pt;">${cid}</div>
-                            ${extHtml}
-                        </div>
-                        <div class="hq-info" style="text-align:right;">
-                            <strong>BROTHERS EGY HQ</strong><br>
-                            50 Abd Al Latef Al Soufani, Sidi Gabir,<br>Alexandria<br>
-                            Tax: 589-464-418 | CR: 10770<br>
-                            Branch: ${val_branch}
-                        </div>
-                    </div>
-
-                    <div class="box-section"><span class="bs-title">PARTIES</span>
-                        <table class="pt" style="margin:0">
-                            <tr><td width="30%"><strong>LESSOR</strong><br>El Alakhua El Mutahidun<br>${val_branch} Branch</td>
-                                <td><strong>LESSEE</strong><br>
-                                <b>Name:</b> ${conVal('con_fname')} ${conVal('con_sname')}<br>
-                                <b>Passport / ID:</b> ${conVal('con_pass')} | <b>License No:</b> ${conVal('con_lic')} | <b>Nation:</b> ${conVal('con_nation')}<br>
-                                <b>Phone:</b> ${conVal('con_ph_code')} ${conVal('con_phone')} | <b>Email:</b> ${conVal('con_email')}<br>
-                                <b>Addr:</b> ${conVal('con_addr')}<br>
-                                ${conVal('con_add_driver') ? '<b>Add. Driver:</b> ' + conVal('con_add_driver') + (conVal('con_add_lic') ? ' | <b>Lic:</b> ' + conVal('con_add_lic') : '') : ''}</td></tr>
-                        </table>
-                    </div>
-
-                    <div class="box-section"><span class="bs-title">VEHICLE & PERIOD</span>
-                        <table class="pt">
-                            <tr><th>Model</th><td>${conVal('con_manModel')}</td><th>Plate</th><td dir="ltr" style="text-align:left; font-size:11pt;"><b>${conVal('con_plate')}</b></td><th>KM Out</th><td>${conVal('con_kmOut')}</td></tr>
-                            <tr><th>VIN</th><td>${conVal('con_vin')}</td><th>Motor</th><td>${conVal('con_motor')}</td><th>Allow</th><td><strong>${kmAllowedTotal}</strong></td></tr>
-                            <tr><th>Pickup</th><td style="text-align:center">${formatDT(conVal('con_p_time'))}<br><span style="font-size:8pt">${pText}</span></td>
-                                <th>Dropoff</th><td style="text-align:center">${formatDT(conVal('con_d_time'))}<br><span style="font-size:8pt">${dText}</span></td>
-                                <th>Duration</th><td style="font-size:11pt;"><b>${c.days} Days</b></td></tr>
-                        </table>
-                    </div>
-
-                    <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span>
-                        <table class="pt">
-                            <tr><th>Item Description</th><th>Rate / Calculation</th><th style="text-align:right">Amount (EGP)</th></tr>
-                            <tr><td>Base Rent</td><td>${rateTxt}</td><td align="right">${Math.round(base).toLocaleString()}</td></tr>
-                            ${c.i > 0 ? `<tr><td>Insurance Fees</td><td>${c.i} x ${c.days} Days</td><td align="right">${(c.i * c.days).toLocaleString()}</td></tr>` : ''}
-                            ${c.kmPackageCost > 0 ? `<tr><td>Mileage Package (${kmSel.options[kmSel.selectedIndex].text})</td><td>Package Fee</td><td align="right">${c.kmPackageCost.toLocaleString()}</td></tr>` : ''}
-                            ${document.getElementById('con_add_dr').checked ? `<tr><td>Additional Driver</td><td>${conNum('con_rate_dr')} x ${c.days} Days</td><td align="right">${(conNum('con_rate_dr') * c.days).toLocaleString()}</td></tr>` : ''}
-                            ${document.getElementById('con_add_st').checked ? `<tr><td>Child Car Seat</td><td>${conNum('con_rate_st')} x ${c.days} Days</td><td align="right">${(conNum('con_rate_st') * c.days).toLocaleString()}</td></tr>` : ''}
-                            ${c.fee_d > 0 ? `<tr><td>Delivery Fee (${pText})</td><td>Fixed</td><td align="right">${c.fee_d}</td></tr>` : ''}
-                            ${c.fee_c > 0 ? `<tr><td>Pickup Fee (${dText})</td><td>Fixed</td><td align="right">${c.fee_c}</td></tr>` : ''}
-                            <tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" align="right">TOTAL CONTRACT VALUE:</td><td align="right">${Math.round(c.totalDue).toLocaleString()} EGP</td></tr>
-                            <tr style="background:#f9f9f9;"><td colspan="3" align="center" style="font-size:8.5pt;">
-                                <strong>Live Exchange Rates Applied:</strong> 
-                                <span style="font-size:10pt; font-weight:bold; color:#04509D; margin:0 15px;">1 USD = ${c.rateUsd} EGP</span>
-                                <span style="font-size:10pt; font-weight:bold; color:#04509D;">1 EUR = ${c.rateEur} EGP</span>
-                            </td></tr>
-                        </table>
-                        <div class="${insClass}" style="border:1px solid #000; padding:5px; text-align:center; font-size:9pt; margin-bottom:5px; border-radius:4px;">
-                            ${simpleInsText[conVal('con_insPack')]}
-                        </div>
-                        <div style="background:#eee; padding:5px; text-align:center;">
-                            PAID NOW: ${rentInfo.text} <br> <span style="color:${c.rentPending > 0 ? '#c0392b' : '#27ae60'}; font-weight:bold;">PENDING: ${Math.round(c.rentPending).toLocaleString()} EGP</span>
-                        </div>
-                    </div>
-
-                    ${(c.reqDep > 0 || totalDepPaid > 0) ? `
-                    <div style="border:2px solid orange; padding:5px; margin-bottom:10px; font-size:9pt;">
-                        <strong>DEPOSIT HELD:</strong> ${depInfo.text} 
-                        <span style="float:right; font-weight:bold; color:${c.depPending > 0 ? '#c0392b' : '#27ae60'}">${c.depPending > 0 ? Math.round(c.depPending) + ' EGP PENDING' : 'FULLY HELD'}</span>
-                    </div>` : ''}
-                    
-                     <div style="text-align:center; border:2px dashed #000; padding:10px; font-size:9pt; margin-top:10px;">
-                        <strong>IMPORTANT:</strong> Contract is void for any period NOT covered by an official payment receipt.<br>
-                        <strong>LIABILITY:</strong> If the RETURN CHECK is not closed/signed, the Lessee retains full liability for the vehicle until official closure.
-                    </div>
-
-                    <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px; margin-bottom: 30px;">
-                        <div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;">
-                            <div style="width:40%;">LESSOR SIGNATURE<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">Date: ........................</div></div>
-                             <div style="width:40%;">LESSEE SIGNATURE<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">Date: ........................</div></div>
-                        </div>
-                    </div>
+                    <div class="doc-head"><img src="${logoSrc}" class="logo"><div style="text-align:center"><h1 style="margin:0; font-size:18pt; color:#04509D">CAR RENTAL AGREEMENT</h1><div style="font-weight:bold; font-size:12pt;">${cid}</div>${extHtml}</div><div class="hq-info" style="text-align:right;"><strong>BROTHERS EGY HQ</strong><br>50 Abd Al Latef Al Soufani, Sidi Gabir,<br>Alexandria<br>Tax: 589-464-418 | CR: 10770<br>Branch: ${val_branch}</div></div>
+                    <div class="box-section"><span class="bs-title">PARTIES</span><table class="pt" style="margin:0"><tr><td width="30%"><strong>LESSOR</strong><br>El Alakhua El Mutahidun<br>${val_branch} Branch</td><td><strong>LESSEE</strong><br><b>Name:</b> ${conVal('con_fname')} ${conVal('con_sname')}<br><b>Passport / ID:</b> ${conVal('con_pass')} | <b>License No:</b> ${conVal('con_lic')} | <b>Nation:</b> ${conVal('con_nation')}<br><b>Phone:</b> ${conVal('con_ph_code')} ${conVal('con_phone')} | <b>Email:</b> ${conVal('con_email')}<br><b>Addr:</b> ${conVal('con_addr')}<br>${conVal('con_add_driver') ? '<b>Add. Driver:</b> ' + conVal('con_add_driver') + (conVal('con_add_lic') ? ' | <b>Lic:</b> ' + conVal('con_add_lic') : '') : ''}</td></tr></table></div>
+                    <div class="box-section"><span class="bs-title">VEHICLE & PERIOD</span><table class="pt"><tr><th>Model</th><td>${conVal('con_manModel')}</td><th>Plate</th><td dir="ltr" style="text-align:left; font-size:11pt;"><b>${conVal('con_plate')}</b></td><th>KM Out</th><td>${conVal('con_kmOut')}</td></tr><tr><th>VIN</th><td>${conVal('con_vin')}</td><th>Motor</th><td>${conVal('con_motor')}</td><th>Allow</th><td><strong>${kmAllowedTotal}</strong></td></tr><tr><th>Pickup</th><td style="text-align:center">${formatDT(conVal('con_p_time'))}<br><span style="font-size:8pt">${pText}</span></td><th>Dropoff</th><td style="text-align:center">${formatDT(conVal('con_d_time'))}<br><span style="font-size:8pt">${dText}</span></td><th>Duration</th><td style="font-size:11pt;"><b>${c.days} Days</b></td></tr></table></div>
+                    <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span><table class="pt"><tr><th>Item Description</th><th>Rate / Calculation</th><th style="text-align:right">Amount (EGP)</th></tr><tr><td>Base Rent</td><td>${rateTxt}</td><td align="right">${Math.round(base).toLocaleString()}</td></tr>${c.i > 0 ? `<tr><td>Insurance Fees</td><td>${c.i} x ${c.days} Days</td><td align="right">${(c.i * c.days).toLocaleString()}</td></tr>` : ''}${c.kmPackageCost > 0 ? `<tr><td>Mileage Package (${kmSel.options[kmSel.selectedIndex].text})</td><td>Package Fee</td><td align="right">${c.kmPackageCost.toLocaleString()}</td></tr>` : ''}${document.getElementById('con_add_dr').checked ? `<tr><td>Additional Driver</td><td>${conNum('con_rate_dr')} x ${c.days} Days</td><td align="right">${(conNum('con_rate_dr') * c.days).toLocaleString()}</td></tr>` : ''}${document.getElementById('con_add_st').checked ? `<tr><td>Child Car Seat</td><td>${conNum('con_rate_st')} x ${c.days} Days</td><td align="right">${(conNum('con_rate_st') * c.days).toLocaleString()}</td></tr>` : ''}${c.fee_d > 0 ? `<tr><td>Delivery Fee (${pText})</td><td>Fixed</td><td align="right">${c.fee_d}</td></tr>` : ''}${c.fee_c > 0 ? `<tr><td>Pickup Fee (${dText})</td><td>Fixed</td><td align="right">${c.fee_c}</td></tr>` : ''}<tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" align="right">TOTAL CONTRACT VALUE:</td><td align="right">${Math.round(c.totalDue).toLocaleString()} EGP</td></tr><tr style="background:#f9f9f9;"><td colspan="3" align="center" style="font-size:8.5pt;"><strong>Live Exchange Rates Applied:</strong> <span style="font-size:10pt; font-weight:bold; color:#04509D; margin:0 15px;">1 USD = ${c.rateUsd} EGP</span><span style="font-size:10pt; font-weight:bold; color:#04509D;">1 EUR = ${c.rateEur} EGP</span></td></tr></table><div class="${insClass}" style="border:1px solid #000; padding:5px; text-align:center; font-size:9pt; margin-bottom:5px; border-radius:4px;">${simpleInsText[conVal('con_insPack')]}</div><div style="background:#eee; padding:5px; text-align:center;">PAID NOW: ${rentInfo.text} <br> <span style="color:${c.rentPending > 0 ? '#c0392b' : '#27ae60'}; font-weight:bold;">PENDING: ${Math.round(c.rentPending).toLocaleString()} EGP</span></div></div>
+                    ${(c.reqDep > 0 || totalDepPaid > 0) ? `<div style="border:2px solid orange; padding:5px; margin-bottom:10px; font-size:9pt;"><strong>DEPOSIT HELD:</strong> ${depInfo.text} <span style="float:right; font-weight:bold; color:${c.depPending > 0 ? '#c0392b' : '#27ae60'}">${c.depPending > 0 ? Math.round(c.depPending) + ' EGP PENDING' : 'FULLY HELD'}</span></div>` : ''}
+                    <div style="text-align:center; border:2px dashed #000; padding:10px; font-size:9pt; margin-top:10px;"><strong>IMPORTANT:</strong> Contract is void for any period NOT covered by an official payment receipt.<br><strong>LIABILITY:</strong> If the RETURN CHECK is not closed/signed, the Lessee retains full liability for the vehicle until official closure.</div>
+                    <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px; margin-bottom: 30px;"><div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;"><div style="width:40%;">LESSOR SIGNATURE<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">Date: ........................</div></div><div style="width:40%;">LESSEE SIGNATURE<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">Date: ........................</div></div></div></div>
                 </div>
             </div>`;
 
-            // --- PAGE 2: TERMS ---
+            const insDetailsText = { "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`, "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`, "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.` };
             const insContent = insDetailsText[conVal('con_insPack')] || insDetailsText["Basic"];
 
             html += `
@@ -1950,220 +1478,37 @@
                 <div class="page-content">
                     <div class="doc-head"><strong>TERMS & CONDITIONS</strong><span>Page 2/4</span></div>
                     <div class="terms-grid">
-                        <div class="term-p"><span class="term-h">1. DRIVER REQUIREMENTS & ELIGIBILITY</span>${termsText[1]}</div>
-                        <div class="term-p"><span class="term-h">2. RENTAL CYCLE & EXTENSIONS</span>${termsText[2]}</div>
-                        <div class="term-p"><span class="term-h">3. CANCELLATION & NO-SHOW POLICY</span>${termsText[3]}</div>
-                        <div class="term-p"><span class="term-h">4. DELIVERY & MILEAGE</span>${termsText[4]}</div>
-
-                        <div class="term-p" style="border:2px solid #e67e22; padding:5px; background:#fff8e1; break-inside:avoid;">
-                            <span class="term-h" style="color:#e67e22; border-bottom-color:#e67e22;">5. YOUR INSURANCE PACKAGE: ${conVal('con_insPack').toUpperCase()}</span>
-                            <div style="font-weight:normal; font-size:8pt; margin-top:5px; line-height:1.3;">${insContent}</div>
-                        </div>
-                        
-                        <div class="term-p"><span class="term-h">6. THEFT & LOSS WAIVER</span>${termsText[6]}</div>
-                        <div class="term-p"><span class="term-h">7. VOIDING OF INSURANCE</span>${termsText[7]}</div>
-                        <div class="term-p"><span class="term-h">8. SCHEDULE OF PENALTIES (NEGLIGENCE)</span>${termsText[8]}</div>
-                        <div class="term-p"><span class="term-h">9. SECURITY DEPOSIT & REFUNDS</span>${termsText[9]}</div>
-                        <div class="term-p"><span class="term-h">10. DISPUTE RESOLUTION</span>${termsText[10]}</div>
-                        <div class="term-p"><span class="term-h">11. TRAFFIC FINES</span>${termsText[11]}</div>
-                        <div class="term-p"><span class="term-h">12. MECHANICAL DIFFICULTIES</span>${termsText[12]}</div>
-                        <div class="term-p"><span class="term-h">13. INSURANCE & LIABILITY NOTICES</span>${termsText[13]}</div>
+                        <div class="term-p"><span class="term-h">1. DRIVER REQUIREMENTS & ELIGIBILITY</span>${termsText[1]}</div><div class="term-p"><span class="term-h">2. RENTAL CYCLE & EXTENSIONS</span>${termsText[2]}</div><div class="term-p"><span class="term-h">3. CANCELLATION & NO-SHOW POLICY</span>${termsText[3]}</div><div class="term-p"><span class="term-h">4. DELIVERY & MILEAGE</span>${termsText[4]}</div>
+                        <div class="term-p" style="border:2px solid #e67e22; padding:5px; background:#fff8e1; break-inside:avoid;"><span class="term-h" style="color:#e67e22; border-bottom-color:#e67e22;">5. YOUR INSURANCE PACKAGE: ${conVal('con_insPack').toUpperCase()}</span><div style="font-weight:normal; font-size:8pt; margin-top:5px; line-height:1.3;">${insContent}</div></div>
+                        <div class="term-p"><span class="term-h">6. THEFT & LOSS WAIVER</span>${termsText[6]}</div><div class="term-p"><span class="term-h">7. VOIDING OF INSURANCE</span>${termsText[7]}</div><div class="term-p"><span class="term-h">8. SCHEDULE OF PENALTIES (NEGLIGENCE)</span>${termsText[8]}</div><div class="term-p"><span class="term-h">9. SECURITY DEPOSIT & REFUNDS</span>${termsText[9]}</div><div class="term-p"><span class="term-h">10. DISPUTE RESOLUTION</span>${termsText[10]}</div><div class="term-p"><span class="term-h">11. TRAFFIC FINES</span>${termsText[11]}</div><div class="term-p"><span class="term-h">12. MECHANICAL DIFFICULTIES</span>${termsText[12]}</div><div class="term-p"><span class="term-h">13. INSURANCE & LIABILITY NOTICES</span>${termsText[13]}</div>
                     </div>
-                    <div style="margin-top:auto; padding:10px; border-top:1px solid #000; font-weight:bold; text-align:center;">
-                        <strong>I have read and accepted all terms & conditions.</strong> <br><br>
-                        <div style="display:flex; justify-content:center; gap:50px; align-items:flex-end; margin-top:5px;">
-                            <div>Signature: __________________________</div>
-                            <div style="font-size:9pt;">Date: ........................</div>
-                        </div>
-                    </div>
+                    <div style="margin-top:auto; padding:10px; border-top:1px solid #000; font-weight:bold; text-align:center;"><strong>I have read and accepted all terms & conditions.</strong> <br><br><div style="display:flex; justify-content:center; gap:50px; align-items:flex-end; margin-top:5px;"><div>Signature: __________________________</div><div style="font-size:9pt;">Date: ........................</div></div></div>
                 </div>
             </div>`;
 
-            // --- PAGE 3: INSPECTION ---
-            const chkRow = (lbl) => `
-                <div class="v-insp-row">
-                    <span class="v-label">${lbl}</span>
-                    <div class="v-check-group">
-                        <div class="v-check-box v-green"></div><div class="v-check-box v-red"></div>
-                    </div>
-                </div>`;
+            const chkRow = (lbl) => `<div class="v-insp-row"><span class="v-label">${lbl}</span><div class="v-check-group"><div class="v-check-box v-green"></div><div class="v-check-box v-red"></div></div></div>`;
+            const checklistGroups = `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;"><div style="width:48%;"><div class="insp-group-head">PASSENGER</div>${chkRow('(D) FEND F')}${chkRow('(L) DOOR F')}${chkRow('(K) DOOR R')}${chkRow('(J) FEND R')}</div><div style="width:48%;"><div class="insp-group-head">FRONT</div>${chkRow('(E) BUMPER')}${chkRow('(F) HOOD')}${chkRow('(W) WINDSH')}</div><div style="width:48%;"><div class="insp-group-head">REAR</div>${chkRow('(Q) TRUNK')}${chkRow('(H) BUMPER')}${chkRow('(I) LIGHTS')}</div><div style="width:48%;"><div class="insp-group-head">DRIVER</div>${chkRow('(M) FEND F')}${chkRow('(C) DOOR F')}${chkRow('(B) DOOR R')}${chkRow('(A) FEND R')}</div></div>`;
 
-            const checklistGroups = `
-                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">
-                    <div style="width:48%;"><div class="insp-group-head">PASSENGER</div>${chkRow('(D) FEND F')}${chkRow('(L) DOOR F')}${chkRow('(K) DOOR R')}${chkRow('(J) FEND R')}</div>
-                    <div style="width:48%;"><div class="insp-group-head">FRONT</div>${chkRow('(E) BUMPER')}${chkRow('(F) HOOD')}${chkRow('(W) WINDSH')}</div>
-                    <div style="width:48%;"><div class="insp-group-head">REAR</div>${chkRow('(Q) TRUNK')}${chkRow('(H) BUMPER')}${chkRow('(I) LIGHTS')}</div>
-                    <div style="width:48%;"><div class="insp-group-head">DRIVER</div>${chkRow('(M) FEND F')}${chkRow('(C) DOOR F')}${chkRow('(B) DOOR R')}${chkRow('(A) FEND R')}</div>
-                </div>`;
+            let pickupHtmlClean = `<div class="insp-left-col"><div class="insp-section-head">PICKUP CHECK (Start of Rental)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0;"><tr style="background:#eee;"><th>KM OUT</th><td align="center">${conVal('con_kmOut')}</td></tr><tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${conVal('con_fuelOut')}</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">EXISTING DAMAGES:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div></div>${checklistGroups}<div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;"><div style="font-size:7pt; font-weight:bold;">NOTES / ACCESSORIES:</div><div style="font-size:7pt;">Spare Tire [ ] Jack [ ] Fire Ext [ ] Triangle [ ]</div></div></div>`;
+            const returnHtml = `<div class="insp-right-col"><div class="insp-section-head">RETURN CHECK (End of Rental)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0;"><tr style="background:#eee;"><th>KM IN (${kmAllowedTotal} Max)</th><td><br>__________________</td></tr><tr style="background:#eee;"><th>FUEL LEVEL</th><td><span style="font-size:7pt;">[ ] Full [ ] 3/4 [ ] 1/2 [ ] 1/4 [ ] Empty</span></td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">MARK NEW DAMAGES:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div></div>${checklistGroups}<div class="box-section" style="margin-top:5px; margin-bottom:2px; padding:2px;"><span class="bs-title" style="font-size:7pt;">FINAL SETTLEMENT</span><table class="pt" style="font-size:8pt; margin-bottom:0;"><tr><th width="45%">Item Description</th><th width="30%">Rate x Qty</th><th width="25%">Total (EGP)</th></tr> <tr><td>Excess KM</td><td align="center">_______ x _______</td><td align="right">___________</td></tr><tr><td>Late Return</td><td align="center">_______ x _______</td><td align="right">___________</td></tr><tr><td>Cleaning Fees</td><td align="center">-</td><td align="right">___________</td></tr><tr><td>Fuel Shortage</td><td align="center">-</td><td align="right">___________</td></tr><tr><td>Traffic Fines</td><td align="center">-</td><td align="right">___________</td></tr><tr><td>New Damages</td><td align="center">-</td><td align="right">___________</td></tr><tr style="font-weight:bold; background:#eee;"><td colspan="2" align="right">TOTAL DEDUCTIONS:</td><td align="right">___________ EGP</td></tr></table></div><div style="font-size:7.5pt; font-weight:bold; margin-top:5px; border:1px solid #000; padding:3px; background:#fff3e0;">IMPORTANT: If the RETURN CHECK is not closed/signed, the Lessee retains full liability.</div></div>`;
 
-            let pickupHtmlClean = `
-                <div class="insp-left-col">
-                    <div class="insp-section-head">PICKUP CHECK (Start of Rental)</div>
-                    <div class="box-section" style="padding:2px; margin-bottom:5px;">
-                        <table class="pt" style="font-size:7pt; margin-bottom:0;">
-                            <tr style="background:#eee;"><th>KM OUT</th><td align="center">${conVal('con_kmOut')}</td></tr>
-                            <tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${conVal('con_fuelOut')}</td></tr>
-                        </table>
-                    </div>
-                    <div style="text-align:center; font-size:7pt; font-weight:bold;">EXISTING DAMAGES:</div>
-                    <div class="car-img-container"><img src="${carSrc}"></div>
-                    <div class="tire-img-wrapper">
-                        <div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div>
-                        <div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div>
-                    </div>
-                    ${checklistGroups}
-                    <div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;">
-                        <div style="font-size:7pt; font-weight:bold;">NOTES / ACCESSORIES:</div>
-                        <div style="font-size:7pt;">Spare Tire [ ] Jack [ ] Fire Ext [ ] Triangle [ ]</div>
-                    </div>
-                </div>`;
+            html += `<div class="a4-page"><div class="watermark"><img src="${logoSrc}"></div><div class="page-content"><div class="doc-head"><strong>VISUAL INSPECTION REPORT</strong><span>Page 3/4</span></div><div style="font-size:8pt; text-align:center; font-weight:bold; margin-bottom:5px;">Contract: ${cid} | Date: ${today}</div><div class="insp-two-col">${pickupHtmlClean}${returnHtml}</div><div style="margin-top:auto; border-top:2px solid #000; padding-top:10px;"><div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;"><div style="width:30%;">PICKUP: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div><div style="width:30%;">RETURN: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div><div style="width:30%;">RETURN: Employee<br><br><br><br>____________________</div></div></div></div></div>`;
 
-            const returnHtml = `
-                <div class="insp-right-col">
-                    <div class="insp-section-head">RETURN CHECK (End of Rental)</div>
-                    <div class="box-section" style="padding:2px; margin-bottom:5px;">
-                         <table class="pt" style="font-size:7pt; margin-bottom:0;">
-                            <tr style="background:#eee;"><th>KM IN (${kmAllowedTotal} Max)</th><td><br>__________________</td></tr>
-                            <tr style="background:#eee;"><th>FUEL LEVEL</th><td><span style="font-size:7pt;">[ ] Full [ ] 3/4 [ ] 1/2 [ ] 1/4 [ ] Empty</span></td></tr>
-                         </table>
-                    </div>
-                    <div style="text-align:center; font-size:7pt; font-weight:bold;">MARK NEW DAMAGES:</div>
-                    <div class="car-img-container"><img src="${carSrc}"></div>
-                    <div class="tire-img-wrapper">
-                        <div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div>
-                        <div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div>
-                    </div>
-                    ${checklistGroups}
-                    <div class="box-section" style="margin-top:5px; margin-bottom:2px; padding:2px;">
-                        <span class="bs-title" style="font-size:7pt;">FINAL SETTLEMENT</span>
-                        <table class="pt" style="font-size:8pt; margin-bottom:0;">
-                            <tr><th width="45%">Item Description</th><th width="30%">Rate x Qty</th><th width="25%">Total (EGP)</th></tr> 
-                            <tr><td>Excess KM</td><td align="center">_______ x _______</td><td align="right">___________</td></tr>
-                            <tr><td>Late Return</td><td align="center">_______ x _______</td><td align="right">___________</td></tr>
-                            <tr><td>Cleaning Fees</td><td align="center">-</td><td align="right">___________</td></tr>
-                            <tr><td>Fuel Shortage</td><td align="center">-</td><td align="right">___________</td></tr>
-                            <tr><td>Traffic Fines</td><td align="center">-</td><td align="right">___________</td></tr>
-                            <tr><td>New Damages</td><td align="center">-</td><td align="right">___________</td></tr>
-                            <tr style="font-weight:bold; background:#eee;"><td colspan="2" align="right">TOTAL DEDUCTIONS:</td><td align="right">___________ EGP</td></tr>
-                        </table>
-                    </div>
-                    <div style="font-size:7.5pt; font-weight:bold; margin-top:5px; border:1px solid #000; padding:3px; background:#fff3e0;">
-                        IMPORTANT: If the RETURN CHECK is not closed/signed, the Lessee retains full liability.
-                    </div>
-                </div>`;
+            // --- PAGE 4: RECEIPTS ---
+            const singleRecHtml = (title, copyType, amountStr, details, isBlankDate = false, periodStr = "", isDeposit = false) => `<div class="receipt-half"><div class="rec-header"><table style="width:100%; border-collapse:collapse;"><tr><td width="20%"><img src="${logoSrc}" style="height:45px; object-fit:contain;"></td><td width="60%" align="center"><div class="rec-title">OFFICIAL RECEIPT</div><div style="font-size:9pt;">${copyType}</div></td><td width="20%" align="right"><img src="https://api.qrserver.com/v1/create-qr-code/?data=https://brothersegy.com&size=80x80" style="height:45px;"></td></tr></table><div style="text-align:right; font-size:9pt; margin-top:5px;">DATE: ${isBlankDate ? "___/___/202_" : today}</div><div style="text-align:right; font-weight:bold;">${title}</div></div><div class="rec-body-grid"><div class="rec-col"><div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${conVal('con_fname')} ${conVal('con_sname')}</span></div><div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${conVal('con_pass') || '-'}</span></div><div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${conVal('con_ph_code')} ${conVal('con_phone')}</span></div></div><div class="rec-col"><div class="rec-row"><span class="rec-label">CONTRACT NO</span><span class="rec-val">${cid}</span></div><div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:left;">${conVal('con_manModel')} | ${conVal('con_plate')}</span></div>${isDeposit ? '' : `<div class="rec-row"><span class="rec-label">PERIOD</span><span class="rec-val" style="font-size:8pt;">${periodStr}</span></div>`}</div></div><div class="rec-amount-box"><div class="rec-amount-row"><span class="rec-amount-lbl">AMOUNT RECEIVED</span><span class="rec-amount-val">${isBlankDate ? "____________ EGP" : amountStr}</span></div><div class="rec-amount-row" style="margin-bottom:0;"><span class="rec-amount-lbl" style="font-size:8pt;">PAYMENT DETAILS</span><span class="rec-val" style="font-size:8pt; font-weight:normal;">${isBlankDate ? "________________________" : details}</span></div></div><div style="font-size:7pt; color:#666; margin-top:5px;">${isDeposit ? "<strong style='color:#c0392b;'>* Fully refundable if returned in same condition. Deductions apply for damages/fines.</strong><br>" : "<strong>Breakdown:</strong> Base Tariff + Added Services (Insurance, Delivery, Logistics).<br>"}${!isDeposit && c.rentPending > 0 ? `<span style="color:#c0392b; font-weight:bold;">⚠ OUTSTANDING BALANCE: ${Math.round(c.rentPending).toLocaleString()} EGP</span>` : ''}</div><div class="rec-footer" style="padding-top:10px;"><div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;"><div style="flex-grow:1;"></div><div class="rec-sig-line">AUTHORIZED SIGNATURE<div style="font-size:8pt; margin-top:2px;">Date: ........................</div></div></div></div></div>`;
 
-            html += `
-            <div class="a4-page">
-                <div class="watermark"><img src="${logoSrc}"></div>
-                <div class="page-content">
-                    <div class="doc-head"><strong>VISUAL INSPECTION REPORT</strong><span>Page 3/4</span></div>
-                    <div style="font-size:8pt; text-align:center; font-weight:bold; margin-bottom:5px;">Contract: ${cid} | Date: ${today}</div>
-                    
-                    <div class="insp-two-col">
-                        ${pickupHtmlClean}
-                        ${returnHtml}
-                    </div>
+            let sDate = new Date(conVal('con_p_time')); if (isNaN(sDate)) sDate = new Date(); let finalDropoffDate = new Date(conVal('con_d_time')); if (isNaN(finalDropoffDate)) finalDropoffDate = new Date(sDate.getTime() + (c.days * 24 * 60 * 60 * 1000)); let fullPeriodStr = `${sDate.toLocaleDateString('en-GB')} to ${finalDropoffDate.toLocaleDateString('en-GB')}`;
 
-                    <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px;">
-                        <div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;">
-                            <div style="width:30%;">PICKUP: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div>
-                            <div style="width:30%;">RETURN: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div>
-                            <div style="width:30%;">RETURN: Employee<br><br><br><br>____________________</div>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-
-            // --- PAGE 4: ONE RECEIPT PAGE ONLY ---
-            const singleRecHtml = (title, copyType, amountStr, details, isBlankDate = false, periodStr = "", isDeposit = false) => `
-                <div class="receipt-half">
-                    <div class="rec-header">
-                        <table style="width:100%; border-collapse:collapse;">
-                            <tr>
-                                <td width="20%"><img src="${logoSrc}" style="height:45px; object-fit:contain;"></td>
-                                <td width="60%" align="center">
-                                    <div class="rec-title">OFFICIAL RECEIPT</div>
-                                    <div style="font-size:9pt;">${copyType}</div>
-                                </td>
-                                <td width="20%" align="right"><img src="https://api.qrserver.com/v1/create-qr-code/?data=https://brothersegy.com&size=80x80" style="height:45px;"></td>
-                            </tr>
-                        </table>
-                        <div style="text-align:right; font-size:9pt; margin-top:5px;">DATE: ${isBlankDate ? "___/___/202_" : today}</div>
-                        <div style="text-align:right; font-weight:bold;">${title}</div>
-                    </div>
-                    
-                    <div class="rec-body-grid">
-                        <div class="rec-col">
-                            <div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${conVal('con_fname')} ${conVal('con_sname')}</span></div>
-                            <div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${conVal('con_pass') || '-'}</span></div>
-                            <div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${conVal('con_ph_code')} ${conVal('con_phone')}</span></div>
-                        </div>
-                        <div class="rec-col">
-                            <div class="rec-row"><span class="rec-label">CONTRACT NO</span><span class="rec-val">${cid}</span></div>
-                            <div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:left;">${conVal('con_manModel')} | ${conVal('con_plate')}</span></div>
-                            ${isDeposit ? '' : `<div class="rec-row"><span class="rec-label">PERIOD</span><span class="rec-val" style="font-size:8pt;">${periodStr}</span></div>`}
-                        </div>
-                    </div>
-
-                    <div class="rec-amount-box">
-                        <div class="rec-amount-row">
-                            <span class="rec-amount-lbl">AMOUNT RECEIVED</span>
-                            <span class="rec-amount-val">${isBlankDate ? "____________ EGP" : amountStr}</span>
-                        </div>
-                        <div class="rec-amount-row" style="margin-bottom:0;">
-                            <span class="rec-amount-lbl" style="font-size:8pt;">PAYMENT DETAILS</span>
-                            <span class="rec-val" style="font-size:8pt; font-weight:normal;">${isBlankDate ? "________________________" : details}</span>
-                        </div>
-                    </div>
-                    
-                    <div style="font-size:7pt; color:#666; margin-top:5px;">
-                        ${isDeposit ? "<strong style='color:#c0392b;'>* Fully refundable if returned in same condition. Deductions apply for damages/fines.</strong><br>" : "<strong>Breakdown:</strong> Base Tariff + Added Services (Insurance, Delivery, Logistics).<br>"}
-                        ${!isDeposit && c.rentPending > 0 ? `<span style="color:#c0392b; font-weight:bold;">⚠ OUTSTANDING BALANCE: ${Math.round(c.rentPending).toLocaleString()} EGP</span>` : ''}
-                    </div>
-                    <div class="rec-footer" style="padding-top:10px;">
-                         <div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;">
-                            <div style="flex-grow:1;"></div>
-                            <div class="rec-sig-line">AUTHORIZED SIGNATURE<div style="font-size:8pt; margin-top:2px;">Date: ........................</div></div>
-                        </div>
-                    </div>
-                </div>`;
-
-            let sDate = new Date(conVal('con_p_time')); if (isNaN(sDate)) sDate = new Date();
-            let finalDropoffDate = new Date(conVal('con_d_time')); if (isNaN(finalDropoffDate)) finalDropoffDate = new Date(sDate.getTime() + (c.days * 24 * 60 * 60 * 1000));
-            let fullPeriodStr = `${sDate.toLocaleDateString('en-GB')} to ${finalDropoffDate.toLocaleDateString('en-GB')}`;
-
-            html += `
-            <div class="a4-page">
-                <div class="page-content">
-                    ${singleRecHtml('RENTAL PAYMENT', 'CLIENT COPY', Math.round(c.totalRentPaid).toLocaleString() + " EGP", rentInfo.breakdownDetails || "Pending", false, fullPeriodStr, false)}
-                    <div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>
-                    ${singleRecHtml('RENTAL PAYMENT', 'COMPANY COPY', Math.round(c.totalRentPaid).toLocaleString() + " EGP", rentInfo.breakdownDetails || "Pending", false, fullPeriodStr, false)}
-                </div>
-            </div>`;
+            html += `<div class="a4-page"><div class="page-content">${singleRecHtml('RENTAL PAYMENT', 'CLIENT COPY', Math.round(c.totalRentPaid).toLocaleString() + " EGP", rentInfo.breakdownDetails || "Pending", false, fullPeriodStr, false)}<div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>${singleRecHtml('RENTAL PAYMENT', 'COMPANY COPY', Math.round(c.totalRentPaid).toLocaleString() + " EGP", rentInfo.breakdownDetails || "Pending", false, fullPeriodStr, false)}</div></div>`;
 
             if (c.reqDep > 0 || totalDepPaid > 0) {
                 let depAmtStr = Math.round(totalDepPaid > 0 ? totalDepPaid : c.reqDep).toLocaleString() + " EGP";
-                html += `
-                <div class="a4-page">
-                    <div class="page-content">
-                        ${singleRecHtml('SECURITY DEPOSIT', 'CLIENT COPY', depAmtStr, depInfo.breakdownDetails || "Pending", totalDepPaid <= 0, "", true)}
-                        <div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>
-                        ${singleRecHtml('SECURITY DEPOSIT', 'COMPANY COPY', depAmtStr, depInfo.breakdownDetails || "Pending", totalDepPaid <= 0, "", true)}
-                    </div>
-                </div>`;
+                html += `<div class="a4-page"><div class="page-content">${singleRecHtml('SECURITY DEPOSIT', 'CLIENT COPY', depAmtStr, depInfo.breakdownDetails || "Pending", totalDepPaid <= 0, "", true)}<div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>${singleRecHtml('SECURITY DEPOSIT', 'COMPANY COPY', depAmtStr, depInfo.breakdownDetails || "Pending", totalDepPaid <= 0, "", true)}</div></div>`;
             }
 
-            document.getElementById('contractOutput').innerHTML = html;
-            document.getElementById('contractOutput').style.display = "flex";
-            document.getElementById('btnRealPrint').style.display = "block";
-            
-            setTimeout(() => {
-                const ws = document.getElementById('main-workspace');
-                const out = document.getElementById('contractOutput');
-                if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); }
-            }, 100);
+            document.getElementById('contractOutput').innerHTML = html; document.getElementById('contractOutput').style.display = "flex"; document.getElementById('btnRealPrint').style.display = "block";
+            setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('contractOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
         }
-        
     </script>
 </body>
 </html>    
