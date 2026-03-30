@@ -99,26 +99,22 @@
         .btn-final-print:hover { background: #219653; transform: scale(1.01); }
 
         /* ================= BULLETPROOF PRINT ENGINE ================= */
-        #contractOutput { display: none; margin: 20px auto; padding-bottom: 20px; align-items: center; flex-direction: column; gap: 20px; }
+        #contractOutput, #proposalOutput { display: none; margin: 20px auto; padding-bottom: 20px; align-items: center; flex-direction: column; gap: 20px; }
         .a4-page { width: 210mm; height: 296mm; padding: 10mm 15mm; margin: 0 auto; background: white; color: #000; position: relative; box-sizing: border-box; font-family: 'Helvetica', 'Arial', sans-serif; font-size: 9.5pt; line-height: 1.35; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); }
         
         @media print {
             @page { margin: 0; size: A4 portrait; }
             body, html { background: white !important; margin: 0 !important; padding: 0 !important; height: auto !important; width: auto !important; overflow: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
-            /* HIDE EVERYTHING EXCEPT THE CONTRACT */
             #login-overlay, .video-wrapper, #data-loader, .navbar, .sidebar, .cp-body, .btn-final-print, .btn-gen { display: none !important; }
             
-            /* Free the Workspace */
             #app-layout { display: block !important; }
             .workspace { margin: 0 !important; padding: 0 !important; width: 100% !important; height: auto !important; background: white !important; overflow: visible !important; position: static !important; }
-            #view-en-contract { display: block !important; }
+            #view-en-contract, #view-proposal { display: block !important; }
             
-            /* The Contract Output Container */
-            #contractOutput { display: block !important; position: static !important; margin: 0 !important; padding: 0 !important; }
-            #contractOutput * { visibility: visible; }
+            #contractOutput, #proposalOutput { display: block !important; position: static !important; margin: 0 !important; padding: 0 !important; }
+            #contractOutput *, #proposalOutput * { visibility: visible; }
             
-            /* Print Specific Page Styles */
             .a4-page { width: 210mm; height: 296mm; margin: 0 !important; padding: 10mm 15mm !important; border: none !important; box-shadow: none !important; page-break-after: always; page-break-inside: avoid; }
         }
 
@@ -137,36 +133,7 @@
         .terms-grid { font-size: 8.5pt; text-align: justify; column-count: 2; column-gap: 30px; line-height: 1.2; margin-bottom: 5px; }
         .term-p { margin-bottom: 12px; break-inside: avoid; }
         .term-h { font-weight: 800; text-transform: uppercase; display: block; margin-bottom: 3px; border-bottom: 1px solid #999; padding-bottom: 2px; font-size: 9.5pt; color: #04509D; }
-        .car-img-container { width: 100%; aspect-ratio: 960/618; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
-        .car-img-container img { width: 100%; height: 100%; object-fit: contain; }
-        .tire-img-wrapper { display: flex; align-items: center; gap: 5px; justify-content: center; margin-top: 2px; }
-        .tire-img-container { height: 50px; aspect-ratio: 219/350; display: flex; align-items: center; justify-content: center; }
-        .tire-img-container img { width: 100%; height: 100%; object-fit: contain; }
-        .insp-two-col { display: flex; width: 100%; height: 100%; gap: 10px; }
-        .insp-left-col { width: 50%; border-right: 1px dashed #000; padding-right: 10px; display: flex; flex-direction: column; justify-content: flex-start; }
-        .insp-right-col { width: 50%; padding-left: 10px; display: flex; flex-direction: column; justify-content: flex-start; }
-        .insp-section-head { background: #eee; font-weight: bold; padding: 5px; text-align: center; font-size: 9pt; border-bottom: 1px solid #000; margin-bottom: 5px; text-transform: uppercase; }
-        .insp-group-head { background: #000; color: #fff; font-weight: bold; font-size: 7.5pt; padding: 2px 4px; margin-top: 5px; margin-bottom: 3px; text-transform: uppercase; border-radius: 2px; }
-        .v-insp-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; font-size: 7pt; border-bottom: 1px dotted #ccc; padding-bottom: 2px; }
-        .v-label { font-weight: bold; font-size: 6.5pt; text-transform: uppercase; flex-grow: 1; }
-        .v-check-group { display: flex; gap: 3px; }
-        .v-check-box { width: 12px; height: 12px; border: 1.5px solid #000; display: inline-block; background: transparent; }
-        .v-green { border-color: #27ae60; background: #e8f8f5; }
-        .v-red { border-color: #c0392b; background: #fdedec; }
-        .receipt-half { height: 48%; border: 2px solid #000; padding: 15px; display: flex; flex-direction: column; position: relative; box-sizing: border-box; background: white; margin-bottom: 0; }
-        .rec-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
-        .rec-logo { height: 45px; }
-        .rec-title { font-size: 16pt; font-weight: bold; text-transform: uppercase; color: #04509D; }
-        .rec-body-grid { display: flex; gap: 20px; font-size: 9pt; line-height: 1.6; border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
-        .rec-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-        .rec-row { display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; }
-        .rec-label { font-weight: bold; color: #555; text-transform: uppercase; font-size: 8.5pt; }
-        .rec-val { font-weight: bold; color: #000; text-align: right; }
-        .rec-amount-box { border: 1px solid #ccc; background: #fbfbfb; padding: 10px 15px; margin-bottom: 5px; }
-        .rec-amount-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .rec-amount-lbl { font-weight: bold; color: #555; font-size: 10pt; text-transform: uppercase; }
-        .rec-amount-val { font-size: 18pt; font-weight: bold; color: #000; }
-        .rec-sig-line { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; font-size: 9pt; font-weight: bold; }
+        
         /* ================= MASTER FLEET RADAR CSS ================= */
         .status-ready { background: #7f8c8d !important; color: white !important; }
         .status-proposed { background: #e84393 !important; color: white !important; }
@@ -178,7 +145,6 @@
         .status-goingsoon { background: #9b59b6 !important; color: white !important; }
         .status-maint { background: #2d3436 !important; color: white !important; }
 
-        /* Perfect Arabic Formatting */
         .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
         .color-dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.3); flex-shrink: 0; }
 
@@ -187,23 +153,18 @@
         .gantt-viewport { width: 100%; overflow: hidden; cursor: grab; background: rgba(0,0,0,0.3); border-radius: 6px; position: relative; border: 1px solid var(--glass-border); }
         .gantt-viewport:active { cursor: grabbing; }
         .gantt-wrapper { position: relative; height: 45px; display: flex; align-items: center; }
-        
         .gantt-bar { position: absolute; height: 16px; border-radius: 4px; cursor: pointer; transition: 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.5); margin-top: 8px; }
         .gantt-bar:hover { filter: brightness(1.3); outline: 1px solid white; z-index: 50 !important; }
         
-        /* The Global Live Time Pointer */
         .live-time-pointer { position: absolute; top: 0; bottom: 0; width: 2px; background: #00ffcc; z-index: 100; box-shadow: 0 0 10px #00ffcc; pointer-events: none; }
         .live-time-label { position: absolute; top: 18px; left: 4px; font-size: 9px; color: #00ffcc; font-weight: bold; background: rgba(0,0,0,0.8); padding: 2px 4px; border-radius: 4px; }
         
-        /* Clickable Elements */
         .clickable-obj { cursor: pointer; transition: 0.2s; }
         .clickable-obj:hover { opacity: 0.7; transform: scale(1.05); color: #00d2ff !important; }
 
-        /* Super Global Tooltip (Escapes all traps) */
         #global-tooltip { position: fixed; visibility: hidden; opacity: 0; background: rgba(15, 20, 25, 0.98); color: white; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid var(--primary); z-index: 999999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.9); pointer-events: none; transition: opacity 0.1s ease-out; width: max-content; min-width: 220px; top: 0; left: 0; }
 
         /* ================= VEHICLE 360 INTERACTIVE UI ================= */
-        /* Fleet Chip Cloud */
         .fleet-chip-track { display: flex; gap: 10px; overflow-x: auto; padding: 10px 5px 15px 5px; scroll-behavior: smooth; }
         .fleet-chip-track::-webkit-scrollbar { height: 6px; }
         .fleet-chip-track::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
@@ -211,7 +172,6 @@
         .fleet-chip:hover { background: rgba(255,255,255,0.1); color: white; }
         .fleet-chip.active { color: white; border-color: var(--primary); background: rgba(4, 80, 157, 0.3); box-shadow: 0 0 10px rgba(4, 80, 157, 0.5); }
         
-        /* Interactive KPI Filters */
         .kpi-filter { cursor: pointer; transition: 0.3s; user-select: none; position: relative; }
         .kpi-filter:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
         .kpi-filter.inactive { opacity: 0.3; filter: grayscale(1); transform: scale(0.98); border-color: transparent !important; box-shadow: none; }
@@ -231,7 +191,6 @@
         .modal-btn { padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; font-family: 'Cairo', sans-serif; }
         .modal-btn-save { background: var(--primary); color: white; }
         .modal-btn-pay { background: var(--success); color: white; }
-        
     </style>
 </head>
 <body>
@@ -353,14 +312,8 @@
                 </div>
                 <div class="table-responsive" style="overflow: visible;">
                     <table class="data-table">
-                        <thead><tr>
-                            <th style="width: 30%; text-align: right;">السيارة (Vehicle Identity)</th>
-                            <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                            <th style="width: 45%; text-align: center;">
-                                📅 Timeline <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Click & Drag to Pan) <i class="fa-solid fa-arrows-left-right"></i></span>
-                            </th>
-                            <th style="width: 15%;">Assignment Info</th>
-                        </tr></thead>
+                        <thead id="radar-head">
+                        </thead>
                         <tbody id="radar-body"></tbody>
                     </table>
                 </div>
@@ -405,8 +358,7 @@
                     <button onclick="resetV360Filters()" style="background:var(--danger); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-rotate-right"></i> Reset All Filters</button>
                 </div>
 
-                <div class="fleet-chip-track" id="v360-chip-track" dir="rtl">
-                    </div>
+                <div class="fleet-chip-track" id="v360-chip-track" dir="rtl"></div>
 
                 <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: flex-end;">
                     <div style="flex: 2;">
@@ -442,7 +394,7 @@
                     <div class="m-card kpi-filter" id="kpicard-maint" onclick="toggleV360KPI('maint', this)" style="border-top: 3px solid #e74c3c; padding:15px;"><label>Maintenance (صيانة)</label><div class="val" id="v-maint" style="color:#e74c3c; font-size:22px;">0 EGP</div></div>
                     <div class="m-card kpi-filter" id="kpicard-docs" onclick="toggleV360KPI('docs', this)" style="border-top: 3px solid #9b59b6; padding:15px;"><label>Licensing/Docs (مخالفات)</label><div class="val" id="v-docs" style="color:#9b59b6; font-size:22px;">0 EGP</div></div>
                     <div class="m-card kpi-filter" id="kpicard-other" onclick="toggleV360KPI('other', this)" style="border-top: 3px solid #e67e22; padding:15px;"><label>Other / Owners (أخرى)</label><div class="val" id="v-other" style="color:#e67e22; font-size:22px;">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 3px solid #95a5a6; padding:15px;"><label>Total Deductions (إجمالي الخصومات)</label><div class="val" id="v-exp" style="color:#95a5a6; font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid #95a5a6; padding:15px;"><label>Total Deductions (الخصومات)</label><div class="val" id="v-exp" style="color:#95a5a6; font-size:22px;">0 EGP</div></div>
                 </div>
 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
@@ -547,11 +499,11 @@
                         <div><label class="contract-label">Security Deposit</label><input type="number" id="prop_dep" class="contract-input" value="0"></div>
                         <div style="display:flex; align-items:center; gap:5px; margin-top:15px;">
                             <input type="checkbox" id="prop_chk_seat" onchange="runPropCalc()" style="width:15px; height:15px; margin:0;">
-                            <span style="font-size:12px; font-weight:bold; color:white;">Child Seat</span>
+                            <span style="font-size:12px; font-weight:bold; color:#111;">Child Seat</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:5px; margin-top:15px;">
                             <input type="checkbox" id="prop_chk_driver" onchange="runPropCalc()" style="width:15px; height:15px; margin:0;">
-                            <span style="font-size:12px; font-weight:bold; color:white;">Add. Driver</span>
+                            <span style="font-size:12px; font-weight:bold; color:#111;">Add. Driver</span>
                         </div>
                     </div>
 
@@ -566,13 +518,13 @@
                     </div>
                 </div>
                 
-                <div id="proposalOutput" style="display:none; margin-top:20px; padding-bottom:50px; flex-direction:column; gap:20px; align-items:center;"></div>
+                <div id="proposalOutput"></div>
             </div>
-                    
+
             <div id="view-en-contract" class="view-section">
                 <div class="cp-body">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h2 style="margin:0;"><i class="fa-solid fa-file-contract"></i> Smart EN Contract Generator</h2>
+                        <h2 style="margin:0;"><i class="fa-solid fa-file-contract"></i> Smart EN Contract Generator (CRM Linked)</h2>
                     </div>
                     
                     <div class="section-head">1. Contract & Branch</div>
@@ -584,7 +536,7 @@
                             </select>
                         </div>
                         <div><label class="contract-label">Rental Mode</label>
-                            <select class="contract-input" id="con_mode" onchange="document.getElementById('lbl_rate').innerText = this.value === 'Monthly' ? 'Monthly Rent (EGP)' : 'Daily Rent (EGP)'; runContractCalc();">
+                            <select class="contract-input" id="con_mode" onchange="document.getElementById('con_lbl_rate').innerText = this.value === 'Monthly' ? 'Monthly Rent (EGP)' : 'Daily Rent (EGP)'; runContractCalc();">
                                 <option value="Daily">Daily (Short Term)</option><option value="Monthly">Monthly (Long Term)</option>
                             </select>
                         </div>
@@ -610,35 +562,26 @@
                         <div><label class="contract-label">Fuel Level</label>
                             <select class="contract-input" id="con_fuelOut"><option>Full (8/8)</option><option>3/4</option><option>1/2</option><option>1/4</option><option>Reserve</option></select>
                         </div>
-                        <div><label class="contract-label" id="lbl_rate">Daily Rent (EGP)</label><input type="number" class="contract-input" id="con_rateRent" value="0" oninput="runContractCalc()"></div>
+                        <div><label class="contract-label" id="con_lbl_rate">Daily Rent (EGP)</label><input type="number" class="contract-input" id="con_rateRent" value="0" oninput="runContractCalc()"></div>
                         <div><label class="contract-label">Ins. Fee (Daily)</label><input type="number" class="contract-input" id="con_rateIns" value="0" oninput="runContractCalc()"></div>
                     </div>
 
                     <div class="section-head">3. Client & Dates (Live CRM Connected)</div>
-                    
-                    <div id="crm_search_container" style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background:rgba(4, 80, 157, 0.1); border:1px solid var(--primary); padding:10px; border-radius:8px;">
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background:rgba(4, 80, 157, 0.1); border:1px solid var(--primary); padding:10px; border-radius:8px;">
                         <div style="flex-grow:1;">
-                            <label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> Search & Auto-Fill Client</label>
-                            <input list="client-list" id="crm_search" class="contract-input" placeholder="Type Name or Passport to Search..." onchange="autoFillClient()" style="border-color:var(--primary);">
-                        </div>
-                        <div style="display:flex; gap:5px; margin-top:15px;">
-                            <button onclick="startNewClient()" style="background:#2ecc71; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-plus"></i> New</button>
-                            <button onclick="enableClientEdit()" style="background:#f39c12; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-pen"></i> Edit</button>
-                            <button id="btn_save_client" onclick="saveClientToFirebase()" style="background:#e74c3c; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; display:none;"><i class="fa-solid fa-cloud-arrow-up"></i> Save</button>
-                            <button id="btn_cancel_client" onclick="cancelClientEdit()" style="background:#888; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; display:none;"><i class="fa-solid fa-xmark"></i> Cancel</button>
+                            <label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> Search CRM Database</label>
+                            <input list="client-list" id="con_crm_search" class="contract-input" placeholder="Type Name or Passport to Search..." onchange="autoFillConClient()" style="border-color:var(--primary);">
                         </div>
                     </div>
-                    
                     <input type="hidden" id="con_client_id" value="">
-                    <div style="font-size:11px; color:#aaa; margin-bottom:10px; text-align:right;">CRM ID: <span id="display_client_id" style="color:var(--success); font-weight:bold;">UNSAVED</span></div>
                     
-                    <div class="grid-4 crm-fields">
+                    <div class="grid-4">
                         <div><label class="contract-label">First Name *</label><input type="text" class="contract-input" id="con_fname" readonly></div>
                         <div><label class="contract-label">Surname *</label><input type="text" class="contract-input" id="con_sname" readonly></div>
                         <div><label class="contract-label">Passport / National ID *</label><input type="text" class="contract-input" id="con_pass" readonly></div>
                         <div><label class="contract-label">Nationality</label><input type="text" class="contract-input" id="con_nation" readonly></div>
                     </div>
-                    <div class="grid-4 crm-fields">
+                    <div class="grid-4">
                         <div><label class="contract-label">Phone *</label>
                             <div class="phone-group"><input type="text" class="contract-input" id="con_ph_code" value="+20" readonly><input type="text" class="contract-input" id="con_phone" readonly></div>
                         </div>
@@ -655,16 +598,12 @@
                     <div class="grid-4" style="margin-top:10px;">
                         <div><label class="contract-label">Pickup Date/Time</label><input type="datetime-local" class="contract-input" id="con_p_time" onchange="runContractCalc()"></div>
                         <div><label class="contract-label">Pickup Location</label>
-                            <select class="contract-input" id="con_p_loc" onchange="runContractCalc()">
-                                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option>
-                            </select>
+                            <select class="contract-input" id="con_p_loc" onchange="runContractCalc()"><option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option></select>
                             <input type="text" class="contract-input" id="con_p_addr" placeholder="Specific Addr..." style="margin-top:5px;" oninput="runContractCalc()">
                         </div>
                         <div><label class="contract-label">Dropoff Date/Time</label><input type="datetime-local" class="contract-input" id="con_d_time" onchange="runContractCalc()"></div>
                         <div><label class="contract-label">Dropoff Location</label>
-                            <select class="contract-input" id="con_d_loc" onchange="runContractCalc()">
-                                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option>
-                            </select>
+                            <select class="contract-input" id="con_d_loc" onchange="runContractCalc()"><option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option></select>
                             <input type="text" class="contract-input" id="con_d_addr" placeholder="Specific Addr..." style="margin-top:5px;" oninput="runContractCalc()">
                         </div>
                     </div>
@@ -699,24 +638,21 @@
                             </div>
 
                             <div class="grid-2">
-                                <div><label class="contract-label">Insurance Package</label><select class="contract-input" id="con_insPack" onchange="runContractCalc()">
+                                <div><label class="contract-label">Insurance Package</label>
+                                    <select class="contract-input" id="con_insPack" onchange="runContractCalc()">
                                         <option value="Basic">Basic (100% Client Liability)</option>
                                         <option value="Intermediate">Intermediate (70% / 30%)</option>
                                         <option value="Full Protection">Full Protection (Zero Liability)</option>
-                                    </select></div>
-
+                                    </select>
+                                </div>
                                 <div><label class="contract-label">Add-ons & KM Package</label>
                                     <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
                                         <div style="display:flex; align-items:center; gap:5px;">
                                             <select class="contract-input" id="con_km_pkg" onchange="runContractCalc()" style="height:26px; font-size:11px; padding:0 5px;">
-                                                <option value="0" data-km="0">Standard (120 KM/Day)</option>
-                                                <option value="1800" data-km="500">500 KM Extra</option>
-                                                <option value="2700" data-km="750">750 KM Extra</option>
-                                                <option value="3600" data-km="1000">1000 KM Extra</option>
-                                                <option value="5400" data-km="1500">1500 KM Package</option>
-                                                <option value="7200" data-km="2000">2000 KM Package</option>
-                                                <option value="10800" data-km="3000">3000 KM Package</option>
-                                                <option value="500" data-km="999999">Unlimited KM (Per Day)</option>
+                                                <option value="0" data-km="0">Standard (120 KM/Day)</option><option value="1800" data-km="500">500 KM Extra</option>
+                                                <option value="2700" data-km="750">750 KM Extra</option><option value="3600" data-km="1000">1000 KM Extra</option>
+                                                <option value="5400" data-km="1500">1500 KM Package</option><option value="7200" data-km="2000">2000 KM Package</option>
+                                                <option value="10800" data-km="3000">3000 KM Package</option><option value="500" data-km="999999">Unlimited KM (Per Day)</option>
                                             </select>
                                             <input type="number" class="contract-input" id="con_km_pkg_cost_manual" value="0" oninput="runContractCalc()" placeholder="Cost Override" style="height:26px; width:80px; padding:2px 5px;">
                                         </div>
@@ -743,7 +679,6 @@
                                 <div class="bal-row"><span>Fees/Addons:</span> <strong id="con_c_fees">0</strong></div>
                                 <div style="text-align:center; font-size:18px; font-weight:bold; color:#e67e22; margin-top:10px;" id="con_c_total_preview">0 EGP</div>
                             </div>
-
                             <div style="border-bottom:1px dashed rgba(255, 255, 255, 0.3); padding-bottom:10px; margin-bottom:10px;">
                                 <div style="text-align:center; font-weight:bold; font-size:12px; margin-bottom:10px; color:var(--accent);">DEPOSIT</div>
                                 <div class="bal-row"><span>Target:</span> <strong id="con_val_dep_req">0</strong></div>
@@ -753,7 +688,6 @@
                                     <div id="con_val_dep_pending" style="font-size:13px; font-weight:bold;">0</div>
                                 </div>
                             </div>
-
                             <div style="margin-top:auto;">
                                 <div class="bal-row"><span>Due:</span> <strong id="con_val_total_due">0</strong></div>
                                 <div class="bal-row"><span>Paid:</span> <strong id="con_val_total_paid" style="color:var(--success);">0</strong></div>
@@ -765,11 +699,11 @@
                         </div>
                     </div>
 
-                    <button class="btn-gen" onclick="executeENContract()"><i class="fa-solid fa-eye"></i> 1. GENERATE PREVIEW</button>
+                    <button class="btn-gen" onclick="executeENContract()"><i class="fa-solid fa-eye"></i> 1. GENERATE CONTRACT PREVIEW</button>
                 </div>
                 
-                <div id="contractOutput" style="display:none; margin-top:20px; padding-bottom:50px; display:flex; flex-direction:column; gap:20px; align-items:center;"></div>
-                <button id="btnRealPrint" onclick="window.print()" class="btn-final-print" style="margin-bottom:50px;"><i class="fa-solid fa-print"></i> 2. CONFIRM & SAVE PDF</button>
+                <div id="contractOutput" style="display:none; margin-top:20px; padding-bottom:50px; flex-direction:column; gap:20px; align-items:center;"></div>
+                <button id="btnRealPrint" onclick="window.print()" class="btn-final-print" style="margin-bottom:50px; display:none;"><i class="fa-solid fa-print"></i> 2. CONFIRM & SAVE PDF</button>
             </div>
 
             <div id="view-frame" class="view-section" style="height:100%;">
@@ -784,28 +718,24 @@
                 <div class="modal-title" id="qm-title"><i class="fa-solid fa-pen-to-square"></i> <span>Edit Record</span></div>
                 <button class="modal-close" onclick="closeQuickModal()"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="modal-body" id="qm-body">
-                </div>
-            <div class="modal-footer" id="qm-footer">
-                </div>
+            <div class="modal-body" id="qm-body"></div>
+            <div class="modal-footer" id="qm-footer"></div>
         </div>
     </div>
                         
     <div style="display:none;">
         <img id="img_logo" src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" crossorigin="anonymous">
         <img id="img_car" src="https://brothersegy.com/wp-content/uploads/2026/02/car-template.png" crossorigin="anonymous">
-        
         <datalist id="client-list"></datalist>
     </div>
 
     <script>
-        // Force video play
+        // --- 0. CLOCK & VIDEO ---
         document.addEventListener('DOMContentLoaded', () => {
             const vid = document.getElementById('bg-video');
             if(vid) vid.play().catch(e => console.log("Auto-play constrained."));
         });
 
-        // Bulletproof Immediate Clock (CAIRO TIMEZONE)
         (function startGlobalClock() {
             function tick() {
                 const clk = document.getElementById('global_clock');
@@ -819,7 +749,7 @@
                 }
             }
             setInterval(tick, 1000);
-            tick(); // Run instantly on load
+            tick(); 
         })();
 
         // --- 1. FIREBASE & GLOBALS ---
@@ -828,11 +758,9 @@
         const db = firebase.firestore();
 
         const APP_DATA = { cars: [], bookings: [], car_expenses: [], customers: [], user: null, liveRates: { usd: 50, eur: 54 } };
-        
-        // TIMELINE CONSTANT (Moved up to prevent crashing)
-        const T_WIDTH_PX = 2160;
+        const T_WIDTH_PX = 2160; // 90 days * 24px per day (For Radar)
 
-        // --- 2. AUTHENTICATION ---
+        // --- 2. AUTHENTICATION & DATA LOAD ---
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
 
         async function attemptLogin() {
@@ -848,7 +776,6 @@
                 const userDoc = await db.collection("users").doc(user).get();
                 if (userDoc.exists && userDoc.data().password === pass) {
                     APP_DATA.user = userDoc.data();
-                    
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('data-loader').style.display = 'flex'; 
                     
@@ -886,64 +813,74 @@
             } catch(e) { console.log("Rate API blocked. Using defaults."); }
         }
 
-        // --- 3. REAL-TIME DATA ENGINE ---
         function loadCloudData() {
             return new Promise((resolve) => {
                 let loaded = { fleet: false, bookings: false, expenses: false, customers: false };
                 const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers) resolve(); };
 
-                // Live Sync Fleet
                 db.collection('fleet').onSnapshot(snap => {
-                    APP_DATA.cars = [];
-                    snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
+                    APP_DATA.cars = []; snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() }));
                     if(document.getElementById('view-radar').style.display === 'block') buildRadar();
                     loaded.fleet = true; checkDone();
                 });
-
-                // Live Sync Orders
                 db.collection('bookings').onSnapshot(snap => {
-                    APP_DATA.bookings = [];
-                    snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
+                    APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() }));
                     if(document.getElementById('view-radar').style.display === 'block') buildRadar();
                     loaded.bookings = true; checkDone();
                 });
-
-                // Live Sync Financials
                 db.collection('car_expenses').onSnapshot(snap => {
-                    APP_DATA.car_expenses = [];
-                    snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
+                    APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() }));
                     loaded.expenses = true; checkDone();
                 });
-
-                // Live Sync CRM
                 db.collection('customers').onSnapshot(snap => {
-                    APP_DATA.customers = [];
-                    snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
-                    if(document.getElementById('view-en-contract').style.display === 'block') populateClientList();
+                    APP_DATA.customers = []; snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() }));
+                    if(document.getElementById('view-proposal').style.display === 'block') populateClientList();
                     loaded.customers = true; checkDone();
                 });
             });
         }
 
-        // Custom UI Notification to replace ugly browser alerts
+        // --- 3. UTILITIES & HELPERS ---
         function showToast(msg) {
             let t = document.getElementById('custom-toast');
             if(!t) {
                 t = document.createElement('div'); t.id = 'custom-toast';
-                t.style.cssText = 'position:fixed; bottom:30px; right:30px; background:var(--primary); color:white; padding:15px 25px; border-radius:8px; z-index:99999; box-shadow:0 10px 30px rgba(0,0,0,0.5); font-weight:bold; transition:0.3s; transform:translateY(100px); opacity:0;';
+                t.style.cssText = 'position:fixed; bottom:30px; right:30px; background:var(--primary); color:white; padding:15px 25px; border-radius:8px; z-index:9999999; box-shadow:0 10px 30px rgba(0,0,0,0.5); font-weight:bold; transition:0.3s; transform:translateY(100px); opacity:0;';
                 document.body.appendChild(t);
             }
-            t.innerText = msg;
-            t.style.transform = 'translateY(0)'; t.style.opacity = '1';
+            t.innerText = msg; t.style.transform = 'translateY(0)'; t.style.opacity = '1';
             setTimeout(() => { t.style.transform = 'translateY(100px)'; t.style.opacity = '0'; }, 3000);
         }
 
         function parseCurrency(val) { return parseFloat(String(val).replace(/[^0-9.-]+/g,"")) || 0; }
         function formatEGP(val) { return val.toLocaleString() + " EGP"; }
 
+        function getSafeVal(obj, searchKeys) {
+            if(!obj) return "";
+            for (let sk of searchKeys) {
+                const target = sk.toLowerCase().trim();
+                const foundKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
+                if (foundKey && obj[foundKey]) return String(obj[foundKey]).trim();
+            }
+            return "";
+        }
+
+        function getCarColorHex(colorStr) {
+            const str = String(colorStr || "").toLowerCase().trim();
+            if (str.includes("red") || str.includes("احمر") || str.includes("أحمر")) return "#e74c3c";
+            if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق") || str.includes("كحلي")) return "#02006c";
+            if (str.includes("black") || str.includes("اسود") || str.includes("أسود")) return "#2c3e50";
+            if (str.includes("silver") || str.includes("فضي")) return "#bdc3c7";
+            if (str.includes("white") || str.includes("ابيض") || str.includes("أبيض")) return "#ffffff";
+            if (str.includes("grey") || str.includes("gray") || str.includes("رمادي")) return "#7f8c8d";
+            if (str.includes("ashen") || str.includes("فئراني") || str.includes("فيراني")) return "#95a5a6";
+            if (str.includes("brown") || str.includes("بني")) return "#8d6e63";
+            return "#2ecc71"; // Default
+        }
+
         // --- 4. ROUTING ---
         function route(viewId, btnEl = null) {
-            document.getElementById('global-rates-panel').style.display = 'flex'; // Rates always visible
+            document.getElementById('global-rates-panel').style.display = 'flex'; 
             document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.side-item, .top-btn').forEach(el => el.classList.remove('active'));
             
@@ -955,68 +892,153 @@
             if(viewId === 'v360') initV360Chips();
             if(viewId === 'crm') buildCRM();
             if(viewId === 'risk') buildRiskRadar();
-            if(viewId === 'en-contract') prepNativeContract();
             if(viewId === 'proposal') prepProposal();
+            if(viewId === 'en-contract') prepNativeContract();
         }
 
         function loadFrame(url, btnEl) {
             document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.side-item, .top-btn').forEach(el => el.classList.remove('active'));
             if(btnEl) btnEl.classList.add('active');
-            
             document.getElementById('view-frame').style.display = 'block';
             document.getElementById('content-frame').src = url;
         }
 
-        // --- DASHBOARD MODULES (Radar, CRM, Orders, V360, Risk) ---
-        // --- 1. ROBUST HELPER: Fuzzy Key Finder (Fixes trailing spaces in Firebase) ---
-        function getSafeVal(obj, searchKeys) {
-            if(!obj) return "";
-            for (let sk of searchKeys) {
-                const target = sk.toLowerCase().trim();
-                const foundKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
-                if (foundKey && obj[foundKey]) return String(obj[foundKey]).trim();
+        function searchTable(tbodyId, inputId) {
+            const filter = document.getElementById(inputId).value.toLowerCase();
+            const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) { rows[i].style.display = rows[i].innerText.toLowerCase().includes(filter) ? "" : "none"; }
+        }
+
+        // --- 5. UNIVERSAL EDIT MODAL ENGINE (FULL DATABASE UI) ---
+        function openQuickModal(type, id) {
+            const m = document.getElementById('quick-modal');
+            const title = document.getElementById('qm-title');
+            const body = document.getElementById('qm-body');
+            const footer = document.getElementById('qm-footer');
+
+            let content = '';
+            let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
+
+            if(type === 'order') {
+                const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {};
+                const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                const paid = parseCurrency(b['المدفوع EGP']);
+                const debt = Math.max(0, total - paid);
+                
+                title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--success);"></i> <span>Financials & Status (Order #${id})</span>`;
+                content = `
+                    <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Client:</span> <b style="color:white;">${b['اسم العميل'] || 'Unknown'}</b></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Total Value:</span> <b style="color:white;">${total.toLocaleString()} EGP</b></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Paid:</span> <b style="color:var(--success);">${paid.toLocaleString()} EGP</b></div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:5px; margin-top:5px;"><span style="color:#aaa;">Remaining Debt:</span> <b style="color:var(--danger); font-size:16px;">${debt.toLocaleString()} EGP</b></div>
+                    </div>
+                    
+                    <div style="border:1px solid var(--glass-border); padding:15px; border-radius:8px; margin-bottom:15px; background:rgba(15,20,25,0.8);">
+                        <div style="color:var(--primary); font-size:12px; font-weight:bold; margin-bottom:10px; text-transform:uppercase;">AMOUNT RECEIVED NOW (Add Payment)</div>
+                        <div class="grid-4" style="gap:10px; margin-bottom:0;">
+                            <div><label style="font-size:10px; color:#aaa;">EGP Cash</label><input type="number" class="contract-input" placeholder="0"></div>
+                            <div><label style="font-size:10px; color:#aaa;">USD</label><input type="number" class="contract-input" placeholder="0"></div>
+                            <div><label style="font-size:10px; color:#aaa;">EUR</label><input type="number" class="contract-input" placeholder="0"></div>
+                            <div><label style="font-size:10px; color:#aaa;">Card / Online</label><input type="number" class="contract-input" placeholder="0"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label>
+                            <select class="contract-input"><option>Active (نشط)</option><option>Closed (مكتمل)</option><option>Cancelled (ملغي)</option></select>
+                        </div>
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Notes / Disputes</label>
+                            <input type="text" class="contract-input" placeholder="Add payment/dispute notes..." value="${b['ملاحظات'] || ''}">
+                        </div>
+                    </div>`;
+                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
+                           <button class="modal-btn modal-btn-pay" onclick="showToast('Phase 3: Payment Logged!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button>
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
+            
+            } else if (type === 'client') {
+                const c = APP_DATA.customers.find(x => String(x.id) === String(id) || String(x['الرقم القومى']) === String(id)) || {};
+                title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>Client Profile (ملف العميل)</span>`;
+                content = `
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">First Name *</label><input type="text" class="contract-input" value="${c['الاسم الأول'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Surname *</label><input type="text" class="contract-input" value="${c['الاسم الأخير'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Passport / ID *</label><input type="text" class="contract-input" value="${c['رقم جواز السفر'] || c['الرقم القومى'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Nationality</label><input type="text" class="contract-input" value="${c['رمز الدولة'] || ''}"></div>
+                    </div>
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Phone *</label><input type="text" class="contract-input" value="${c['رقم التليفون'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Email Address</label><input type="text" class="contract-input" value="${c['عنوان البريد الإلكتروني'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Driver License</label><input type="text" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Address</label><input type="text" class="contract-input" value="${c['العنوان'] || ''}"></div>
+                    </div>
+                    <div style="margin-bottom:5px;">
+                        <label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Info</label>
+                        <input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes...">
+                    </div>`;
+            
+            } else if (type === 'car') {
+                const car = APP_DATA.cars.find(x => String(x.id) === String(id)) || {};
+                let carName = `${getSafeVal(car, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(car, ['الطراز', 'Model'])}`.trim() || 'Unknown';
+                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>Vehicle Profile - ${carName} [${id}]</span>`;
+                content = `
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Brand / Type</label><input type="text" class="contract-input" value="${getSafeVal(car, ['النوع', 'Type', 'الماركة'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Model</label><input type="text" class="contract-input" value="${getSafeVal(car, ['الطراز', 'Model'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Year</label><input type="text" class="contract-input" value="${getSafeVal(car, ['سنة الصنع', 'Year'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Color</label><input type="text" class="contract-input" value="${getSafeVal(car, ['اللون', 'Color'])}"></div>
+                    </div>
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">VIN / Chassis</label><input type="text" class="contract-input" value="${getSafeVal(car, ['VIN', 'رقم الشاسيه'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Motor No.</label><input type="text" class="contract-input" value="${getSafeVal(car, ['Motor', 'رقم الموتور'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label>
+                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>حوادث (Accident)</option></select>
+                        </div>
+                    </div>
+                    <div class="grid-2" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">License Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Insurance Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}"></div>
+                    </div>
+                    <div style="margin-bottom:5px;">
+                        <label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label>
+                        <input type="text" class="contract-input" style="border-color:var(--danger);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc...">
+                    </div>`;
             }
-            return "";
+
+            body.innerHTML = content;
+            footer.innerHTML = buttons;
+            m.classList.add('show');
         }
 
-        // --- 2. COLOR ENGINE ---
-        function getCarColorHex(colorStr) {
-            const str = String(colorStr || "").toLowerCase().trim();
-            if (str.includes("red") || str.includes("احمر") || str.includes("أحمر")) return "#e74c3c";
-            if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق") || str.includes("كحلي")) return "#02006c";
-            if (str.includes("black") || str.includes("اسود") || str.includes("أسود")) return "#2c3e50";
-            if (str.includes("silver") || str.includes("فضي")) return "#bdc3c7";
-            if (str.includes("light blue") || str.includes("سماوي")) return "#20a7db";
-            if (str.includes("white") || str.includes("ابيض") || str.includes("أبيض")) return "#ffffff";
-            if (str.includes("grey") || str.includes("gray") || str.includes("رمادي")) return "#7f8c8d";
-            if (str.includes("ashen") || str.includes("فئراني") || str.includes("فيراني")) return "#95a5a6";
-            if (str.includes("brown") || str.includes("بني")) return "#8d6e63";
-            return "#2ecc71"; // Default Fallback
+        function closeQuickModal(e) {
+            if(e && e.target.id !== 'quick-modal') return;
+            document.getElementById('quick-modal').classList.remove('show');
         }
 
-        // --- 3. MASTER FLEET RADAR ENGINE ---
+        // --- 6. MASTER FLEET RADAR ---
         function buildRadar() {
             const body = document.getElementById('radar-body');
-            if(!body) return; // Failsafe
+            if(!body) return;
             body.innerHTML = '';
             
-            const cairoNowStr = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
-            const now = new Date(cairoNowStr);
+            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
             const nowMs = now.getTime();
-            
             const filter = document.getElementById('radar-status-filter').value;
             let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
 
-            // Rolling 90-Day Window: -30 Days to +60 Days
             const T_START = nowMs - (30 * 24 * 60 * 60 * 1000);
             const T_END = nowMs + (60 * 24 * 60 * 60 * 1000);
             const T_TOTAL_MS = T_END - T_START;
 
             let axisHTML = `<div style="position:absolute; top:0; left:0; width:100%; height:16px; border-bottom:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.5); z-index:1;">`;
             for(let i=0; i<=90; i+=5) {
-                let d = new Date(T_START + (i * 86400000));
                 let pct = (i / 90) * 100;
+                let d = new Date(T_START + (i * 86400000));
                 axisHTML += `<div style="position:absolute; left:${pct}%; top:2px; font-size:9px; color:#aaa; border-left:1px solid rgba(255,255,255,0.3); padding-left:4px;">${d.toLocaleDateString('en-GB', {month:'short', day:'numeric'})}</div>`;
             }
             axisHTML += `</div>`;
@@ -1027,38 +1049,27 @@
             const radarTable = document.querySelector('#view-radar .data-table');
             if (radarTable) radarTable.classList.add('radar-fixed-table');
 
-            document.getElementById('radar-head').innerHTML = `
-                <tr>
-                    <th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th>
-                    <th style="width: 10%; text-align: center;">الحالة (Status)</th>
-                    <th style="width: 48%; text-align: center; padding:5px 0;">
-                        <div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>
-                        ${headerTimeline}
-                    </th>
-                    <th style="width: 17%;">Assignment Info</th>
-                </tr>`;
+            document.getElementById('radar-head').innerHTML = `<tr>
+                <th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th>
+                <th style="width: 10%; text-align: center;">الحالة (Status)</th>
+                <th style="width: 48%; text-align: center; padding:5px 0;"><div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>${headerTimeline}</th>
+                <th style="width: 17%;">Assignment Info</th>
+            </tr>`;
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
-                const isActive = contractStr.includes('valid') || contractStr.includes('ساري');
-                if(filter === 'active' && !isActive) return;
+                if(filter === 'active' && !contractStr.includes('valid') && !contractStr.includes('ساري')) return;
 
-                // 1. PERFECT ARABIC FORMATTING
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
-                let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
-                let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
                 
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
                 let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
                 let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 
-                const carHTML = `
-                    <div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')">
-                        <span>${carName} (${cYear}) ${fullPlate} [${c.id}]</span>
-                        <div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div>
-                    </div>`;
+                const carHTML = `<div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')"><span>${carName} (${cYear}) ${fullPlate} [${c.id}]</span><div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div></div>`;
 
                 let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id));
                 carBookings.sort((a,b) => new Date(a['بداية التعاقد']).getTime() - new Date(b['بداية التعاقد']).getTime());
@@ -1081,33 +1092,29 @@
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']).getTime();
                     const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
-                    
                     if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    
                     assignmentText = `<span style="color:#888; font-size:10px;">Next:</span> <b class="clickable-obj" style="color:#fff" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else { counts.ready++; }
 
-                // 4. GENERATE HOUR-PERFECT TIMELINE BLOCKS
-                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}`;
-                timelineHTML += `<div class="live-time-pointer" style="left: 33.33%;"></div>`;
-                
+                let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left: 33.33%;"></div>`;
                 let occupiedLevels = [];
 
                 for (let b of carBookings) {
-                    let bStart = new Date(b['بداية التعاقد']).getTime(); 
-                    let bEnd = new Date(b['نهاية التعاقد']).getTime();
-                    
+                    let bStart = new Date(b['بداية التعاقد']).getTime(); let bEnd = new Date(b['نهاية التعاقد']).getTime();
                     if (bEnd > T_START && bStart < T_END) {
-                        let renderStart = Math.max(bStart, T_START);
-                        let renderEnd = Math.min(bEnd, T_END);
-                        
+                        let renderStart = Math.max(bStart, T_START); let renderEnd = Math.min(bEnd, T_END);
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100;
                         let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
                         const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                        const debt = Math.max(0, total - paid);
+                        const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
+                        const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
+                        
+                        let depBadge = deposit > 0 ? `<span style="color:var(--danger);">${deposit.toLocaleString()} EGP (محتجزة / Held)</span>` : `<span style="color:var(--success);">مستردة (Returned)</span>`;
                         let barClass = "status-paid"; let statusTxt = "Paid";
                         
                         if (bStart <= nowMs && bEnd >= nowMs) {
@@ -1117,7 +1124,7 @@
                             if (((bStart - nowMs) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; }
                             else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending (Unpaid)"; }
                             else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
-                        } else { barClass = "status-ready"; statusTxt = "Archived (Past)"; }
+                        } else { barClass = "status-ready"; statusTxt = "Archived"; }
 
                         let topOffset = "14px"; 
                         if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
@@ -1127,32 +1134,21 @@
 
                         let hoverText = `
                             <div style="text-align:right; font-family:'Cairo', sans-serif;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span>
-                                    <span style='font-size:11px; color:#aaa;'>Order #${b.id}</span>
-                                </div>
-                                <b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br>
-                                <span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
-                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa;'>Order #${b.id}</span></div>
+                                <b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br><span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span><hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
                                 <div style="margin-bottom:6px;"><span style="color:#888;">من:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
                                 <div style="margin-bottom:10px;"><span style="color:#888;">إلى:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
                                 <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                        <span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b>
-                                    </div>
-                                    <div style="display:flex; justify-content:space-between;">
-                                        <span style="color:#888;">المدفوع:</span> <b style="color:${paid < total ? 'var(--accent)' : 'var(--success)'}">${paid.toLocaleString()} EGP</b>
-                                    </div>
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b></div>
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">المدفوع:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
+                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888;">المتبقي:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b></div>
                                 </div>
-                            </div>
-                        `;
+                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">الوديعة:</span> <b>${depBadge}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span style="color:#888;">التأمين:</span> <b style="color:white">${insPack}</b></div>
+                            </div>`;
 
-                        timelineHTML += `
-                            <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" 
-                                 data-info="${hoverText.replace(/"/g, '&quot;').replace(/'/g, "%27")}"
-                                 onclick="openQuickModal('order', '${b.id}')">
-                            </div>
-                        `;
+                        timelineHTML += `<div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" data-info="${encodeURIComponent(hoverText).replace(/'/g, "%27")}" onclick="openQuickModal('order', '${b.id}')"></div>`;
                     }
                 }
                 timelineHTML += `</div></div>`;
@@ -1175,8 +1171,8 @@
             initDragScroll(); 
             setTimeout(scrollToToday, 50); 
         }
-        
 
+        // --- 7. ORDER BOOK ---
         function buildOrderBook() {
             const body = document.getElementById('orders-body');
             const periodFilter = document.getElementById('order-period-filter').value;
@@ -1198,18 +1194,15 @@
                 if(isLegacy) paid = total;
 
                 const row = body.insertRow();
-                row.innerHTML = `<td><b>#${b.id}</b></td><td style="color:var(--accent); font-weight:600;">${b['اسم العميل'] || '-'}</td><td>Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
+                row.innerHTML = `<td><b class="clickable-obj" onclick="openQuickModal('order', '${b.id}')">#${b.id}</b></td><td class="clickable-obj" style="color:var(--accent); font-weight:600;" onclick="openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</td><td class="clickable-obj" onclick="openQuickModal('car', '${b['كود السيارة']}')">Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
             });
         }
 
-        // --- VEHICLE 360 MULTI-SELECT ENGINE ---
+        // --- 8. VEHICLE 360 (MULTI-SELECT & LEDGER) ---
         let selectedV360Cars = new Set();
         let activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
 
-        function toggleV360Dropdown() {
-            document.getElementById('v360-dropdown').classList.toggle('show');
-        }
-
+        function toggleV360Dropdown() { document.getElementById('v360-dropdown').classList.toggle('show'); }
         document.addEventListener('click', function(event) {
             const container = document.getElementById('v360-container');
             if (container && !container.contains(event.target)) {
@@ -1236,21 +1229,24 @@
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
 
-                selectedV360Cars.add(String(c.id)); // STRICLY ADD AS STRING TO PREVENT CRASHES
+                selectedV360Cars.add(String(c.id)); 
 
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
-                let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
-                let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
 
-                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
-                let colorName = getSafeVal(c, ['اللون', 'Color']) || 'Unknown';
-                let colorHex = getCarColorHex(colorName);
+                let carNameAr = `${getSafeVal(c, ['النوع', 'الماركة'])} ${getSafeVal(c, ['الطراز'])}`.trim();
+                let carNameEn = `${getSafeVal(c, ['Type'])} ${getSafeVal(c, ['Model'])}`.trim();
+                let carName = carNameAr || carNameEn || 'Unknown';
+                let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
+                
+                let searchIndex = `${carNameAr} ${carNameEn} ${nums} ${lets} ${c.id}`.toLowerCase();
 
                 let div = document.createElement('div');
                 div.className = 'fleet-chip active v360-car-chip';
                 div.setAttribute('data-id', String(c.id));
+                div.setAttribute('data-search', searchIndex);
                 div.innerHTML = `<div class="color-dot" style="background:${colorHex}; width:12px; height:12px; border:none;"></div> <span dir="ltr">${carName} | ${fullPlate}</span>`;
                 div.onclick = () => toggleV360Car(String(c.id), div);
                 track.appendChild(div);
@@ -1262,6 +1258,22 @@
             buildV360();
         }
 
+        function filterV360Cars() {
+            const filter = document.getElementById('v360-text-search').value.toLowerCase().trim();
+            const chips = document.querySelectorAll('.v360-car-chip');
+            if(filter === "") {
+                chips.forEach(chip => chip.style.display = "flex");
+                document.getElementById('v360-chip-all').style.display = "flex";
+            } else {
+                document.getElementById('v360-chip-all').style.display = "none";
+                chips.forEach(chip => {
+                    const text = chip.getAttribute('data-search');
+                    chip.style.display = text.includes(filter) ? "flex" : "none";
+                });
+            }
+            buildV360(); 
+        }
+
         function toggleV360Car(id, element) {
             if (id === 'all') {
                 const isAllActive = document.getElementById('v360-chip-all').classList.contains('active');
@@ -1271,10 +1283,7 @@
                     selectedV360Cars.clear();
                 } else {
                     document.getElementById('v360-chip-all').classList.add('active');
-                    document.querySelectorAll('.v360-car-chip').forEach(el => {
-                        el.classList.add('active');
-                        selectedV360Cars.add(String(el.getAttribute('data-id')));
-                    });
+                    document.querySelectorAll('.v360-car-chip').forEach(el => { el.classList.add('active'); selectedV360Cars.add(String(el.getAttribute('data-id'))); });
                 }
             } else {
                 element.classList.toggle('active');
@@ -1297,19 +1306,15 @@
 
         function resetV360Filters() {
             document.getElementById('v360-text-search').value = "";
+            filterV360Cars();
             document.querySelectorAll('.kpi-filter').forEach(el => el.classList.remove('inactive'));
             activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
             
-            // Force selection of all cars
             document.getElementById('v360-chip-all').classList.add('active');
-            document.querySelectorAll('.v360-car-chip').forEach(el => {
-                el.classList.add('active');
-                selectedV360Cars.add(String(el.getAttribute('data-id')));
-            });
+            document.querySelectorAll('.v360-car-chip').forEach(el => { el.classList.add('active'); selectedV360Cars.add(String(el.getAttribute('data-id'))); });
             buildV360();
         }
 
-        // --- VEHICLE 360 MASTER LEDGER ENGINE ---
         function buildV360() {
             const monthFilter = document.getElementById('v360-month').value; 
             const yearFilter = parseInt(document.getElementById('v360-year').value);
@@ -1319,14 +1324,13 @@
             let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiMaint = 0, kpiDocs = 0, kpiOther = 0, timeline = [];
 
             if (selectedV360Cars.size === 0) {
-                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">الرجاء تحديد سيارة واحدة على الأقل من القائمة بالأعلى. (Select at least one vehicle)</td></tr>`;
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">الرجاء تحديد سيارة واحدة على الأقل من القائمة بالأعلى.</td></tr>`;
                 return;
             }
 
             const isDateInFilter = (dateStr) => {
                 if(!dateStr) return false;
-                const d = new Date(dateStr);
-                if(isNaN(d)) return false;
+                const d = new Date(dateStr); if(isNaN(d)) return false;
                 if(yearFilter && d.getFullYear() !== yearFilter) return false;
                 if(monthFilter !== 'all' && (d.getMonth() + 1) !== parseInt(monthFilter)) return false;
                 return true;
@@ -1342,7 +1346,7 @@
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Vehicle';
                 let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 
-                return `<div class="clickable-obj" onclick="openQuickModal('car', '${c.id}', '${carName} ${fullPlate}')" style="display:flex; flex-direction:column; align-items:flex-end;">
+                return `<div class="clickable-obj" onclick="openQuickModal('car', '${c.id}')" style="display:flex; flex-direction:column; align-items:flex-end;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <span style="color:white; font-weight:bold; font-size:13px;">${carName}</span>
                                 <div class="color-dot" style="background:${colorHex}; width:10px; height:10px;"></div>
@@ -1351,10 +1355,9 @@
                         </div>`;
             };
 
-            // 1. Parse Bookings
             APP_DATA.bookings.forEach(b => {
                 const cid = String(b['كود السيارة']);
-                if(!selectedV360Cars.has(cid)) return; // Strict String Check
+                if(!selectedV360Cars.has(cid)) return; 
                 const startDate = b['بداية التعاقد']?.split(' ')[0];
                 if(!isDateInFilter(startDate)) return;
 
@@ -1366,7 +1369,6 @@
                 const debt = Math.max(0, total - paid);
                 const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
                 
-                // Income Breakdown variables
                 const insPack = getSafeVal(b, ['نوع التأمين', 'Insurance Package']) || 'Basic';
                 const baseRent = parseCurrency(b['الايجار اليومى']);
                 const extras = parseCurrency(b['إضافات أخري (ملاّك)']);
@@ -1375,19 +1377,11 @@
                     <div style="text-align:right; font-family:'Cairo', sans-serif;">
                         <b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b><hr style="margin:8px 0; border-top:1px solid #444;">
                         <div style="margin-bottom:4px;"><span style="color:#888;">العميل:</span> <b style="color:white">${b['اسم العميل']}</b></div>
-                        
                         <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333; margin-top:10px;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;">
-                                <span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b>
-                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b></div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b></div>
+                            <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b></div>
                         </div>
-
                         <div style="margin-top:10px; font-size:11px; color:#aaa;">
                             <div><span style="color:#888;">قيمة الإيجار:</span> ${baseRent.toLocaleString()} EGP/Day</div>
                             <div><span style="color:#888;">باقة التأمين:</span> ${insPack}</div>
@@ -1399,24 +1393,23 @@
                 if (paid > 0) {
                     kpiRev += paid;
                     if(activeV360Types.has('income')) {
-                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
+                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
                     }
                 }
                 if (debt > 0) {
                     kpiDebt += debt;
                     if(activeV360Types.has('debt')) {
-                        timeline.push({ typeCode: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--danger)" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b><div style="display:flex; gap:10px;"><button class="clickable-obj" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>${infoIcon}</div></div>` });
+                        timeline.push({ typeCode: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--danger)" onclick="openQuickModal('order', '${b.id}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b><div style="display:flex; gap:10px;"><button class="clickable-obj" onclick="openQuickModal('order', '${b.id}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>${infoIcon}</div></div>` });
                     }
                 }
                 if (deposit > 0) {
                     kpiDep += deposit;
                     if(activeV360Types.has('deposit')) {
-                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
+                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
                     }
                 }
             });
 
-            // 2. Parse Expenses
             APP_DATA.car_expenses.forEach(e => {
                 const cid = String(e['كود السيارة'] || e['كود السيارة\r'] || "").trim();
                 if(!selectedV360Cars.has(cid)) return;
@@ -1436,11 +1429,10 @@
                 else { kpiOther += amt; badge = `<span class="badge" style="background:#e67e22; color:white;">OTHER EXP</span>`; amtColor = '#e67e22'; tCode = 'other'; }
 
                 if(activeV360Types.has(tCode)) {
-                    timeline.push({ typeCode: tCode, type: badge, date: dateStr, carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(), desc: `<span class="clickable-obj" style="color:#ddd;" onclick="openQuickModal('car', '${cid}', '${details}')">${details || 'Expense Record'}</span>` });
+                    timeline.push({ typeCode: tCode, type: badge, date: dateStr, carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(), desc: `<span class="clickable-obj" style="color:#ddd;" onclick="openQuickModal('car', '${cid}')">${details || 'Expense Record'}</span>` });
                 }
             });
 
-            // 3. Update Metrics (KPIs calculate ALL matching records, regardless of visual toggle)
             const kpiTotalExp = kpiMaint + kpiDocs + kpiOther;
             const netCashROI = kpiRev - kpiTotalExp;
 
@@ -1454,39 +1446,47 @@
             document.getElementById('v-roi').innerText = netCashROI.toLocaleString() + " EGP";
             document.getElementById('v-roi').style.color = netCashROI >= 0 ? '#00d2ff' : 'var(--danger)';
 
-            // 4. Build Table
             timeline.sort((a,b) => b.sortDate - a.sortDate);
             timeline.forEach(t => { 
                 const row = body.insertRow(); 
                 let displayAmt = t.amt > 0 ? `+${t.amt.toLocaleString()}` : `${t.amt.toLocaleString()}`;
                 row.innerHTML = `<td style="font-weight:bold; font-size:13px; color:#aaa; white-space:nowrap;">${t.date}</td><td>${t.type}</td><td dir="rtl" style="text-align:right; font-family:'Cairo', sans-serif;">${t.carDisplay}</td><td style="line-height:1.4;">${t.desc}</td><td style="font-weight:900; text-align:right; font-size:15px; color:${t.amtColor};">${displayAmt} <span style="font-size:10px;">EGP</span></td>`; 
             });
-            if (timeline.length === 0) body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found for these filters.</td></tr>`;
+            if (timeline.length === 0) body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found.</td></tr>`;
         }
 
+        // --- 9. CRM HUB ---
         function buildCRM() {
             const body = document.getElementById('crm-body'); body.innerHTML = '';
             const clients = {}; let totalDep = 0;
 
             APP_DATA.bookings.forEach(b => {
                 const name = b['اسم العميل']; if(!name) return;
-                if(!clients[name]) clients[name] = { trips: 0, spendEGP: 0, spendUSD: 0, deposit: 0 };
-                clients[name].trips++; clients[name].spendEGP += parseCurrency(b['إجمالي المستحق (Total)']); clients[name].spendUSD += parseCurrency(b['المدفوع USD']);
-                const dep = parseCurrency(b['الوديعة المعلقة لدينا']); clients[name].deposit += dep; totalDep += dep;
+                const cid = String(b['كود العميل'] || name); 
+                if(!clients[cid]) clients[cid] = { name: name, trips: 0, spendEGP: 0, spendUSD: 0, deposit: 0 };
+                clients[cid].trips++; 
+                clients[cid].spendEGP += parseCurrency(b['إجمالي المستحق (Total)']); 
+                clients[cid].spendUSD += parseCurrency(b['المدفوع USD']);
+                const dep = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit'])); 
+                clients[cid].deposit += dep; totalDep += dep;
             });
 
             document.getElementById('crm-total').innerText = Object.keys(clients).length; document.getElementById('crm-dep').innerText = formatEGP(totalDep);
-            Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP).forEach(([name, data]) => {
-                const row = body.insertRow(); row.innerHTML = `<td style="color:var(--accent); font-weight:bold;">${name}</td><td>${data.trips}</td><td>${formatEGP(data.spendEGP)}</td><td>$${data.spendUSD.toLocaleString()}</td><td style="color:${data.deposit > 0 ? 'var(--danger)' : 'var(--success)'}">${formatEGP(data.deposit)}</td>`;
+            Object.entries(clients).sort((a,b) => b[1].spendEGP - a[1].spendEGP).forEach(([cid, data]) => {
+                const row = body.insertRow(); 
+                row.innerHTML = `<td class="clickable-obj" style="color:var(--accent); font-weight:bold;" onclick="openQuickModal('client', '${cid}')">${data.name}</td><td>${data.trips}</td><td>${formatEGP(data.spendEGP)}</td><td>$${data.spendUSD.toLocaleString()}</td><td style="color:${data.deposit > 0 ? 'var(--danger)' : 'var(--success)'}">${formatEGP(data.deposit)}</td>`;
             });
         }
 
+        // --- 10. RISK RADAR ---
         function buildRiskRadar() {
             const body = document.getElementById('risk-body'); body.innerHTML = ''; const now = new Date();
             APP_DATA.cars.forEach(c => {
                 const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
                 if(!contract.includes('valid') && !contract.includes('ساري')) return;
-                const name = `#${c.id} - ${c['Type'] || ''} ${c['Model'] || ''}`;
+                
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                const name = `<span class="clickable-obj" style="color:#00d2ff; font-weight:bold;" onclick="openQuickModal('car', '${c.id}')">#${c.id} - ${carName}</span>`;
                 
                 const checkRisk = (dateStr, type) => {
                     if(!dateStr || dateStr.toLowerCase() === 'nan') return;
@@ -1496,19 +1496,171 @@
                     let badge = '<span class="badge bg-orange">MEDIUM (3-6m)</span>';
                     if(diffDays <= 90) badge = '<span class="badge bg-red">HIGH (0-3m)</span>';
                     if(diffDays < 0) badge = '<span class="badge" style="background:#e74c3c; color:white;">EXPIRED</span>';
-                    const row = body.insertRow(); row.innerHTML = `<td><b>${name}</b></td><td style="color:#888;">${type}</td><td>${d.toLocaleDateString()}</td><td style="font-weight:bold;">${diffDays} days</td><td>${badge}</td>`;
+                    const row = body.insertRow(); row.innerHTML = `<td>${name}</td><td style="color:#888;">${type}</td><td>${d.toLocaleDateString()}</td><td style="font-weight:bold;">${diffDays} days</td><td>${badge}</td>`;
                 };
-                checkRisk(c['نهاية الترخيص'], 'License'); checkRisk(c['نهاية التأمين'], 'Insurance'); checkRisk(c['نهاية التعاقد'], 'Owner Contract');
+                checkRisk(getSafeVal(c, ['نهاية الترخيص']), 'License'); checkRisk(getSafeVal(c, ['نهاية التأمين']), 'Insurance'); checkRisk(getSafeVal(c, ['نهاية التعاقد']), 'Owner Contract');
             });
         }
 
-        function searchTable(tbodyId, inputId) {
-            const filter = document.getElementById(inputId).value.toLowerCase();
-            const rows = document.getElementById(tbodyId).getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) { rows[i].style.display = rows[i].innerText.toLowerCase().includes(filter) ? "" : "none"; }
+        // --- 11. TOOLTIPS & DRAGGING ---
+        function initDragScroll() {
+            const sliders = document.querySelectorAll('.drag-scroll');
+            let isDown = false; let startX; let scrollLeft;
+            sliders.forEach(slider => {
+                slider.addEventListener('mousedown', (e) => { isDown = true; sliders.forEach(s => s.style.cursor = 'grabbing'); startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft; });
+                slider.addEventListener('mouseleave', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
+                slider.addEventListener('mouseup', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
+                slider.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 1.5; sliders.forEach(s => s.scrollLeft = scrollLeft - walk); });
+                slider.addEventListener('scroll', (e) => { sliders.forEach(s => { if (s !== slider) s.scrollLeft = slider.scrollLeft; }); });
+            });
         }
 
-        // --- 5. NATIVE EN CONTRACT ENGINE & PRINTING ---
+        function scrollToToday() { const targetPx = (T_WIDTH_PX * 0.3333) - 250; document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx); }
+
+        function showGanttTooltip(e, encodedHTML) {
+            let t = document.getElementById('global-tooltip');
+            if(!t) { t = document.createElement('div'); t.id = 'global-tooltip'; document.body.appendChild(t); }
+            t.innerHTML = decodeURIComponent(encodedHTML); t.style.visibility = 'visible'; t.style.opacity = '1';
+            moveGanttTooltip(e);
+        }
+
+        function moveGanttTooltip(e) {
+            let t = document.getElementById('global-tooltip');
+            if (t && t.style.visibility === 'visible') {
+                let tWidth = t.offsetWidth || 250; let tHeight = t.offsetHeight || 150;
+                let x = e.clientX + 15; let y = e.clientY + 15;
+                if (x + tWidth > window.innerWidth - 20) x = e.clientX - tWidth - 15;
+                if (y + tHeight > window.innerHeight - 20) y = e.clientY - tHeight - 15;
+                t.style.left = x + 'px'; t.style.top = y + 'px';
+            }
+        }
+        function hideGanttTooltip() { let t = document.getElementById('global-tooltip'); if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; } }
+
+        // --- 12. NATIVE PROPOSAL ENGINE (CRM LINKED) ---
+        function prepProposal() {
+            populateClientList(); 
+            const sel = document.getElementById('prop_car');
+            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
+            APP_DATA.cars.forEach(c => {
+                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
+                if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                let rate = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
+                let opt = document.createElement('option'); opt.value = c.id; opt.setAttribute('data-rate', rate);
+                opt.text = `[#${c.id}] ${carName} - ${pNum} (${rate} EGP/Day)`;
+                sel.add(opt);
+            });
+        }
+
+        function autoFillPropClient() {
+            const searchVal = document.getElementById('prop_crm_search').value;
+            const list = document.getElementById('client-list');
+            let selectedId = null;
+            for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
+            if(!selectedId) return;
+            const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(c) {
+                document.getElementById('prop_client_id').value = c.id;
+                document.getElementById('prop_fname').value = c['الاسم الأول'] || '';
+                document.getElementById('prop_sname').value = c['الاسم الأخير'] || '';
+                document.getElementById('prop_phone').value = c['رقم التليفون'] || '';
+                document.getElementById('prop_email').value = c['عنوان البريد الإلكتروني'] || '';
+            }
+        }
+
+        function updatePropRate() {
+            const sel = document.getElementById('prop_car');
+            if(sel.selectedIndex > 0) { document.getElementById('prop_rate').value = sel.options[sel.selectedIndex].getAttribute('data-rate'); runPropCalc(); }
+        }
+
+        function suggestPropInsFee() {
+            const plan = document.getElementById('prop_ins_pack').value; const feeInput = document.getElementById('prop_ins_fee');
+            if (plan === "Basic") feeInput.value = 0; else if (plan === "Intermediate") feeInput.value = 400; else if (plan === "Full Protection") feeInput.value = 900;
+            runPropCalc();
+        }
+
+        function propNum(id) { const el = document.getElementById(id); return el ? parseFloat(el.value) || 0 : 0; }
+
+        function runPropCalc() {
+            const sStr = document.getElementById('prop_start').value; const eStr = document.getElementById('prop_end').value;
+            let days = 1;
+            if (sStr && eStr) { const s = new Date(sStr), e = new Date(eStr); if (e > s) { days = Math.ceil(Math.abs(e - s) / 86400000); if (days < 1) days = 1; } }
+            document.getElementById('prop_days_val').value = days + " Days";
+
+            const rate = propNum('prop_rate'); const kmCost = propNum('prop_km_cost'); const insFee = propNum('prop_ins_fee') * days;
+            const delFee = propNum('prop_del'); const seatFee = document.getElementById('prop_chk_seat').checked ? 250 * days : 0; const driverFee = document.getElementById('prop_chk_driver').checked ? 500 * days : 0;
+            const totalBase = rate * days; const grandTotal = totalBase + kmCost + insFee + delFee + seatFee + driverFee;
+            
+            document.getElementById('prop_grand_total').innerText = grandTotal.toLocaleString() + " EGP";
+            return { days, rate, kmCost, insFee, delFee, seatFee, driverFee, totalBase, grandTotal };
+        }
+
+        function executePropPreview() {
+            const math = runPropCalc();
+            if (math.days === 0) { alert("Please select Pickup and Dropoff dates."); return; }
+            const name = document.getElementById('prop_fname').value + " " + document.getElementById('prop_sname').value;
+            const ref = "PR-" + Math.floor(Math.random()*90000);
+            const sel = document.getElementById('prop_car'); const carText = sel.selectedIndex > 0 ? sel.options[sel.selectedIndex].text : "Vehicle TBD";
+            const kmSel = document.getElementById('prop_km_type'); const pkgKMValue = parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km'));
+            const totalKM = pkgKMValue >= 999999 ? "Unlimited" : (math.days * 120 + pkgKMValue).toLocaleString() + " KM Total";
+
+            let table = `<tr><td>Base Rental</td><td>${math.rate.toLocaleString()} x ${math.days} Days</td><td align="right">${math.totalBase.toLocaleString()}</td></tr>`;
+            if(math.insFee > 0) table += `<tr><td>Insurance Fees</td><td>Daily x ${math.days} Days</td><td align="right">${math.insFee.toLocaleString()}</td></tr>`;
+            if(math.kmCost > 0) table += `<tr><td>KM Package</td><td>Flat Fee</td><td align="right">${math.kmCost.toLocaleString()}</td></tr>`;
+            if(math.seatFee > 0) table += `<tr><td>Child Car Seat</td><td>250 x ${math.days} Days</td><td align="right">${math.seatFee.toLocaleString()}</td></tr>`;
+            if(math.driverFee > 0) table += `<tr><td>Additional Driver</td><td>500 x ${math.days} Days</td><td align="right">${math.driverFee.toLocaleString()}</td></tr>`;
+            if(math.delFee > 0) table += `<tr><td>Logistics Fee</td><td>Fixed Fee</td><td align="right">${math.delFee.toLocaleString()}</td></tr>`;
+
+            const insDetailsText = {
+                "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`,
+                "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`,
+                "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.`
+            };
+
+            const html = `
+            <div class="a4-page" style="display:block;">
+                <div class="page-content">
+                    <div class="doc-head" style="border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px;">
+                        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px;">
+                        <div style="text-align: right;">
+                            <h2 style="margin: 0; color: var(--primary); font-size: 16pt;">PRICE PROPOSAL</h2>
+                            <p style="margin: 0; font-weight: bold; font-size: 10pt;">Ref: ${ref} | Date: ${new Date().toLocaleDateString('en-GB')}</p>
+                        </div>
+                    </div>
+                    <div class="box-section"><span class="bs-title">CLIENT & PERIOD</span>
+                        <table class="pt">
+                            <tr><th width="15%">Client Name</th><td colspan="3">${name}</td></tr>
+                            <tr><th>Phone</th><td>${document.getElementById('prop_phone').value}</td><th>Email</th><td>${document.getElementById('prop_email').value}</td></tr>
+                            <tr><th width="15%">Pickup</th><td width="35%">${document.getElementById('prop_start').value.replace('T', ' ')}</td><th width="15%">Dropoff</th><td width="35%">${document.getElementById('prop_end').value.replace('T', ' ')}</td></tr>
+                            <tr><th>Duration</th><td>${math.days} Days</td><th>KM Allowance</th><td>${totalKM}</td></tr>
+                        </table>
+                    </div>
+                    <div class="box-section"><span class="bs-title">VEHICLE DETAILS</span>
+                        <table class="pt"><tr><th width="15%">Model</th><td colspan="3">${carText}</td></tr></table>
+                    </div>
+                    <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span>
+                        <table class="pt">
+                            <thead><tr><th>Description</th><th>Details</th><th style="text-align:right;">Total (EGP)</th></tr></thead>
+                            <tbody>${table}</tbody>
+                            <tfoot>
+                                <tr style="font-weight:bold; background:#f0f0f0;"><td colspan="2" align="right">TOTAL PROPOSAL VALUE:</td><td align="right">${math.grandTotal.toLocaleString()} EGP</td></tr>
+                                <tr><td colspan="2" align="right">Security Deposit (Held):</td><td align="right">${propNum('prop_dep').toLocaleString()} EGP</td></tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="box-section"><span class="bs-title">INSURANCE: ${document.getElementById('prop_ins_pack').value.toUpperCase()}</span>
+                        <p style="margin:0; font-size:8.5pt;">${insDetailsText[document.getElementById('prop_ins_pack').value]}</p>
+                    </div>
+                </div>
+            </div>`;
+
+            document.getElementById('proposalOutput').innerHTML = html; document.getElementById('proposalOutput').style.display = 'flex';
+            document.getElementById('btn_print_prop').style.display = 'block';
+            setTimeout(() => { document.getElementById('proposalOutput').scrollIntoView({ behavior: 'smooth' }); }, 100);
+        }
+
+        // ================= BLOCK 2: NATIVE EN CONTRACT ENGINE =================
         const termsText = {
             1: `* <strong>Minimum Age:</strong> You must be 21 years or older.<br>* <strong>License:</strong> Valid ID and Driving License accepted in Egypt are mandatory.<br>* <strong>Authorized Drivers:</strong> Only the person named on the contract may drive. Additional drivers must be approved and listed.`,
             2: `* <strong>24-Hour Cycle:</strong> Charges based on 24-hour units.<br>* <strong>Rental Cycle:</strong> Charges based on 24-hour units. Every hour is charged from the 1st hour. If the period is exceeded by 5 hours, a full additional day is charged.<br>* <strong>Extensions:</strong> Any extension must be approved by the Company. Unauthorized late returns are charged at a higher local tariff.<br>* <strong>Early Return:</strong> No refunds are issued for vehicles returned early (Non-refundable).`,
@@ -1524,221 +1676,69 @@
             13: `* <strong>Interior Negligence:</strong> Insurance does NOT cover negligence inside the vehicle (e.g., cigarette burns, stained seats, broken handles).<br>* <strong>Minor Damages:</strong> For small scratches, tire, or glass damage where a Police Report is impractical, the Lessee agrees to pay the repair cost directly to save time.<br>* <strong>Police Report:</strong> If Lessee refuses to settle damages, a Police Report from the accident scene is MANDATORY.`
         };
 
-        const insDetails = {
+        const insDetailsText = {
             "Basic": `<strong>High Deductible.</strong> You pay 100% for Glass, Tires, and Undercarriage damages.<br><strong>INCLUDES:</strong> Standard CDW (Body damage only with excess).<br><strong>EXCLUDES:</strong> All glass, tires, undercarriage, towing, and third party liability.`,
             "Intermediate": `<strong>Reduced Liability.</strong> Client pays 70% of repair costs. Company pays 30%.<br><strong>INCLUDES:</strong> Undercarriage coverage up to 10K EGP.<br><strong>EXCLUDES:</strong> Glass, Tires, and Interior damage.`,
             "Full Protection": `<strong>Zero Deductible (Waiver).</strong> Reduces liability to ZERO for covered items.<br><strong>CAPS:</strong> Roof (20k), Glass (25k), Undercarriage (40k), Tires (4k/tire).<br><strong>EXCLUDES:</strong> Interior damage (saloon), misfueling, or personal possessions.`
         };
 
         function prepNativeContract() {
+            populateClientList(); 
             const sel = document.getElementById('con_carSelect');
             sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
             
             APP_DATA.cars.forEach(c => {
-                const contract = (c['Contract'] || c['حاله التعاقد'] || "").toLowerCase();
-                if(!contract.includes('valid') && !contract.includes('ساري')) return; 
-                let pNum = c['رقم اللوحة'] || c['Plate'] || "";
-                let pLet = c['احرف اللوحة'] || "";
-                let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${c['Model'] || c['الطراز']} - ${pNum} ${pLet}`;
+                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
+                if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                let opt = document.createElement('option'); opt.value = c.id; 
+                opt.text = `[#${c.id}] ${carName} - ${pNum}`;
                 sel.add(opt);
             });
-            
-            populateClientList();
             runContractCalc();
         }
 
-        // --- NEW CLOUD CRM BRAIN (Globally Accessible) ---
-        function populateClientList() {
-            const list = document.getElementById('client-list');
-            if(!list) return;
-            list.innerHTML = '';
-            
-            // Sort alphabetically safely
-            const sortedClients = [...APP_DATA.customers].sort((a, b) => {
-                const nameA = String(a['الاسم الأول'] || '');
-                const nameB = String(b['الاسم الأول'] || '');
-                return nameA.localeCompare(nameB);
-            });
-            
-            sortedClients.forEach(c => {
-                const fName = c['الاسم الأول'] || '';
-                const lName = c['الاسم الأخير'] || '';
-                const pass = c['رقم جواز السفر'] || c['الرقم القومى'] || '';
-                const fullName = `${fName} ${lName}`.trim();
-                
-                if(fullName) {
-                    let opt = document.createElement('option');
-                    opt.value = `${fullName} | ${pass}`;
-                    opt.setAttribute('data-id', c.id);
-                    list.appendChild(opt);
-                }
-            });
+        function conLoadCar() {
+            const id = document.getElementById('con_carSelect').value;
+            const c = APP_DATA.cars.find(x => String(x.id) === String(id));
+            if(c) {
+                document.getElementById('con_manModel').value = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
+                let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                document.getElementById('con_plate').value = `${lets} | ${nums}`.trim();
+                document.getElementById('con_year').value = getSafeVal(c, ['سنة الصنع', 'Year']);
+                document.getElementById('con_vin').value = getSafeVal(c, ['VIN', 'رقم الشاسيه']);
+                document.getElementById('con_motor').value = getSafeVal(c, ['Motor', 'رقم الموتور']);
+                document.getElementById('con_rateRent').value = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
+                runContractCalc();
+            }
         }
 
-        function autoFillClient() {
-            const searchVal = document.getElementById('crm_search').value;
-            if(!searchVal) {
-                cancelClientEdit();
-                return;
-            }
-            
+        function autoFillConClient() {
+            const searchVal = document.getElementById('con_crm_search').value;
             const list = document.getElementById('client-list');
             let selectedId = null;
-            for(let opt of list.options) {
-                if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; }
-            }
-
+            for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
             if(!selectedId) return;
 
             const c = APP_DATA.customers.find(x => x.id === selectedId);
             if(c) {
                 document.getElementById('con_client_id').value = c.id;
-                document.getElementById('display_client_id').innerText = c.id;
-                
                 document.getElementById('con_fname').value = c['الاسم الأول'] || '';
                 document.getElementById('con_sname').value = c['الاسم الأخير'] || '';
-                document.getElementById('con_pass').value = (c['رقم جواز السفر'] && c['رقم جواز السفر'].length > 2) ? c['رقم جواز السفر'] : (c['الرقم القومى'] || '');
+                document.getElementById('con_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || '';
                 document.getElementById('con_phone').value = c['رقم التليفون'] || '';
-                let email = c['عنوان البريد الإلكتروني'] || '';
-                document.getElementById('con_email').value = (email === '-') ? '' : email;
+                document.getElementById('con_email').value = c['عنوان البريد الإلكتروني'] || '';
                 document.getElementById('con_lic').value = c['رقم رخصة القيادة'] || '';
                 document.getElementById('con_addr').value = c['العنوان'] || '';
                 document.getElementById('con_nation').value = c['رمز الدولة'] || '';
-                
-                lockClientForm();
             }
         }
 
-        function startNewClient() {
-            document.getElementById('crm_search').value = "";
-            document.getElementById('con_client_id').value = "";
-            document.getElementById('display_client_id').innerText = "NEW (UNSAVED)";
-            
-            document.querySelectorAll('.crm-fields input').forEach(input => {
-                if(input.id !== 'con_ph_code') {
-                    input.value = "";
-                    input.removeAttribute('readonly');
-                    input.style.border = "1px solid var(--success)";
-                }
-            });
-            document.getElementById('con_ph_code').value = "+20";
-            
-            document.getElementById('btn_save_client').style.display = "block";
-            document.getElementById('btn_cancel_client').style.display = "block";
-        }
-
-        function hasCRMAccess() {
-            if (!APP_DATA.user) return false;
-            const role = String(APP_DATA.user.role || "").toLowerCase();
-            const accessArr = APP_DATA.user.access || [];
-            return role.includes('admin') || accessArr.includes(6) || accessArr.includes(7);
-        }
-
-        function enableClientEdit() {
-            if(!document.getElementById('con_client_id').value) return alert("Select a client from the search bar first to edit.");
-            if(!hasCRMAccess()) return alert("Access Denied: You do not have CRM Edit permissions.");
-
-            document.querySelectorAll('.crm-fields input').forEach(input => {
-                if(input.id !== 'con_ph_code') {
-                    input.removeAttribute('readonly');
-                    input.style.border = "1px solid var(--accent)";
-                }
-            });
-            document.getElementById('display_client_id').innerText += " (EDITING...)";
-            document.getElementById('btn_save_client').style.display = "block";
-            document.getElementById('btn_cancel_client').style.display = "block";
-        }
-
-        function cancelClientEdit() {
-            document.getElementById('crm_search').value = "";
-            document.getElementById('con_client_id').value = "";
-            document.getElementById('display_client_id').innerText = "UNSAVED";
-            
-            document.querySelectorAll('.crm-fields input').forEach(input => {
-                if(input.id !== 'con_ph_code') input.value = "";
-            });
-            lockClientForm();
-        }
-
-        function lockClientForm() {
-            document.querySelectorAll('.crm-fields input').forEach(input => {
-                input.setAttribute('readonly', 'true');
-                input.style.border = "1px solid rgba(255,255,255,0.2)";
-            });
-            document.getElementById('btn_save_client').style.display = "none";
-            document.getElementById('btn_cancel_client').style.display = "none";
-        }
-
-        async function saveClientToFirebase() {
-            if(!hasCRMAccess()) return alert("Access Denied: You do not have CRM Edit permissions.");
-            
-            const fname = document.getElementById('con_fname').value.trim();
-            const pass = document.getElementById('con_pass').value.trim();
-            
-            if(!fname || !pass) return alert("First Name and Passport/National ID are required.");
-
-            const cairoTime = new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' });
-            const editorName = APP_DATA.user.name || APP_DATA.user.role || "System";
-
-            const clientData = {
-                "الاسم الأول": fname,
-                "الاسم الأخير": document.getElementById('con_sname').value.trim(),
-                "رقم جواز السفر": pass,
-                "الرقم القومى": pass,
-                "رقم التليفون": document.getElementById('con_phone').value.trim(),
-                "عنوان البريد الإلكتروني": document.getElementById('con_email').value.trim(),
-                "رقم رخصة القيادة": document.getElementById('con_lic').value.trim(),
-                "العنوان": document.getElementById('con_addr').value.trim(),
-                "رمز الدولة": document.getElementById('con_nation').value.trim(),
-                "_sys_updated": Date.now(),
-                "_sys_updated_by": editorName,
-                "_sys_updated_timestamp": cairoTime
-            };
-
-            const existingId = document.getElementById('con_client_id').value;
-
-            try {
-                document.getElementById('btn_save_client').innerText = "Saving...";
-                
-                if(existingId) {
-                    await db.collection('customers').doc(existingId).update(clientData);
-                    alert("Client Updated Successfully!");
-                    const idx = APP_DATA.customers.findIndex(x => x.id === existingId);
-                    if(idx !== -1) APP_DATA.customers[idx] = { id: existingId, ...clientData };
-                } else {
-                    const docRef = await db.collection('customers').add(clientData);
-                    document.getElementById('con_client_id').value = docRef.id;
-                    APP_DATA.customers.push({ id: docRef.id, ...clientData });
-                    alert("New Client Saved to Database!");
-                }
-                
-                document.getElementById('display_client_id').innerText = document.getElementById('con_client_id').value + " (SAVED)";
-                document.getElementById('btn_save_client').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save';
-                populateClientList(); 
-                lockClientForm();
-
-            } catch(e) {
-                console.error(e);
-                alert("Error saving client: " + e.message);
-                document.getElementById('btn_save_client').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save';
-            }
-        }
-
-        function conLoadCar() {
-            const id = document.getElementById('con_carSelect').value;
-            const c = APP_DATA.cars.find(x => x.id === id);
-            if(c) {
-                document.getElementById('con_manModel').value = c['Model'] || c['الطراز'] || "";
-                document.getElementById('con_plate').value = `${c['رقم اللوحة']||c['Plate']||''} ${c['احرف اللوحة']||''}`;
-                document.getElementById('con_year').value = c['سنة الصنع'] || "";
-                document.getElementById('con_vin').value = c['VIN'] || c['رقم الشاسيه'] || "";
-                document.getElementById('con_motor').value = c['Motor'] || c['رقم الموتور'] || "";
-                runContractCalc();
-            }
-        }
-
-        function conNum(id) { const el = document.getElementById('con_'+id); return el ? parseFloat(el.value) || 0 : 0; }
-        function conVal(id) { const el = document.getElementById('con_'+id); return el ? el.value : ""; }
+        function conNum(id) { const el = document.getElementById(id); return el ? parseFloat(el.value) || 0 : 0; }
+        function conVal(id) { const el = document.getElementById(id); return el ? el.value : ""; }
 
         function runContractCalc() {
             try {
@@ -1755,28 +1755,28 @@
                 }
 
                 let mult = (mode === "Monthly") ? ((days / 30).toFixed(1) < 1 ? 1 : parseFloat((days / 30).toFixed(1))) : days;
-                const r = conNum('rateRent'), i = conNum('rateIns'), fee_d = conNum('fee_del'), fee_c = conNum('fee_col');
+                const r = conNum('con_rateRent'), i = conNum('con_rateIns'), fee_d = conNum('con_fee_del'), fee_c = conNum('con_fee_col');
 
                 let adds = 0; let addOnsList = [];
                 const kmSel = document.getElementById('con_km_pkg');
                 const pkgKM = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
-                let kmPackageCost = conNum('km_pkg_cost_manual') || (kmSel ? parseFloat(kmSel.value) : 0);
+                let kmPackageCost = conNum('con_km_pkg_cost_manual') || (kmSel ? parseFloat(kmSel.value) : 0);
 
                 if (pkgKM === 999999) { adds += (kmPackageCost * days); addOnsList.push(`Unl. KM Package`); } 
                 else if (kmPackageCost > 0) { adds += kmPackageCost; addOnsList.push(`Extra KM Package`); }
 
-                if (document.getElementById('con_add_dr').checked) { adds += (conNum('rate_dr') * days); addOnsList.push(`Driver`); }
-                if (document.getElementById('con_add_st').checked) { adds += (conNum('rate_st') * days); addOnsList.push(`Child Seat`); }
+                if (document.getElementById('con_add_dr').checked) { adds += (conNum('con_rate_dr') * days); addOnsList.push(`Driver`); }
+                if (document.getElementById('con_add_st').checked) { adds += (conNum('con_rate_st') * days); addOnsList.push(`Child Seat`); }
                 let addOnsStr = addOnsList.length > 0 ? addOnsList.join(", ") : "None";
 
                 let totalRentOnly = (mode === "Monthly") ? (r * mult) + (i * days) + adds : ((r + i) * mult) + adds;
                 let totalDue = Math.round(totalRentOnly + fee_d + fee_c);
 
-                let totalRentPaid = Math.round(conNum('pay_rent_egp') + (conNum('pay_rent_usd') * rateUsd) + (conNum('pay_rent_eur') * rateEur) + conNum('pay_rent_card'));
+                let totalRentPaid = Math.round(conNum('con_pay_rent_egp') + (conNum('con_pay_rent_usd') * rateUsd) + (conNum('con_pay_rent_eur') * rateEur) + conNum('con_pay_rent_card'));
                 let rentPending = totalDue - totalRentPaid;
 
-                let reqDep = conNum('req_deposit');
-                let totalDepPaid = Math.round(conNum('pay_dep_egp') + (conNum('pay_dep_usd') * rateUsd) + (conNum('pay_dep_eur') * rateEur) + conNum('pay_dep_card'));
+                let reqDep = conNum('con_req_deposit');
+                let totalDepPaid = Math.round(conNum('con_pay_dep_egp') + (conNum('con_pay_dep_usd') * rateUsd) + (conNum('con_pay_dep_eur') * rateEur) + conNum('con_pay_dep_card'));
                 let depPending = reqDep - totalDepPaid;
 
                 document.getElementById('con_c_days').innerText = days;
@@ -1804,15 +1804,15 @@
 
         function executeENContract() {
             const c = runContractCalc();
-            const val_branch = document.getElementById('con_branch').value || "HRG";
+            if (c.days === 0) return alert("Please select dates first.");
             
+            const val_branch = document.getElementById('con_branch').value || "HRG";
             let now = new Date();
             let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0');
             let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
             const cid = `BR-${val_branch}-${dStr}-${tStr}`; 
             const today = now.toLocaleDateString('en-GB');
 
-            // DATE/TIME FORMATTER (Standard Clean Font for Print)
             const formatDT = (dtString) => {
                 if(!dtString) return "";
                 const d = new Date(dtString);
@@ -1832,25 +1832,25 @@
                 return { total: total, text: `<strong>${Math.round(total).toLocaleString()} EGP</strong> <span style="font-size:8.5pt; font-weight:normal;">${detail}</span>`, breakdownDetails: detail };
             };
 
-            let rentInfo = buildPayStr('pay_rent'); let depInfo = buildPayStr('pay_dep');
-            let totalDepPaid = conNum('pay_dep_egp') + (conNum('pay_dep_usd') * c.rateUsd) + (conNum('pay_dep_eur') * c.rateEur) + conNum('pay_dep_card');
+            let rentInfo = buildPayStr('con_pay_rent'); let depInfo = buildPayStr('con_pay_dep');
+            let totalDepPaid = conNum('con_pay_dep_egp') + (conNum('con_pay_dep_usd') * c.rateUsd) + (conNum('con_pay_dep_eur') * c.rateEur) + conNum('con_pay_dep_card');
 
             let rateTxt = c.mode === 'Monthly' ? `${c.r} x ${c.mult} Mo` : `${c.r} x ${c.days} Days`;
             let base = c.mode === 'Monthly' ? (c.r * c.mult) : (c.r * c.days);
 
-            let pText = conVal('p_loc') + (conVal('p_addr') ? " (" + conVal('p_addr') + ")" : "");
-            let dText = conVal('d_loc') + (conVal('d_addr') ? " (" + conVal('d_addr') + ")" : "");
+            let pText = conVal('con_p_loc') + (conVal('con_p_addr') ? " (" + conVal('con_p_addr') + ")" : "");
+            let dText = conVal('con_d_loc') + (conVal('con_d_addr') ? " (" + conVal('con_d_addr') + ")" : "");
 
-            const insClass = conVal('insPack') === 'Full Protection' ? 'ins-full' : (conVal('insPack') === 'Intermediate' ? 'ins-inter' : 'ins-basic');
+            const insClass = conVal('con_insPack') === 'Full Protection' ? 'ins-full' : (conVal('con_insPack') === 'Intermediate' ? 'ins-inter' : 'ins-basic');
             const simpleInsText = { "Basic": "Basic Insurance: 100% Client Liability for Damages.", "Intermediate": "Intermediate: 70% Client Liability / 30% Company Coverage.", "Full Protection": "Full Protection: Zero Deductible (Subject to caps)." };
-            const extHtml = conVal('type') === 'Extension' ? `<div style="font-size:10pt; font-weight:bold; margin-top:3px;">(EXTENSION TO ${conVal('prevCon')})</div>` : '';
+            const extHtml = conVal('con_type') === 'Extension' ? `<div style="font-size:10pt; font-weight:bold; margin-top:3px;">(EXTENSION TO ${conVal('con_prev')})</div>` : '';
 
             const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png";
             const carSrc = "https://brothersegy.com/wp-content/uploads/2026/02/car-template.png";
 
             const kmSel = document.getElementById('con_km_pkg');
             const pkgKMValue = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
-            const kmAllowedTotal = pkgKMValue === 999999 ? "Unlimited" : (120 * c.days + pkgKMValue).toLocaleString() + " KM Total";
+            const kmAllowedTotal = pkgKMValue >= 999999 ? "Unlimited" : (120 * c.days + pkgKMValue).toLocaleString() + " KM Total";
 
             let html = ``;
 
@@ -1878,20 +1878,20 @@
                         <table class="pt" style="margin:0">
                             <tr><td width="30%"><strong>LESSOR</strong><br>El Alakhua El Mutahidun<br>${val_branch} Branch</td>
                                 <td><strong>LESSEE</strong><br>
-                                <b>Name:</b> ${conVal('fname')} ${conVal('sname')}<br>
-                                <b>Passport / ID:</b> ${conVal('pass')} | <b>License No:</b> ${conVal('lic')} | <b>Nation:</b> ${conVal('nation')}<br>
-                                <b>Phone:</b> ${conVal('ph_code')} ${conVal('phone')} | <b>Email:</b> ${conVal('email')}<br>
-                                <b>Addr:</b> ${conVal('addr')}<br>
-                                ${conVal('add_driver') ? '<b>Add. Driver:</b> ' + conVal('add_driver') + (conVal('add_lic') ? ' | <b>Lic:</b> ' + conVal('add_lic') : '') : ''}</td></tr>
+                                <b>Name:</b> ${conVal('con_fname')} ${conVal('con_sname')}<br>
+                                <b>Passport / ID:</b> ${conVal('con_pass')} | <b>License No:</b> ${conVal('con_lic')} | <b>Nation:</b> ${conVal('con_nation')}<br>
+                                <b>Phone:</b> ${conVal('con_ph_code')} ${conVal('con_phone')} | <b>Email:</b> ${conVal('con_email')}<br>
+                                <b>Addr:</b> ${conVal('con_addr')}<br>
+                                ${conVal('con_add_driver') ? '<b>Add. Driver:</b> ' + conVal('con_add_driver') + (conVal('con_add_lic') ? ' | <b>Lic:</b> ' + conVal('con_add_lic') : '') : ''}</td></tr>
                         </table>
                     </div>
 
                     <div class="box-section"><span class="bs-title">VEHICLE & PERIOD</span>
                         <table class="pt">
-                            <tr><th>Model</th><td>${conVal('manModel')}</td><th>Plate</th><td dir="ltr" style="text-align:left; font-size:11pt;"><b>${conVal('plate')}</b></td><th>KM Out</th><td>${conVal('kmOut')}</td></tr>
-                            <tr><th>VIN</th><td>${conVal('vin')}</td><th>Motor</th><td>${conVal('motor')}</td><th>Allow</th><td><strong>${kmAllowedTotal}</strong></td></tr>
-                            <tr><th>Pickup</th><td style="text-align:center">${formatDT(conVal('p_time'))}<br><span style="font-size:8pt">${pText}</span></td>
-                                <th>Dropoff</th><td style="text-align:center">${formatDT(conVal('d_time'))}<br><span style="font-size:8pt">${dText}</span></td>
+                            <tr><th>Model</th><td>${conVal('con_manModel')}</td><th>Plate</th><td dir="ltr" style="text-align:left; font-size:11pt;"><b>${conVal('con_plate')}</b></td><th>KM Out</th><td>${conVal('con_kmOut')}</td></tr>
+                            <tr><th>VIN</th><td>${conVal('con_vin')}</td><th>Motor</th><td>${conVal('con_motor')}</td><th>Allow</th><td><strong>${kmAllowedTotal}</strong></td></tr>
+                            <tr><th>Pickup</th><td style="text-align:center">${formatDT(conVal('con_p_time'))}<br><span style="font-size:8pt">${pText}</span></td>
+                                <th>Dropoff</th><td style="text-align:center">${formatDT(conVal('con_d_time'))}<br><span style="font-size:8pt">${dText}</span></td>
                                 <th>Duration</th><td style="font-size:11pt;"><b>${c.days} Days</b></td></tr>
                         </table>
                     </div>
@@ -1902,8 +1902,8 @@
                             <tr><td>Base Rent</td><td>${rateTxt}</td><td align="right">${Math.round(base).toLocaleString()}</td></tr>
                             ${c.i > 0 ? `<tr><td>Insurance Fees</td><td>${c.i} x ${c.days} Days</td><td align="right">${(c.i * c.days).toLocaleString()}</td></tr>` : ''}
                             ${c.kmPackageCost > 0 ? `<tr><td>Mileage Package (${kmSel.options[kmSel.selectedIndex].text})</td><td>Package Fee</td><td align="right">${c.kmPackageCost.toLocaleString()}</td></tr>` : ''}
-                            ${document.getElementById('con_add_dr').checked ? `<tr><td>Additional Driver</td><td>${conNum('rate_dr')} x ${c.days} Days</td><td align="right">${(conNum('rate_dr') * c.days).toLocaleString()}</td></tr>` : ''}
-                            ${document.getElementById('con_add_st').checked ? `<tr><td>Child Car Seat</td><td>${conNum('rate_st')} x ${c.days} Days</td><td align="right">${(conNum('rate_st') * c.days).toLocaleString()}</td></tr>` : ''}
+                            ${document.getElementById('con_add_dr').checked ? `<tr><td>Additional Driver</td><td>${conNum('con_rate_dr')} x ${c.days} Days</td><td align="right">${(conNum('con_rate_dr') * c.days).toLocaleString()}</td></tr>` : ''}
+                            ${document.getElementById('con_add_st').checked ? `<tr><td>Child Car Seat</td><td>${conNum('con_rate_st')} x ${c.days} Days</td><td align="right">${(conNum('con_rate_st') * c.days).toLocaleString()}</td></tr>` : ''}
                             ${c.fee_d > 0 ? `<tr><td>Delivery Fee (${pText})</td><td>Fixed</td><td align="right">${c.fee_d}</td></tr>` : ''}
                             ${c.fee_c > 0 ? `<tr><td>Pickup Fee (${dText})</td><td>Fixed</td><td align="right">${c.fee_c}</td></tr>` : ''}
                             <tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" align="right">TOTAL CONTRACT VALUE:</td><td align="right">${Math.round(c.totalDue).toLocaleString()} EGP</td></tr>
@@ -1914,7 +1914,7 @@
                             </td></tr>
                         </table>
                         <div class="${insClass}" style="border:1px solid #000; padding:5px; text-align:center; font-size:9pt; margin-bottom:5px; border-radius:4px;">
-                            ${simpleInsText[conVal('insPack')]}
+                            ${simpleInsText[conVal('con_insPack')]}
                         </div>
                         <div style="background:#eee; padding:5px; text-align:center;">
                             PAID NOW: ${rentInfo.text} <br> <span style="color:${c.rentPending > 0 ? '#c0392b' : '#27ae60'}; font-weight:bold;">PENDING: ${Math.round(c.rentPending).toLocaleString()} EGP</span>
@@ -1930,7 +1930,6 @@
                      <div style="text-align:center; border:2px dashed #000; padding:10px; font-size:9pt; margin-top:10px;">
                         <strong>IMPORTANT:</strong> Contract is void for any period NOT covered by an official payment receipt.<br>
                         <strong>LIABILITY:</strong> If the RETURN CHECK is not closed/signed, the Lessee retains full liability for the vehicle until official closure.
-                        The Lessee bears full legal and criminal liability for the rented vehicle during the entire rental period.
                     </div>
 
                     <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px; margin-bottom: 30px;">
@@ -1943,7 +1942,7 @@
             </div>`;
 
             // --- PAGE 2: TERMS ---
-            const insContent = insDetails[conVal('insPack')] || insDetails["Basic"];
+            const insContent = insDetailsText[conVal('con_insPack')] || insDetailsText["Basic"];
 
             html += `
             <div class="a4-page">
@@ -1957,7 +1956,7 @@
                         <div class="term-p"><span class="term-h">4. DELIVERY & MILEAGE</span>${termsText[4]}</div>
 
                         <div class="term-p" style="border:2px solid #e67e22; padding:5px; background:#fff8e1; break-inside:avoid;">
-                            <span class="term-h" style="color:#e67e22; border-bottom-color:#e67e22;">5. YOUR INSURANCE PACKAGE: ${conVal('insPack').toUpperCase()}</span>
+                            <span class="term-h" style="color:#e67e22; border-bottom-color:#e67e22;">5. YOUR INSURANCE PACKAGE: ${conVal('con_insPack').toUpperCase()}</span>
                             <div style="font-weight:normal; font-size:8pt; margin-top:5px; line-height:1.3;">${insContent}</div>
                         </div>
                         
@@ -2002,8 +2001,8 @@
                     <div class="insp-section-head">PICKUP CHECK (Start of Rental)</div>
                     <div class="box-section" style="padding:2px; margin-bottom:5px;">
                         <table class="pt" style="font-size:7pt; margin-bottom:0;">
-                            <tr style="background:#eee;"><th>KM OUT</th><td align="center">${conVal('kmOut')}</td></tr>
-                            <tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${conVal('fuelOut')}</td></tr>
+                            <tr style="background:#eee;"><th>KM OUT</th><td align="center">${conVal('con_kmOut')}</td></tr>
+                            <tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${conVal('con_fuelOut')}</td></tr>
                         </table>
                     </div>
                     <div style="text-align:center; font-size:7pt; font-weight:bold;">EXISTING DAMAGES:</div>
@@ -2075,7 +2074,7 @@
                 </div>
             </div>`;
 
-            // --- PAGE 4: ONE RECEIPT PAGE ONLY (No Blank Loops) ---
+            // --- PAGE 4: ONE RECEIPT PAGE ONLY ---
             const singleRecHtml = (title, copyType, amountStr, details, isBlankDate = false, periodStr = "", isDeposit = false) => `
                 <div class="receipt-half">
                     <div class="rec-header">
@@ -2095,13 +2094,13 @@
                     
                     <div class="rec-body-grid">
                         <div class="rec-col">
-                            <div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${conVal('fname')} ${conVal('sname')}</span></div>
-                            <div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${conVal('pass') || '-'}</span></div>
-                            <div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${conVal('ph_code')} ${conVal('phone')}</span></div>
+                            <div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${conVal('con_fname')} ${conVal('con_sname')}</span></div>
+                            <div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${conVal('con_pass') || '-'}</span></div>
+                            <div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${conVal('con_ph_code')} ${conVal('con_phone')}</span></div>
                         </div>
                         <div class="rec-col">
                             <div class="rec-row"><span class="rec-label">CONTRACT NO</span><span class="rec-val">${cid}</span></div>
-                            <div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:left;">${conVal('manModel')} | ${conVal('plate')}</span></div>
+                            <div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:left;">${conVal('con_manModel')} | ${conVal('con_plate')}</span></div>
                             ${isDeposit ? '' : `<div class="rec-row"><span class="rec-label">PERIOD</span><span class="rec-val" style="font-size:8pt;">${periodStr}</span></div>`}
                         </div>
                     </div>
@@ -2129,9 +2128,8 @@
                     </div>
                 </div>`;
 
-            // SINGLE RENT RECEIPT (No loop)
-            let sDate = new Date(conVal('p_time')); if (isNaN(sDate)) sDate = new Date();
-            let finalDropoffDate = new Date(conVal('d_time')); if (isNaN(finalDropoffDate)) finalDropoffDate = new Date(sDate.getTime() + (c.days * 24 * 60 * 60 * 1000));
+            let sDate = new Date(conVal('con_p_time')); if (isNaN(sDate)) sDate = new Date();
+            let finalDropoffDate = new Date(conVal('con_d_time')); if (isNaN(finalDropoffDate)) finalDropoffDate = new Date(sDate.getTime() + (c.days * 24 * 60 * 60 * 1000));
             let fullPeriodStr = `${sDate.toLocaleDateString('en-GB')} to ${finalDropoffDate.toLocaleDateString('en-GB')}`;
 
             html += `
@@ -2143,7 +2141,6 @@
                 </div>
             </div>`;
 
-            // SINGLE DEPOSIT RECEIPT
             if (c.reqDep > 0 || totalDepPaid > 0) {
                 let depAmtStr = Math.round(totalDepPaid > 0 ? totalDepPaid : c.reqDep).toLocaleString() + " EGP";
                 html += `
@@ -2158,9 +2155,7 @@
 
             document.getElementById('contractOutput').innerHTML = html;
             document.getElementById('contractOutput').style.display = "flex";
-            
-            const printBtn = document.getElementById('btnRealPrint');
-            if(printBtn) printBtn.style.display = "block";
+            document.getElementById('btnRealPrint').style.display = "block";
             
             setTimeout(() => {
                 const ws = document.getElementById('main-workspace');
@@ -2168,422 +2163,7 @@
                 if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); }
             }, 100);
         }
-        // --- SYNCHRONIZED MASTER DRAG-TO-SCROLL ---
-        function initDragScroll() {
-            const sliders = document.querySelectorAll('.drag-scroll');
-            let isDown = false;
-            let startX;
-            let scrollLeft;
-
-            sliders.forEach(slider => {
-                // Drag tracking
-                slider.addEventListener('mousedown', (e) => {
-                    isDown = true;
-                    sliders.forEach(s => s.style.cursor = 'grabbing');
-                    startX = e.pageX - slider.offsetLeft;
-                    scrollLeft = slider.scrollLeft;
-                });
-                slider.addEventListener('mouseleave', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
-                slider.addEventListener('mouseup', () => { isDown = false; sliders.forEach(s => s.style.cursor = 'grab'); });
-                
-                // Pan left/right
-                slider.addEventListener('mousemove', (e) => {
-                    if (!isDown) return;
-                    e.preventDefault();
-                    const x = e.pageX - slider.offsetLeft;
-                    const walk = (x - startX) * 1.5; // Drag speed multiplier
-                    
-                    // Move EVERY slider on the screen in sync
-                    sliders.forEach(s => s.scrollLeft = scrollLeft - walk);
-                });
-
-                // Mouse wheel / trackpad sync
-                slider.addEventListener('scroll', (e) => {
-                    sliders.forEach(s => {
-                        if (s !== slider) s.scrollLeft = slider.scrollLeft;
-                    });
-                });
-            });
-
-            // Auto-center the view to "Today" on first load
-            setTimeout(() => {
-                const viewport = document.querySelector('.gantt-viewport');
-                if(viewport) {
-                    const centerPoint = (viewport.scrollWidth - viewport.clientWidth) / 2;
-                    sliders.forEach(s => s.scrollLeft = centerPoint);
-                }
-            }, 100);
-        }
-
-        // --- 90-DAY ROLLING TIMELINE CONFIG ---
-        const T_WIDTH_PX = 2160; // 90 days * 24px per day
-
-        // --- BULLETPROOF GLOBAL TOOLTIP ENGINE ---
-        document.addEventListener('mouseover', function(e) {
-            let bar = e.target.closest('.gantt-bar');
-            if (bar) {
-                let t = document.getElementById('global-tooltip');
-                if(!t) {
-                    t = document.createElement('div'); t.id = 'global-tooltip';
-                    document.body.appendChild(t);
-                }
-                t.innerHTML = bar.getAttribute('data-info');
-                t.style.visibility = 'visible'; t.style.opacity = '1';
-            }
-        });
-        
-        document.addEventListener('mousemove', function(e) {
-            let t = document.getElementById('global-tooltip');
-            if (t && t.style.visibility === 'visible') {
-                let tWidth = t.offsetWidth;
-                let tHeight = t.offsetHeight;
-                
-                // Default position: Bottom-Right of the mouse
-                let x = e.clientX + 15; 
-                let y = e.clientY + 15;
-                
-                // If it bleeds off the right edge (with 20px safety buffer), flip to Left
-                if (x + tWidth > window.innerWidth - 20) {
-                    x = e.clientX - tWidth - 15;
-                }
-                
-                // If it bleeds off the bottom edge (with 20px safety buffer), flip UPWARD
-                if (y + tHeight > window.innerHeight - 20) {
-                    y = e.clientY - tHeight - 15;
-                }
-                
-                t.style.left = x + 'px'; 
-                t.style.top = y + 'px';
-            }
-        });
-        
-        document.addEventListener('mouseout', function(e) {
-            let bar = e.target.closest('.gantt-bar');
-            if (bar) {
-                let t = document.getElementById('global-tooltip');
-                if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; }
-            }
-        });
-
-        // --- BULLETPROOF GLOBAL TOOLTIP ENGINE ---
-        function showGanttTooltip(e, encodedHTML) {
-            let t = document.getElementById('global-tooltip');
-            if(!t) {
-                t = document.createElement('div'); t.id = 'global-tooltip';
-                document.body.appendChild(t);
-            }
-            t.innerHTML = decodeURIComponent(encodedHTML);
-            t.style.visibility = 'visible'; t.style.opacity = '1';
-            moveGanttTooltip(e);
-        }
-
-        function moveGanttTooltip(e) {
-            let t = document.getElementById('global-tooltip');
-            if (t && t.style.visibility === 'visible') {
-                let tWidth = t.offsetWidth || 250;
-                let tHeight = t.offsetHeight || 150;
-                
-                let x = e.clientX + 15; 
-                let y = e.clientY + 15;
-                
-                if (x + tWidth > window.innerWidth - 20) x = e.clientX - tWidth - 15;
-                if (y + tHeight > window.innerHeight - 20) y = e.clientY - tHeight - 15;
-                
-                t.style.left = x + 'px'; 
-                t.style.top = y + 'px';
-            }
-        }
-
-        function hideGanttTooltip() {
-            let t = document.getElementById('global-tooltip');
-            if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; }
-        }
-
-        // Fleet Radar Gantt Bar Listeners
-        document.addEventListener('mouseover', function(e) {
-            let bar = e.target.closest('.gantt-bar');
-            if (bar && bar.hasAttribute('data-info')) {
-                showGanttTooltip(e, encodeURIComponent(bar.getAttribute('data-info')));
-            }
-        });
-        document.addEventListener('mousemove', function(e) {
-            let bar = e.target.closest('.gantt-bar');
-            if (bar) moveGanttTooltip(e);
-        });
-        document.addEventListener('mouseout', function(e) {
-            let bar = e.target.closest('.gantt-bar');
-            if (bar) hideGanttTooltip();
-        });
-
-        // Center the view on "Today"
-        function scrollToToday() {
-            // Today is 30 days into our 90-day window (33.33%)
-            const targetPx = (T_WIDTH_PX * 0.3333) - 250; 
-            document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx);
-        }
-
-        // --- UNIVERSAL EDIT MODAL ENGINE (FULL DATABASE UI) ---
-        function openQuickModal(type, id) {
-            const m = document.getElementById('quick-modal');
-            const title = document.getElementById('qm-title');
-            const body = document.getElementById('qm-body');
-            const footer = document.getElementById('qm-footer');
-
-            let content = '';
-            let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
-
-            if(type === 'order') {
-                const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {};
-                const total = parseCurrency(b['إجمالي المستحق (Total)']);
-                const paid = parseCurrency(b['المدفوع EGP']);
-                const debt = Math.max(0, total - paid);
-                
-                title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--success);"></i> <span>Financials & Status (Order #${id})</span>`;
-                
-                content = `
-                    <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Client:</span> <b style="color:white;">${b['اسم العميل'] || 'Unknown'}</b></div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Total Value:</span> <b style="color:white;">${total.toLocaleString()} EGP</b></div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Paid:</span> <b style="color:var(--success);">${paid.toLocaleString()} EGP</b></div>
-                        <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:5px; margin-top:5px;"><span style="color:#aaa;">Remaining Debt:</span> <b style="color:var(--danger); font-size:16px;">${debt.toLocaleString()} EGP</b></div>
-                    </div>
-                    
-                    <div style="border:1px solid var(--glass-border); padding:15px; border-radius:8px; margin-bottom:15px; background:rgba(15,20,25,0.8);">
-                        <div style="color:var(--primary); font-size:12px; font-weight:bold; margin-bottom:10px; text-transform:uppercase;">AMOUNT RECEIVED NOW (Add Payment)</div>
-                        <div class="grid-4" style="gap:10px; margin-bottom:0;">
-                            <div><label style="font-size:10px; color:#aaa;">EGP Cash</label><input type="number" class="contract-input" placeholder="0"></div>
-                            <div><label style="font-size:10px; color:#aaa;">USD</label><input type="number" class="contract-input" placeholder="0"></div>
-                            <div><label style="font-size:10px; color:#aaa;">EUR</label><input type="number" class="contract-input" placeholder="0"></div>
-                            <div><label style="font-size:10px; color:#aaa;">Card / Online</label><input type="number" class="contract-input" placeholder="0"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="grid-2">
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label>
-                            <select class="contract-input"><option>Active (نشط)</option><option>Closed (مكتمل)</option><option>Cancelled (ملغي)</option></select>
-                        </div>
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Notes</label>
-                            <input type="text" class="contract-input" placeholder="Add payment/dispute notes..." value="${b['ملاحظات'] || ''}">
-                        </div>
-                    </div>`;
-                    
-                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-pay" onclick="showToast('Payment Processed Successfully!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
-            
-            } else if (type === 'client') {
-                const c = APP_DATA.customers.find(x => String(x.id) === String(id)) || {};
-                title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>Client Profile (ملف العميل) - ID: ${id}</span>`;
-                
-                content = `
-                    <div class="grid-4" style="margin-bottom:10px;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">First Name *</label><input type="text" class="contract-input" value="${c['الاسم الأول'] || ''}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Surname *</label><input type="text" class="contract-input" value="${c['الاسم الأخير'] || ''}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Passport / ID *</label><input type="text" class="contract-input" value="${c['رقم جواز السفر'] || c['الرقم القومى'] || ''}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Nationality</label><input type="text" class="contract-input" value="${c['رمز الدولة'] || ''}"></div>
-                    </div>
-                    <div class="grid-4" style="margin-bottom:10px;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Phone *</label><input type="text" class="contract-input" value="${c['رقم التليفون'] || ''}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Email Address</label><input type="text" class="contract-input" value="${c['عنوان البريد الإلكتروني'] || ''}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Driver License</label><input type="text" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Address</label><input type="text" class="contract-input" value="${c['العنوان'] || ''}"></div>
-                    </div>
-                    <div style="margin-bottom:5px;">
-                        <label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Info</label>
-                        <input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes...">
-                    </div>`;
-            
-            } else if (type === 'car') {
-                const car = APP_DATA.cars.find(x => String(x.id) === String(id)) || {};
-                let carName = `${getSafeVal(car, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(car, ['الطراز', 'Model'])}`.trim() || 'Unknown';
-                
-                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>Vehicle Profile - ${carName} [${id}]</span>`;
-                
-                content = `
-                    <div class="grid-4" style="margin-bottom:10px;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Brand / Type</label><input type="text" class="contract-input" value="${getSafeVal(car, ['النوع', 'Type', 'الماركة'])}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Model</label><input type="text" class="contract-input" value="${getSafeVal(car, ['الطراز', 'Model'])}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Year</label><input type="text" class="contract-input" value="${getSafeVal(car, ['سنة الصنع', 'Year'])}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Color</label><input type="text" class="contract-input" value="${getSafeVal(car, ['اللون', 'Color'])}"></div>
-                    </div>
-                    <div class="grid-4" style="margin-bottom:10px;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">VIN / Chassis</label><input type="text" class="contract-input" value="${getSafeVal(car, ['VIN', 'رقم الشاسيه'])}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Motor No.</label><input type="text" class="contract-input" value="${getSafeVal(car, ['Motor', 'رقم الموتور'])}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label>
-                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>حوادث (Accident)</option></select>
-                        </div>
-                    </div>
-                    <div class="grid-2" style="margin-bottom:10px;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">License Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Insurance Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}"></div>
-                    </div>
-                    <div style="margin-bottom:5px;">
-                        <label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label>
-                        <input type="text" class="contract-input" style="border-color:var(--danger);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc...">
-                    </div>`;
-            }
-
-            body.innerHTML = content;
-            footer.innerHTML = buttons;
-            m.classList.add('show');
-        }
-
-        function closeQuickModal(e) {
-            if(e && e.target.id !== 'quick-modal') return;
-            document.getElementById('quick-modal').classList.remove('show');
-        }
-
-        // ================= BLOCK 1: NATIVE PROPOSAL ENGINE =================
-        function prepProposal() {
-            populateClientList(); // Ensure CRM is loaded
-            const sel = document.getElementById('prop_car');
-            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
-            
-            APP_DATA.cars.forEach(c => {
-                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
-                if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
-                
-                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
-                let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
-                let rate = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
-                
-                let opt = document.createElement('option'); 
-                opt.value = c.id; 
-                opt.setAttribute('data-rate', rate);
-                opt.text = `[#${c.id}] ${carName} - ${pNum} (${rate} EGP/Day)`;
-                sel.add(opt);
-            });
-        }
-
-        function autoFillPropClient() {
-            const searchVal = document.getElementById('prop_crm_search').value;
-            const list = document.getElementById('client-list');
-            let selectedId = null;
-            for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
-            if(!selectedId) return;
-
-            const c = APP_DATA.customers.find(x => x.id === selectedId);
-            if(c) {
-                document.getElementById('prop_client_id').value = c.id;
-                document.getElementById('prop_fname').value = c['الاسم الأول'] || '';
-                document.getElementById('prop_sname').value = c['الاسم الأخير'] || '';
-                document.getElementById('prop_phone').value = c['رقم التليفون'] || '';
-                document.getElementById('prop_email').value = c['عنوان البريد الإلكتروني'] || '';
-            }
-        }
-
-        function updatePropRate() {
-            const sel = document.getElementById('prop_car');
-            if(sel.selectedIndex > 0) {
-                document.getElementById('prop_rate').value = sel.options[sel.selectedIndex].getAttribute('data-rate');
-                runPropCalc();
-            }
-        }
-
-        function suggestPropInsFee() {
-            const plan = document.getElementById('prop_ins_pack').value;
-            const feeInput = document.getElementById('prop_ins_fee');
-            if (plan === "Basic") feeInput.value = 0;
-            else if (plan === "Intermediate") feeInput.value = 400;
-            else if (plan === "Full Protection") feeInput.value = 900;
-            runPropCalc();
-        }
-
-        function propNum(id) { const el = document.getElementById(id); return el ? parseFloat(el.value) || 0 : 0; }
-
-        function runPropCalc() {
-            const sStr = document.getElementById('prop_start').value;
-            const eStr = document.getElementById('prop_end').value;
-            let days = 1;
-            if (sStr && eStr) {
-                const s = new Date(sStr), e = new Date(eStr);
-                if (e > s) { days = Math.ceil(Math.abs(e - s) / 86400000); if (days < 1) days = 1; }
-            }
-            document.getElementById('prop_days_val').value = days + " Days";
-
-            const rate = propNum('prop_rate');
-            const kmCost = propNum('prop_km_cost');
-            const insFee = propNum('prop_ins_fee') * days;
-            const delFee = propNum('prop_del');
-            const seatFee = document.getElementById('prop_chk_seat').checked ? 250 * days : 0;
-            const driverFee = document.getElementById('prop_chk_driver').checked ? 500 * days : 0;
-
-            const totalBase = rate * days;
-            const grandTotal = totalBase + kmCost + insFee + delFee + seatFee + driverFee;
-
-            document.getElementById('prop_grand_total').innerText = grandTotal.toLocaleString() + " EGP";
-            return { days, rate, kmCost, insFee, delFee, seatFee, driverFee, totalBase, grandTotal };
-        }
-
-        function executePropPreview() {
-            const math = runPropCalc();
-            if (math.days === 0) { alert("Please select Pickup and Dropoff dates."); return; }
-
-            const name = document.getElementById('prop_fname').value + " " + document.getElementById('prop_sname').value;
-            const ref = "PR-" + Math.floor(Math.random()*90000);
-            
-            const sel = document.getElementById('prop_car');
-            const carText = sel.selectedIndex > 0 ? sel.options[sel.selectedIndex].text : "Vehicle TBD";
-            
-            const kmSel = document.getElementById('prop_km_type');
-            const pkgKMValue = parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km'));
-            const totalKM = pkgKMValue >= 999999 ? "Unlimited" : (math.days * 120 + pkgKMValue).toLocaleString() + " KM Total";
-
-            let table = `<tr><td>Base Rental</td><td>${math.rate.toLocaleString()} x ${math.days} Days</td><td align="right">${math.totalBase.toLocaleString()}</td></tr>`;
-            if(math.insFee > 0) table += `<tr><td>Insurance Fees</td><td>Daily x ${math.days} Days</td><td align="right">${math.insFee.toLocaleString()}</td></tr>`;
-            if(math.kmCost > 0) table += `<tr><td>KM Package</td><td>Flat Fee</td><td align="right">${math.kmCost.toLocaleString()}</td></tr>`;
-            if(math.seatFee > 0) table += `<tr><td>Child Car Seat</td><td>250 x ${math.days} Days</td><td align="right">${math.seatFee.toLocaleString()}</td></tr>`;
-            if(math.driverFee > 0) table += `<tr><td>Additional Driver</td><td>500 x ${math.days} Days</td><td align="right">${math.driverFee.toLocaleString()}</td></tr>`;
-            if(math.delFee > 0) table += `<tr><td>Logistics Fee</td><td>Fixed Fee</td><td align="right">${math.delFee.toLocaleString()}</td></tr>`;
-
-            const html = `
-            <div class="a4-page" style="display:block;">
-                <div class="page-content">
-                    <div class="doc-head" style="border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px;">
-                        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px;">
-                        <div style="text-align: right;">
-                            <h2 style="margin: 0; color: var(--primary); font-size: 16pt;">PRICE PROPOSAL</h2>
-                            <p style="margin: 0; font-weight: bold; font-size: 10pt;">Ref: ${ref} | Date: ${new Date().toLocaleDateString('en-GB')}</p>
-                        </div>
-                    </div>
-                    <div class="box-section"><span class="bs-title">CLIENT & PERIOD</span>
-                        <table class="pt">
-                            <tr><th width="15%">Client Name</th><td colspan="3">${name}</td></tr>
-                            <tr><th>Phone</th><td>${document.getElementById('prop_phone').value}</td><th>Email</th><td>${document.getElementById('prop_email').value}</td></tr>
-                            <tr><th width="15%">Pickup</th><td width="35%">${document.getElementById('prop_start').value.replace('T', ' ')}</td><th width="15%">Dropoff</th><td width="35%">${document.getElementById('prop_end').value.replace('T', ' ')}</td></tr>
-                            <tr><th>Duration</th><td>${math.days} Days</td><th>KM Allowance</th><td>${totalKM}</td></tr>
-                        </table>
-                    </div>
-                    <div class="box-section"><span class="bs-title">VEHICLE DETAILS</span>
-                        <table class="pt"><tr><th width="15%">Model</th><td colspan="3">${carText}</td></tr></table>
-                    </div>
-                    <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span>
-                        <table class="pt">
-                            <thead><tr><th>Description</th><th>Details</th><th style="text-align:right;">Total (EGP)</th></tr></thead>
-                            <tbody>${table}</tbody>
-                            <tfoot>
-                                <tr style="font-weight:bold; background:#f0f0f0;"><td colspan="2" align="right">TOTAL PROPOSAL VALUE:</td><td align="right">${math.grandTotal.toLocaleString()} EGP</td></tr>
-                                <tr><td colspan="2" align="right">Security Deposit (Held):</td><td align="right">${propNum('prop_dep').toLocaleString()} EGP</td></tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    <div class="box-section"><span class="bs-title">INSURANCE: ${document.getElementById('prop_ins_pack').value.toUpperCase()}</span>
-                        <p style="margin:0; font-size:8.5pt;">${insDetails[document.getElementById('prop_ins_pack').value]}</p>
-                    </div>
-                </div>
-            </div>`;
-
-            document.getElementById('proposalOutput').innerHTML = html;
-            document.getElementById('proposalOutput').style.display = 'flex';
-            document.getElementById('btn_print_prop').style.display = 'block';
-            
-            setTimeout(() => { document.getElementById('proposalOutput').scrollIntoView({ behavior: 'smooth' }); }, 100);
-        }
         
     </script>
 </body>
-</html>
+</html>    
