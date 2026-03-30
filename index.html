@@ -1118,7 +1118,6 @@
             document.getElementById('v360-dropdown').classList.toggle('show');
         }
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
             const container = document.getElementById('v360-container');
             if (container && !container.contains(event.target)) {
@@ -1128,28 +1127,34 @@
 
         function populateV360Select() {
             const list = document.getElementById('v360-checkbox-list');
-            // FIX: Ensure we only check element children, ignoring whitespace/comments
             if (list.children.length > 0) return; 
             
-            list.innerHTML = ''; // Clear properly
+            list.innerHTML = ''; 
             
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
 
-                // EXACT ARABIC PLATE LOGIC
+                // 1. PERFECT ARABIC FORMATTING (From Fleet Radar)
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
                 let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
 
-                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
+                let carNameAr = `${getSafeVal(c, ['النوع', 'الماركة'])} ${getSafeVal(c, ['الطراز'])}`.trim();
+                let carNameEn = `${getSafeVal(c, ['Type'])} ${getSafeVal(c, ['Model'])}`.trim();
+                let carName = carNameAr || carNameEn || 'Unknown';
                 let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
+                
                 let displayName = `${carName} (${cYear}) ${fullPlate} [${c.id}]`;
+                
+                // Hidden index for bilingual searching
+                let searchIndex = `${carNameAr} ${carNameEn} ${nums} ${lets} ${cYear} ${c.id}`.toLowerCase();
 
                 let div = document.createElement('label');
                 div.className = 'multi-item';
+                div.setAttribute('data-search', searchIndex);
                 div.innerHTML = `<input type="checkbox" value="${c.id}" class="v360-check" onchange="updateV360Selection()"> <span>${displayName}</span>`;
                 list.appendChild(div);
             });
@@ -1163,7 +1168,7 @@
             const filter = document.getElementById('v360-search').value.toLowerCase();
             const items = document.querySelectorAll('.multi-item');
             items.forEach(item => {
-                const text = item.innerText.toLowerCase();
+                const text = item.getAttribute('data-search') || item.innerText.toLowerCase();
                 item.style.display = text.includes(filter) ? "flex" : "none";
             });
         }
@@ -1208,12 +1213,23 @@
             const getCarDisplay = (cid) => {
                 const c = APP_DATA.cars.find(x => x.id == cid);
                 if(!c) return `<span style="color:#888;">[ID: ${cid}]</span>`;
-                let n1 = getSafeVal(c, ['رقم اللوحة', 'Field_28']); let l1 = getSafeVal(c, ['احرف اللوحة', 'Field_24']);
-                let cName = getSafeVal(c, ['الطراز', 'Model']) || 'Vehicle';
-                return `<span style="color:white; font-weight:bold;">${cName}</span> <span style="color:var(--accent); font-size:11px;">${l1} ${n1} [${c.id}]</span>`;
+                
+                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
+                let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
+                let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
+
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
+                let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
+                
+                return `<div class="clickable-obj" onclick="showToast('Open Car Profile: ID ${c.id}')" style="display:flex; flex-direction:column; align-items:flex-end;">
+                            <span style="color:white; font-weight:bold; font-size:13px;">${carName} (${cYear})</span>
+                            <span style="color:var(--accent); font-size:11px;">${fullPlate} [${c.id}]</span>
+                        </div>`;
             };
 
-            // 1. Parse Bookings
+            // 1. Parse Bookings for Cash Ledger
             APP_DATA.bookings.forEach(b => {
                 const cid = String(b['كود السيارة']);
                 if(!selectedV360Cars.has(cid)) return;
@@ -1225,13 +1241,39 @@
                 const paid = parseCurrency(b['المدفوع EGP']);
                 const debt = Math.max(0, total - paid);
                 const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
+                const method = getSafeVal(b, ['طريقة الدفع', 'Payment Method']) || "Cash/Transfer";
+                
+                // Hover Details (Rich Tooltip)
+                let hoverText = `
+                    <div style="text-align:right; font-family:'Cairo', sans-serif;">
+                        <b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b>
+                        <hr style="margin:8px 0; border-top:1px solid #444;">
+                        <div style="margin-bottom:4px;"><span style="color:#888;">العميل:</span> <b style="color:white">${b['اسم العميل']}</b></div>
+                        <div style="margin-bottom:4px;"><span style="color:#888;">البدء:</span> <span dir="ltr" style="color:white">${b['بداية التعاقد']}</span></div>
+                        <div style="margin-bottom:8px;"><span style="color:#888;">الانتهاء:</span> <span dir="ltr" style="color:white">${b['نهاية التعاقد']}</span></div>
+                        <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;">
+                                <span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b>
+                            </div>
+                        </div>
+                    </div>`;
 
                 if (paid > 0) {
                     kpiRev += paid;
                     timeline.push({ 
                         id: b.id, type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(),
-                        desc: `<b class="clickable-obj" style="color:var(--success)">Order #${b.id} - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Base + Addons Included</span>`
+                        desc: `<div style="display:flex; justify-content:space-between;">
+                                   <b class="clickable-obj" style="color:var(--success)" onclick="showToast('Open Order #${b.id}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); showToast('Client: ${b['اسم العميل']}')">${b['اسم العميل']}</span></b>
+                                   <i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText)}')" onmouseleave="hideGanttTooltip()"></i>
+                               </div>
+                               <div style="font-size:11px; color:#aaa; margin-top:4px;">Collected via ${method} | Breakdown: Base + Insurance + Extras Included</div>`
                     });
                 }
                 if (debt > 0) {
@@ -1239,7 +1281,14 @@
                     timeline.push({ 
                         id: b.id, type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1,
-                        desc: `<b style="color:var(--danger)">Unpaid Balance - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Total Order Value: ${total.toLocaleString()} EGP</span>`
+                        desc: `<div style="display:flex; justify-content:space-between; align-items:center;">
+                                   <b class="clickable-obj" style="color:var(--danger)" onclick="showToast('Open Order #${b.id}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); showToast('Client: ${b['اسم العميل']}')">${b['اسم العميل']}</span></b>
+                                   <div style="display:flex; gap:10px;">
+                                       <button class="clickable-obj" onclick="showToast('Add Payment UI for Order #${b.id}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>
+                                       <i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText)}')" onmouseleave="hideGanttTooltip()"></i>
+                                   </div>
+                               </div>
+                               <div style="font-size:11px; color:#aaa; margin-top:4px;">Total Order: ${total.toLocaleString()} EGP | Needs Collection</div>`
                     });
                 }
                 if (deposit > 0) {
@@ -1247,7 +1296,7 @@
                     timeline.push({ 
                         id: b.id, type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2,
-                        desc: `<b style="color:#f1c40f">Security Deposit Held - ${b['اسم العميل']}</b>`
+                        desc: `<b class="clickable-obj" style="color:#f1c40f" onclick="showToast('Open Order #${b.id}')">Security Deposit Held - <span style="color:white">${b['اسم العميل']}</span></b><br><span style="font-size:10px; color:#aaa;">To be refunded upon safe return.</span>`
                     });
                 }
             });
@@ -1263,7 +1312,6 @@
                 const amt = parseCurrency(e['قيمة المصروف']); 
                 const details = String(e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || e['نوع المصروف'] || "").toLowerCase();
                 
-                // Fuzzy categorization
                 let isMaint = details.includes('صيانة') || details.includes('غيار') || details.includes('زيت');
                 let isDoc = details.includes('تأمين') || details.includes('رخصة') || details.includes('مخالفات') || details.includes('مرور');
                 
@@ -1279,7 +1327,7 @@
                 timeline.push({ 
                     id: e.id || '-', type: badge, date: dateStr, 
                     carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(),
-                    desc: `<span style="color:#ddd;">${e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || 'Expense Record'}</span>`
+                    desc: `<span class="clickable-obj" onclick="showToast('Edit Expense Record')" style="color:#ddd;">${e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || 'Expense Record'}</span>`
                 });
             });
 
