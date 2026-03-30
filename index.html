@@ -535,7 +535,6 @@
                         <div style="flex-grow:1;">
                             <label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> Search & Auto-Fill Client</label>
                             <input list="client-list" id="crm_search" class="contract-input" placeholder="Type Name or Passport to Search..." onchange="autoFillClient()" style="border-color:var(--primary);">
-                            <datalist id="client-list"></datalist>
                         </div>
                         <div style="display:flex; gap:5px; margin-top:15px;">
                             <button onclick="startNewClient()" style="background:#2ecc71; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-plus"></i> New</button>
@@ -710,6 +709,8 @@
     <div style="display:none;">
         <img id="img_logo" src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" crossorigin="anonymous">
         <img id="img_car" src="https://brothersegy.com/wp-content/uploads/2026/02/car-template.png" crossorigin="anonymous">
+        
+        <datalist id="client-list"></datalist>
     </div>
 
     <script>
@@ -908,6 +909,7 @@
         // --- 3. MASTER FLEET RADAR ENGINE ---
         function buildRadar() {
             const body = document.getElementById('radar-body');
+            if(!body) return; // Failsafe
             body.innerHTML = '';
             
             const cairoNowStr = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
@@ -922,7 +924,6 @@
             const T_END = nowMs + (60 * 24 * 60 * 60 * 1000);
             const T_TOTAL_MS = T_END - T_START;
 
-            // Generate Timeline Axis (Markers every 5 days)
             let axisHTML = `<div style="position:absolute; top:0; left:0; width:100%; height:16px; border-bottom:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.5); z-index:1;">`;
             for(let i=0; i<=90; i+=5) {
                 let d = new Date(T_START + (i * 86400000));
@@ -931,7 +932,6 @@
             }
             axisHTML += `</div>`;
 
-            // Dynamic Header
             let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:30px; border:none;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">`;
             headerTimeline += `${axisHTML}<div class="live-time-pointer" style="left:33.33%;"><div class="live-time-label">LIVE</div></div></div></div>`;
             
@@ -957,23 +957,21 @@
                 // 1. PERFECT ARABIC FORMATTING
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
-                
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
                 let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
                 
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
                 let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
-                let colorName = getSafeVal(c, ['اللون', 'Color']);
-                let colorHex = getCarColorHex(colorName);
+                let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 
                 const carHTML = `
-                    <div class="arabic-car-title">
-                        <span class="clickable-obj" onclick="showToast('Edit UI for Car ID: ${c.id}')">${carName} (${cYear}) ${fullPlate} [${c.id}]</span>
-                        <div class="color-dot clickable-obj" title="اللون: ${colorName}" style="background: ${colorHex}; margin-right:5px;" onclick="showToast('Insurance/Docs UI for ID: ${c.id}')"></div>
+                    <div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')">
+                        <span>${carName} (${cYear}) ${fullPlate} [${c.id}]</span>
+                        <div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div>
                     </div>`;
 
-                let carBookings = APP_DATA.bookings.filter(b => b['كود السيارة'] == c.id);
+                let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id));
                 carBookings.sort((a,b) => new Date(a['بداية التعاقد']).getTime() - new Date(b['بداية التعاقد']).getTime());
 
                 let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)";
@@ -986,12 +984,11 @@
                     if (start > nowMs && !nextFutureBooking) { nextFutureBooking = b; }
                 }
 
-                // Master Status Priority Logic
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
                     if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Client Profile: ${currentActiveBooking['اسم العميل']}')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']).getTime();
                     const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
@@ -1001,7 +998,7 @@
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
                     
-                    assignmentText = `<span style="color:#888; font-size:10px;">Next:</span> <b class="clickable-obj" style="color:#fff" onclick="showToast('Client Profile')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<span style="color:#888; font-size:10px;">Next:</span> <b class="clickable-obj" style="color:#fff" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else { counts.ready++; }
 
                 // 4. GENERATE HOUR-PERFECT TIMELINE BLOCKS
@@ -1021,19 +1018,7 @@
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100;
                         let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
-                        const paid = parseCurrency(b['المدفوع EGP']); 
-                        const total = parseCurrency(b['إجمالي المستحق (Total)']);
-                        const debt = Math.max(0, total - paid); // Calculate remaining debt
-                        
-                        // Safely fetch Deposit and Insurance
-                        const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
-                        const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
-                        
-                        // Smart Deposit Status
-                        let depBadge = deposit > 0 
-                            ? `<span style="color:var(--danger);">${deposit.toLocaleString()} EGP (محتجزة / Held)</span>` 
-                            : `<span style="color:var(--success);">مستردة / لا يوجد (Returned)</span>`;
-                        
+                        const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']);
                         let barClass = "status-paid"; let statusTxt = "Paid";
                         
                         if (bStart <= nowMs && bEnd >= nowMs) {
@@ -1045,14 +1030,12 @@
                             else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
                         } else { barClass = "status-ready"; statusTxt = "Archived (Past)"; }
 
-                        // Stack Overlapping Orders Visually
                         let topOffset = "14px"; 
                         if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) {
                             if(barClass === "status-paid") topOffset = "4px"; else topOffset = "24px";
                         }
                         occupiedLevels.push(renderEnd); 
 
-                        // UPGRADED RICH HOVER DATA
                         let hoverText = `
                             <div style="text-align:right; font-family:'Cairo', sans-serif;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1062,36 +1045,23 @@
                                 <b style='color:var(--accent); font-size:15px;'>العميل: ${b['اسم العميل']}</b><br>
                                 <span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span>
                                 <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                
                                 <div style="margin-bottom:6px;"><span style="color:#888;">من:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
                                 <div style="margin-bottom:10px;"><span style="color:#888;">إلى:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
-                                
                                 <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
                                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                        <span style="color:#888;">الإجمالي (Total):</span> <b style="color:white">${total.toLocaleString()} EGP</b>
+                                        <span style="color:#888;">الإجمالي:</span> <b style="color:white">${total.toLocaleString()} EGP</b>
                                     </div>
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                        <span style="color:#888;">المدفوع (Paid):</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b>
+                                    <div style="display:flex; justify-content:space-between;">
+                                        <span style="color:#888;">المدفوع:</span> <b style="color:${paid < total ? 'var(--accent)' : 'var(--success)'}">${paid.toLocaleString()} EGP</b>
                                     </div>
-                                    <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed #555;">
-                                        <span style="color:#888;">المتبقي (Debt):</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b>
-                                    </div>
-                                </div>
-                                
-                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                    <span style="color:#888;">الوديعة:</span> <b>${depBadge}</b>
-                                </div>
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span style="color:#888;">التأمين:</span> <b style="color:white">${insPack}</b>
                                 </div>
                             </div>
                         `;
 
                         timelineHTML += `
                             <div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" 
-                                 data-info="${hoverText.replace(/"/g, '&quot;')}"
-                                 onclick="showToast('Opening Edit Panel for Order #${b.id}')">
+                                 data-info="${hoverText.replace(/"/g, '&quot;').replace(/'/g, "%27")}"
+                                 onclick="openQuickModal('order', '${b.id}')">
                             </div>
                         `;
                     }
@@ -2263,8 +2233,8 @@
             document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx);
         }
 
-        // --- UNIVERSAL EDIT MODAL ENGINE (PHASE 3 PREVIEW) ---
-        function openQuickModal(type, id, titleExtra) {
+        // --- UNIVERSAL EDIT MODAL ENGINE (PHASE 3 UI) ---
+        function openQuickModal(type, id) {
             const m = document.getElementById('quick-modal');
             const title = document.getElementById('qm-title');
             const body = document.getElementById('qm-body');
@@ -2272,62 +2242,84 @@
 
             let content = '';
             let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Will save to Database!'); closeQuickModal()">حفظ (Save)</button>`;
 
             if(type === 'order') {
-                title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--accent);"></i> <span>تحديث بيانات الطلب (Order #${id})</span>`;
+                const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {};
+                const total = parseCurrency(b['إجمالي المستحق (Total)']);
+                const paid = parseCurrency(b['المدفوع EGP']);
+                const debt = Math.max(0, total - paid);
+                
+                title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--success);"></i> <span>Financials & Status (Order #${id})</span>`;
                 content = `
-                    <div style="margin-bottom:15px;">
-                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">العميل (Client)</label>
-                        <input type="text" class="contract-input" value="${titleExtra}" readonly style="opacity:0.7;">
+                    <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Client:</span> <b style="color:white; font-size:16px;">${b['اسم العميل'] || 'Unknown'}</b></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Total Value:</span> <b style="color:white;">${total.toLocaleString()} EGP</b></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Paid:</span> <b style="color:var(--success);">${paid.toLocaleString()} EGP</b></div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:5px; margin-top:5px;"><span style="color:#aaa;">Remaining Debt:</span> <b style="color:var(--danger); font-size:16px;">${debt.toLocaleString()} EGP</b></div>
                     </div>
                     <div class="grid-2">
                         <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">حالة الطلب (Status)</label>
-                            <select class="contract-input"><option>نشط (Active)</option><option>مكتمل (Closed)</option><option>ملغي (Cancelled)</option></select>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Add New Payment (EGP)</label>
+                            <input type="number" class="contract-input" placeholder="Amount to add..." style="border-color:var(--success);">
                         </div>
                         <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">المدفوعات الجديدة (Add Payment)</label>
-                            <input type="number" class="contract-input" placeholder="EGP..." value="">
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Payment Method</label>
+                            <select class="contract-input"><option>Cash (كاش)</option><option>Bank Transfer (تحويل بنكي)</option><option>Credit Card (بطاقة ائتمان)</option></select>
                         </div>
+                    </div>
+                    <div style="margin-top:15px;">
+                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label>
+                        <select class="contract-input"><option>Active (نشط)</option><option>Closed/Archived (مكتمل)</option><option>Cancelled (ملغي)</option></select>
                     </div>`;
                 buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-pay" onclick="showToast('Payment Processed Successfully!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Add Payment</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
+                           <button class="modal-btn modal-btn-pay" onclick="showToast('Phase 3: Payment processed!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button>
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
             
             } else if (type === 'client') {
-                title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>ملف العميل (Client Profile)</span>`;
+                const c = APP_DATA.customers.find(x => String(x.id) === String(id)) || {};
+                title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>Client Profile (ملف العميل) - ID: ${id}</span>`;
                 content = `
-                    <div style="margin-bottom:15px;">
-                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">الاسم (Name)</label>
-                        <input type="text" class="contract-input" value="${titleExtra}">
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">First Name *</label><input type="text" class="contract-input" value="${c['الاسم الأول'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Surname *</label><input type="text" class="contract-input" value="${c['الاسم الأخير'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Passport / ID *</label><input type="text" class="contract-input" value="${c['رقم جواز السفر'] || c['الرقم القومى'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Nationality</label><input type="text" class="contract-input" value="${c['رمز الدولة'] || ''}"></div>
                     </div>
-                    <div class="grid-2">
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">رقم الهاتف (Phone)</label>
-                            <input type="text" class="contract-input" placeholder="+20...">
-                        </div>
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">رقم الهوية (ID/Passport)</label>
-                            <input type="text" class="contract-input" placeholder="ID...">
-                        </div>
-                    </div>`;
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Phone *</label><input type="text" class="contract-input" value="${c['رقم التليفون'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Email Address</label><input type="text" class="contract-input" value="${c['عنوان البريد الإلكتروني'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Driver License</label><input type="text" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Address</label><input type="text" class="contract-input" value="${c['العنوان'] || ''}"></div>
+                    </div>
+                    <div style="margin-bottom:5px;"><label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes</label><input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes..."></div>`;
             
             } else if (type === 'car') {
-                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>ملف السيارة (Vehicle Profile)</span>`;
+                const car = APP_DATA.cars.find(x => String(x.id) === String(id)) || {};
+                let carName = `${getSafeVal(car, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(car, ['الطراز', 'Model'])}`.trim() || 'Unknown';
+                let cYear = getSafeVal(car, ['سنة الصنع', 'Year']);
+                let currentKm = getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0';
+                
+                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>Vehicle Profile - ${carName} (${cYear}) [${id}]</span>`;
                 content = `
-                    <div style="margin-bottom:15px;">
-                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">السيارة (Vehicle)</label>
-                        <input type="text" class="contract-input" value="${titleExtra}" readonly style="opacity:0.7;">
+                    <div class="grid-2" style="margin-bottom:15px;">
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Update Current KM</label>
+                            <input type="number" class="contract-input" value="${currentKm}">
+                        </div>
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Fleet Status Override</label>
+                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>مباعة (Sold)</option></select>
+                        </div>
                     </div>
                     <div class="grid-2">
                         <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">تحديث الكيلومتر (Update KM)</label>
-                            <input type="number" class="contract-input" placeholder="KM...">
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Insurance Expiry</label>
+                            <input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}">
                         </div>
                         <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">الحالة (Status Override)</label>
-                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option></select>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">License Expiry</label>
+                            <input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}">
                         </div>
                     </div>`;
             }
