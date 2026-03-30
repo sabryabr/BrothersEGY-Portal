@@ -47,7 +47,7 @@
         .side-item:hover, .side-item.active { background: var(--primary); color: white; box-shadow: 0 5px 15px rgba(4,80,157,0.3); }
 
         /* Main Workspace */
-        .workspace { margin-top: 70px; margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); height: calc(100vh - 70px); padding: 30px; box-sizing: border-box; overflow-y: auto; background: rgba(0,0,0,0.2); scroll-behavior: smooth; position: relative; }
+        .workspace { margin-top: 70px; margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); height: calc(100vh - 70px); padding: 30px; box-sizing: border-box; overflow-y: auto; background: rgba(0,0,0,0.2); scroll-behavior: smooth; position: relative; padding-top: 30px !important; scroll-padding-top: 30px; }
         .view-section { display: none; animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
@@ -216,6 +216,21 @@
         .kpi-filter:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
         .kpi-filter.inactive { opacity: 0.3; filter: grayscale(1); transform: scale(0.98); border-color: transparent !important; box-shadow: none; }
         .kpi-filter.inactive::after { content: 'HIDDEN'; position: absolute; top: 10px; right: 10px; font-size: 9px; font-weight: bold; background: #333; color: #aaa; padding: 2px 6px; border-radius: 4px; }
+
+        /* ================= QUICK EDIT MODAL (PHASE 3 PREVIEW) ================= */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 999999; display: none; align-items: center; justify-content: center; opacity: 0; transition: 0.3s; }
+        .modal-overlay.show { display: flex; opacity: 1; }
+        .modal-box { background: rgba(15, 20, 25, 0.95); border: 1px solid var(--primary); border-radius: 15px; width: 500px; max-width: 90vw; padding: 25px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); transform: translateY(20px); transition: 0.3s; }
+        .modal-overlay.show .modal-box { transform: translateY(0); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        .modal-title { font-size: 18px; font-weight: bold; color: white; display:flex; align-items:center; gap:10px; font-family: 'Cairo', sans-serif; }
+        .modal-close { background: none; border: none; color: #888; font-size: 20px; cursor: pointer; transition: 0.2s; }
+        .modal-close:hover { color: var(--danger); }
+        .modal-body { color: #ddd; font-size: 14px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: right; }
+        .modal-footer { margin-top: 20px; display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; justify-content: flex-end; }
+        .modal-btn { padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; font-family: 'Cairo', sans-serif; }
+        .modal-btn-save { background: var(--primary); color: white; }
+        .modal-btn-pay { background: var(--success); color: white; }
         
     </style>
 </head>
@@ -354,33 +369,39 @@
             <div id="view-orders" class="view-section">
                 <h2>📋 Master Order Book</h2>
                 <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
-                    <button onclick="scrollToToday()" style="background:#00d2ff; color:#000; border:none; padding:12px 20px; border-radius:8px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-location-crosshairs"></i> Reset to Live Time</button>
-                    
-                    <div style="flex: 1; margin-left:15px;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Fleet Status</label>
-                        <select id="radar-status-filter" class="contract-input" onchange="buildRadar()" style="height: 44px; font-weight:bold;">
-                            <option value="active">Active Fleet Only</option>
-                            <option value="all">All Registered Vehicles</option>
+                    <div style="flex: 1;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Time Period</label>
+                        <select id="order-period-filter" class="contract-input" onchange="buildOrderBook()" style="height: 48px; font-weight:bold;">
+                            <option value="all">All Time History</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_year">This Year</option>
                         </select>
                     </div>
-                    <div style="flex: 2;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search Database</label>
-                        <input type="text" class="contract-input" id="search-radar" placeholder="Search Plate, Model, or Customer..." onkeyup="searchTable('radar-body', 'search-radar')" style="height: 44px; margin-bottom:0;">
+                    <div style="flex: 3;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search Orders</label>
+                        <input type="text" class="contract-input" id="search-orders" placeholder="Search Order # or Customer Name..." onkeyup="searchTable('orders-body', 'search-orders')" style="height: 48px; margin-bottom:0;">
                     </div>
                 </div>
-                
-                <div class="table-responsive" style="overflow: visible;">
+                <div class="table-responsive">
                     <table class="data-table">
-                        <thead id="radar-head">
-                            </thead>
-                        <tbody id="radar-body"></tbody>
+                        <thead><tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Car ID</th>
+                            <th>Rental Period</th>
+                            <th>Grand Total</th>
+                            <th>Paid (Income)</th>
+                            <th>Status</th>
+                        </tr></thead>
+                        <tbody id="orders-body"></tbody>
                     </table>
                 </div>
             </div>
 
             <div id="view-v360" class="view-section">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h2>🚗 Vehicle 360 (Comprehensive Ledger)</h2>
+                    <h2 style="margin-top:0;">🚗 Vehicle 360 (Comprehensive Ledger)</h2>
                     <button onclick="resetV360Filters()" style="background:var(--danger); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-rotate-right"></i> Reset All Filters</button>
                 </div>
 
@@ -673,6 +694,19 @@
         </div>
     </div>
 
+    <div id="quick-modal" class="modal-overlay" onclick="closeQuickModal(event)">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="qm-title"><i class="fa-solid fa-pen-to-square"></i> <span>Edit Record</span></div>
+                <button class="modal-close" onclick="closeQuickModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="qm-body">
+                </div>
+            <div class="modal-footer" id="qm-footer">
+                </div>
+        </div>
+    </div>
+                        
     <div style="display:none;">
         <img id="img_logo" src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" crossorigin="anonymous">
         <img id="img_car" src="https://brothersegy.com/wp-content/uploads/2026/02/car-template.png" crossorigin="anonymous">
@@ -1229,7 +1263,7 @@
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Vehicle';
                 let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 
-                return `<div class="clickable-obj" onclick="showToast('Open Car Profile: ID ${c.id}')" style="display:flex; flex-direction:column; align-items:flex-end;">
+                return `<div class="clickable-obj" onclick="openQuickModal('car', '${c.id}', '${carName} ${fullPlate}')" style="display:flex; flex-direction:column; align-items:flex-end;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <span style="color:white; font-weight:bold; font-size:13px;">${carName}</span>
                                 <div class="color-dot" style="background:${colorHex}; width:10px; height:10px;"></div>
@@ -1237,6 +1271,26 @@
                             <span style="color:var(--accent); font-size:11px; margin-top:2px;" dir="ltr">${fullPlate} [${c.id}]</span>
                         </div>`;
             };
+
+            // IN THE BOOKING LOOP (replace the desc blocks with these openQuickModal calls):
+                if (paid > 0) {
+                    kpiRev += paid;
+                    if(activeV360Types.has('income')) {
+                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
+                    }
+                }
+                if (debt > 0) {
+                    kpiDebt += debt;
+                    if(activeV360Types.has('debt')) {
+                        timeline.push({ typeCode: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--danger)" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b><div style="display:flex; gap:10px;"><button class="clickable-obj" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>${infoIcon}</div></div>` });
+                    }
+                }
+                if (deposit > 0) {
+                    kpiDep += deposit;
+                    if(activeV360Types.has('deposit')) {
+                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
+                    }
+                }
 
             // 1. Parse Bookings
             APP_DATA.bookings.forEach(b => {
@@ -2196,6 +2250,85 @@
             // Today is 30 days into our 90-day window (33.33%)
             const targetPx = (T_WIDTH_PX * 0.3333) - 250; 
             document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx);
+        }
+
+        // --- UNIVERSAL EDIT MODAL ENGINE (PHASE 3 PREVIEW) ---
+        function openQuickModal(type, id, titleExtra) {
+            const m = document.getElementById('quick-modal');
+            const title = document.getElementById('qm-title');
+            const body = document.getElementById('qm-body');
+            const footer = document.getElementById('qm-footer');
+
+            let content = '';
+            let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
+
+            if(type === 'order') {
+                title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--accent);"></i> <span>تحديث بيانات الطلب (Order #${id})</span>`;
+                content = `
+                    <div style="margin-bottom:15px;">
+                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">العميل (Client)</label>
+                        <input type="text" class="contract-input" value="${titleExtra}" readonly style="opacity:0.7;">
+                    </div>
+                    <div class="grid-2">
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">حالة الطلب (Status)</label>
+                            <select class="contract-input"><option>نشط (Active)</option><option>مكتمل (Closed)</option><option>ملغي (Cancelled)</option></select>
+                        </div>
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">المدفوعات الجديدة (Add Payment)</label>
+                            <input type="number" class="contract-input" placeholder="EGP..." value="">
+                        </div>
+                    </div>`;
+                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
+                           <button class="modal-btn modal-btn-pay" onclick="showToast('Payment Processed Successfully!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Add Payment</button>
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
+            
+            } else if (type === 'client') {
+                title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>ملف العميل (Client Profile)</span>`;
+                content = `
+                    <div style="margin-bottom:15px;">
+                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">الاسم (Name)</label>
+                        <input type="text" class="contract-input" value="${titleExtra}">
+                    </div>
+                    <div class="grid-2">
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">رقم الهاتف (Phone)</label>
+                            <input type="text" class="contract-input" placeholder="+20...">
+                        </div>
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">رقم الهوية (ID/Passport)</label>
+                            <input type="text" class="contract-input" placeholder="ID...">
+                        </div>
+                    </div>`;
+            
+            } else if (type === 'car') {
+                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>ملف السيارة (Vehicle Profile)</span>`;
+                content = `
+                    <div style="margin-bottom:15px;">
+                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">السيارة (Vehicle)</label>
+                        <input type="text" class="contract-input" value="${titleExtra}" readonly style="opacity:0.7;">
+                    </div>
+                    <div class="grid-2">
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">تحديث الكيلومتر (Update KM)</label>
+                            <input type="number" class="contract-input" placeholder="KM...">
+                        </div>
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">الحالة (Status Override)</label>
+                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option></select>
+                        </div>
+                    </div>`;
+            }
+
+            body.innerHTML = content;
+            footer.innerHTML = buttons;
+            m.classList.add('show');
+        }
+
+        function closeQuickModal(e) {
+            if(e && e.target.id !== 'quick-modal') return;
+            document.getElementById('quick-modal').classList.remove('show');
         }
 
     </script>
