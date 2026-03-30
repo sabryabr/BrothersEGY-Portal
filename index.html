@@ -414,12 +414,16 @@
                     <button onclick="buildV360()" style="background:var(--primary); color:white; border:none; height:44px; padding:0 25px; border-radius:8px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-rotate-right"></i> Run</button>
                 </div>
 
-                <div class="metrics-grid" style="grid-template-columns: repeat(5, 1fr);">
-                    <div class="m-card" style="border-top: 4px solid var(--success);"><label>Collected Income (الإيرادات)</label><div class="val" id="v-rev" style="color:var(--success)">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid var(--danger);"><label>Pending Debt (ديون معلقة)</label><div class="val" id="v-debt" style="color:var(--danger)">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid #f1c40f;"><label>Deposits Held (الودائع)</label><div class="val" id="v-dep" style="color:#f1c40f">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid var(--accent);"><label>Total Expenses (مصروفات)</label><div class="val" id="v-exp" style="color:var(--accent)">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid #00d2ff; background:rgba(0, 210, 255, 0.05);"><label>Net Cash ROI (الصافي)</label><div class="val" id="v-roi" style="color:#00d2ff">0 EGP</div></div>
+                <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr); gap:15px; margin-bottom:20px;">
+                    <div class="m-card" style="border-top: 3px solid var(--success); padding:15px;"><label>Collected Income (الإيرادات)</label><div class="val" id="v-rev" style="color:var(--success); font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid #f39c12; padding:15px;"><label>Deposits Held (الودائع)</label><div class="val" id="v-dep" style="color:#f39c12; font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid var(--danger); padding:15px;"><label>Pending Debt (ديون)</label><div class="val" id="v-debt" style="color:var(--danger); font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid #00d2ff; padding:15px; background:rgba(0, 210, 255, 0.05);"><label>Net Cash ROI (الصافي)</label><div class="val" id="v-roi" style="color:#00d2ff; font-size:22px;">0 EGP</div></div>
+                    
+                    <div class="m-card" style="border-top: 3px solid #e74c3c; padding:15px;"><label>Maintenance (صيانة)</label><div class="val" id="v-maint" style="color:#e74c3c; font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid #9b59b6; padding:15px;"><label>Licensing/Docs (تراخيص ومخالفات)</label><div class="val" id="v-docs" style="color:#9b59b6; font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid #e67e22; padding:15px;"><label>Other / Owners (أخرى)</label><div class="val" id="v-other" style="color:#e67e22; font-size:22px;">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 3px solid #95a5a6; padding:15px;"><label>Total Deductions (إجمالي الخصومات)</label><div class="val" id="v-exp" style="color:#95a5a6; font-size:22px;">0 EGP</div></div>
                 </div>
 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
@@ -677,27 +681,28 @@
     </div>
 
     <script>
-        // Force video play and Clock Init (CAIRO TIMEZONE)
-        document.addEventListener('mousemove', function(e) {
-            let t = document.getElementById('global-tooltip');
-            if (t && t.style.visibility === 'visible') {
-                let x = e.clientX + 15; 
-                let y = e.clientY + 15;
-                
-                // Flip Left if it goes off the right edge
-                if (x + t.offsetWidth > window.innerWidth) {
-                    x = e.clientX - t.offsetWidth - 15;
-                }
-                
-                // Flip UP if it goes off the bottom edge
-                if (y + t.offsetHeight > window.innerHeight) {
-                    y = e.clientY - t.offsetHeight - 15;
-                }
-                
-                t.style.left = x + 'px'; 
-                t.style.top = y + 'px';
-            }
+        // Force video play
+        document.addEventListener('DOMContentLoaded', () => {
+            const vid = document.getElementById('bg-video');
+            if(vid) vid.play().catch(e => console.log("Auto-play constrained."));
         });
+
+        // Bulletproof Immediate Clock (CAIRO TIMEZONE)
+        (function startGlobalClock() {
+            function tick() {
+                const clk = document.getElementById('global_clock');
+                const dt = document.getElementById('global_date');
+                if (clk && dt) {
+                    const now = new Date();
+                    const optionsTime = { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+                    const optionsDate = { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' };
+                    clk.innerText = now.toLocaleTimeString('en-US', optionsTime);
+                    dt.innerText = now.toLocaleDateString('en-GB', optionsDate);
+                }
+            }
+            setInterval(tick, 1000);
+            tick(); // Run instantly on load
+        })();
 
         // --- 1. FIREBASE & GLOBALS ---
         const firebaseConfig = { apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal", appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d" };
@@ -1123,13 +1128,16 @@
 
         function populateV360Select() {
             const list = document.getElementById('v360-checkbox-list');
-            if (list.innerHTML !== '') return; 
+            // FIX: Ensure we only check element children, ignoring whitespace/comments
+            if (list.children.length > 0) return; 
+            
+            list.innerHTML = ''; // Clear properly
             
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
 
-                // EXACT ARABIC PLATE LOGIC PROVIDED BY USER
+                // EXACT ARABIC PLATE LOGIC
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
@@ -1175,13 +1183,13 @@
             else header.innerText = `${selectedV360Cars.size} Vehicles Selected`;
         }
 
-        // --- VEHICLE 360 CASH-BASIS LEDGER ENGINE ---
+        // --- VEHICLE 360 GRANULAR LEDGER ENGINE ---
         function buildV360() {
             const monthFilter = document.getElementById('v360-month').value; 
             const yearFilter = parseInt(document.getElementById('v360-year').value);
             const body = document.getElementById('v360-body'); body.innerHTML = '';
             
-            let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiExp = 0, timeline = [];
+            let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiMaint = 0, kpiDocs = 0, kpiOther = 0, timeline = [];
 
             if (selectedV360Cars.size === 0) {
                 body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Please select at least one vehicle from the dropdown above.</td></tr>`;
@@ -1205,7 +1213,7 @@
                 return `<span style="color:white; font-weight:bold;">${cName}</span> <span style="color:var(--accent); font-size:11px;">${l1} ${n1} [${c.id}]</span>`;
             };
 
-            // 1. Process Bookings (Cash-Basis Split)
+            // 1. Parse Bookings
             APP_DATA.bookings.forEach(b => {
                 const cid = String(b['كود السيارة']);
                 if(!selectedV360Cars.has(cid)) return;
@@ -1217,40 +1225,34 @@
                 const paid = parseCurrency(b['المدفوع EGP']);
                 const debt = Math.max(0, total - paid);
                 const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
-                const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
 
-                // A. Actual Collected Income
                 if (paid > 0) {
                     kpiRev += paid;
                     timeline.push({ 
-                        id: b.id, type: `<span class="badge bg-green">INCOME (COLLECTED)</span>`, date: startDate, 
+                        id: b.id, type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(),
-                        desc: `<b class="clickable-obj" style="color:var(--success)">Order #${b.id} - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Insurance: ${insPack} | Base Rent + Extras Included</span>`
+                        desc: `<b class="clickable-obj" style="color:var(--success)">Order #${b.id} - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Base + Addons Included</span>`
                     });
                 }
-
-                // B. Pending Debt (Does NOT add to cash ROI)
                 if (debt > 0) {
                     kpiDebt += debt;
                     timeline.push({ 
                         id: b.id, type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1,
-                        desc: `<b style="color:var(--danger)">Outstanding Balance - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Total Order Value was ${total.toLocaleString()} EGP</span>`
+                        desc: `<b style="color:var(--danger)">Unpaid Balance - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Total Order Value: ${total.toLocaleString()} EGP</span>`
                     });
                 }
-
-                // C. Security Deposit (Liability, NOT Income)
                 if (deposit > 0) {
                     kpiDep += deposit;
                     timeline.push({ 
                         id: b.id, type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2,
-                        desc: `<b style="color:#f1c40f">Security Deposit Held - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">To be refunded upon safe return.</span>`
+                        desc: `<b style="color:#f1c40f">Security Deposit Held - ${b['اسم العميل']}</b>`
                     });
                 }
             });
 
-            // 2. Process Expenses
+            // 2. Parse Expenses & Categorize Safely
             APP_DATA.car_expenses.forEach(e => {
                 const cid = String(e['كود السيارة'] || e['كود السيارة\r'] || "").trim();
                 if(!selectedV360Cars.has(cid)) return;
@@ -1259,22 +1261,41 @@
                 if(!isDateInFilter(dateStr)) return;
 
                 const amt = parseCurrency(e['قيمة المصروف']); 
-                kpiExp += amt;
+                const details = String(e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || e['نوع المصروف'] || "").toLowerCase();
+                
+                // Fuzzy categorization
+                let isMaint = details.includes('صيانة') || details.includes('غيار') || details.includes('زيت');
+                let isDoc = details.includes('تأمين') || details.includes('رخصة') || details.includes('مخالفات') || details.includes('مرور');
+                
+                let badge, amtColor;
+                if(isMaint) {
+                    kpiMaint += amt; badge = `<span class="badge bg-red">MAINTENANCE</span>`; amtColor = '#e74c3c';
+                } else if (isDoc) {
+                    kpiDocs += amt; badge = `<span class="badge" style="background:#9b59b6; color:white;">DOCS/FINES</span>`; amtColor = '#9b59b6';
+                } else {
+                    kpiOther += amt; badge = `<span class="badge" style="background:#e67e22; color:white;">OTHER EXP</span>`; amtColor = '#e67e22';
+                }
 
                 timeline.push({ 
-                    id: e.id || '-', type: `<span class="badge" style="background:#555; color:white;">EXPENSE / MAINT.</span>`, date: dateStr, 
-                    carDisplay: getCarDisplay(cid), amt: -amt, amtColor: '#ff7675', sortDate: new Date(dateStr).getTime(),
-                    desc: `<span style="color:#ddd;">${e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || 'Maintenance / Operations Expense'}</span>`
+                    id: e.id || '-', type: badge, date: dateStr, 
+                    carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(),
+                    desc: `<span style="color:#ddd;">${e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || 'Expense Record'}</span>`
                 });
             });
 
-            // 3. Update Metrics UI
-            const netCashROI = kpiRev - kpiExp; // True cash in pocket
+            // 3. Update 8-Card Metrics UI
+            const kpiTotalExp = kpiMaint + kpiDocs + kpiOther;
+            const netCashROI = kpiRev - kpiTotalExp;
 
             document.getElementById('v-rev').innerText = kpiRev.toLocaleString() + " EGP"; 
-            document.getElementById('v-debt').innerText = kpiDebt.toLocaleString() + " EGP"; 
             document.getElementById('v-dep').innerText = kpiDep.toLocaleString() + " EGP"; 
-            document.getElementById('v-exp').innerText = kpiExp.toLocaleString() + " EGP";
+            document.getElementById('v-debt').innerText = kpiDebt.toLocaleString() + " EGP"; 
+            
+            document.getElementById('v-maint').innerText = kpiMaint.toLocaleString() + " EGP";
+            document.getElementById('v-docs').innerText = kpiDocs.toLocaleString() + " EGP";
+            document.getElementById('v-other').innerText = kpiOther.toLocaleString() + " EGP";
+            document.getElementById('v-exp').innerText = kpiTotalExp.toLocaleString() + " EGP";
+
             document.getElementById('v-roi').innerText = netCashROI.toLocaleString() + " EGP";
             document.getElementById('v-roi').style.color = netCashROI >= 0 ? '#00d2ff' : 'var(--danger)';
 
