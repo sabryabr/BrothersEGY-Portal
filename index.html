@@ -1143,18 +1143,29 @@
             });
         }
 
-        // --- VEHICLE 360 MASTER LEDGER ENGINE ---
+        // --- VEHICLE 360 MULTI-SELECT ENGINE ---
         let selectedV360Cars = new Set();
         let activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
 
+        function toggleV360Dropdown() {
+            document.getElementById('v360-dropdown').classList.toggle('show');
+        }
+
+        document.addEventListener('click', function(event) {
+            const container = document.getElementById('v360-container');
+            if (container && !container.contains(event.target)) {
+                const drop = document.getElementById('v360-dropdown');
+                if(drop) drop.classList.remove('show');
+            }
+        });
+
         function initV360Chips() {
             const track = document.getElementById('v360-chip-track');
-            if (track.children.length > 0) return; 
+            if (!track || track.children.length > 0) return; 
             
             track.innerHTML = ''; 
             selectedV360Cars.clear();
 
-            // Master "All Cars" Chip
             let allChip = document.createElement('div');
             allChip.className = 'fleet-chip active';
             allChip.id = 'v360-chip-all';
@@ -1166,7 +1177,7 @@
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
 
-                selectedV360Cars.add(c.id); // Default to all selected
+                selectedV360Cars.add(String(c.id)); // STRICLY ADD AS STRING TO PREVENT CRASHES
 
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
@@ -1175,13 +1186,14 @@
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
 
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
-                let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
+                let colorName = getSafeVal(c, ['اللون', 'Color']) || 'Unknown';
+                let colorHex = getCarColorHex(colorName);
 
                 let div = document.createElement('div');
                 div.className = 'fleet-chip active v360-car-chip';
-                div.setAttribute('data-id', c.id);
+                div.setAttribute('data-id', String(c.id));
                 div.innerHTML = `<div class="color-dot" style="background:${colorHex}; width:12px; height:12px; border:none;"></div> <span dir="ltr">${carName} | ${fullPlate}</span>`;
-                div.onclick = () => toggleV360Car(c.id, div);
+                div.onclick = () => toggleV360Car(String(c.id), div);
                 track.appendChild(div);
             });
             
@@ -1202,13 +1214,13 @@
                     document.getElementById('v360-chip-all').classList.add('active');
                     document.querySelectorAll('.v360-car-chip').forEach(el => {
                         el.classList.add('active');
-                        selectedV360Cars.add(el.getAttribute('data-id'));
+                        selectedV360Cars.add(String(el.getAttribute('data-id')));
                     });
                 }
             } else {
                 element.classList.toggle('active');
-                if (selectedV360Cars.has(id)) selectedV360Cars.delete(id);
-                else selectedV360Cars.add(id);
+                if (selectedV360Cars.has(String(id))) selectedV360Cars.delete(String(id));
+                else selectedV360Cars.add(String(id));
                 
                 const totalCars = document.querySelectorAll('.v360-car-chip').length;
                 if (selectedV360Cars.size === totalCars) document.getElementById('v360-chip-all').classList.add('active');
@@ -1228,9 +1240,17 @@
             document.getElementById('v360-text-search').value = "";
             document.querySelectorAll('.kpi-filter').forEach(el => el.classList.remove('inactive'));
             activeV360Types = new Set(['income', 'debt', 'deposit', 'maint', 'docs', 'other']);
-            toggleV360Car('all'); // This will select all and trigger build
+            
+            // Force selection of all cars
+            document.getElementById('v360-chip-all').classList.add('active');
+            document.querySelectorAll('.v360-car-chip').forEach(el => {
+                el.classList.add('active');
+                selectedV360Cars.add(String(el.getAttribute('data-id')));
+            });
+            buildV360();
         }
 
+        // --- VEHICLE 360 MASTER LEDGER ENGINE ---
         function buildV360() {
             const monthFilter = document.getElementById('v360-month').value; 
             const yearFilter = parseInt(document.getElementById('v360-year').value);
@@ -1240,7 +1260,7 @@
             let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiMaint = 0, kpiDocs = 0, kpiOther = 0, timeline = [];
 
             if (selectedV360Cars.size === 0) {
-                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Please select at least one vehicle from the timeline chips above.</td></tr>`;
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">الرجاء تحديد سيارة واحدة على الأقل من القائمة بالأعلى. (Select at least one vehicle)</td></tr>`;
                 return;
             }
 
@@ -1248,13 +1268,13 @@
                 if(!dateStr) return false;
                 const d = new Date(dateStr);
                 if(isNaN(d)) return false;
-                if(d.getFullYear() !== yearFilter) return false;
+                if(yearFilter && d.getFullYear() !== yearFilter) return false;
                 if(monthFilter !== 'all' && (d.getMonth() + 1) !== parseInt(monthFilter)) return false;
                 return true;
             };
 
             const getCarDisplay = (cid) => {
-                const c = APP_DATA.cars.find(x => x.id == cid);
+                const c = APP_DATA.cars.find(x => String(x.id) === String(cid));
                 if(!c) return `<span style="color:#888;">[ID: ${cid}]</span>`;
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
@@ -1272,11 +1292,55 @@
                         </div>`;
             };
 
-            // IN THE BOOKING LOOP (replace the desc blocks with these openQuickModal calls):
+            // 1. Parse Bookings
+            APP_DATA.bookings.forEach(b => {
+                const cid = String(b['كود السيارة']);
+                if(!selectedV360Cars.has(cid)) return; // Strict String Check
+                const startDate = b['بداية التعاقد']?.split(' ')[0];
+                if(!isDateInFilter(startDate)) return;
+
+                const searchData = `${b['اسم العميل']} ${b.id} ${b['كود العميل']}`.toLowerCase();
+                if(searchStr && !searchData.includes(searchStr)) return;
+
+                const total = parseCurrency(b['إجمالي المستحق (Total)']); 
+                const paid = parseCurrency(b['المدفوع EGP']);
+                const debt = Math.max(0, total - paid);
+                const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
+                
+                // Income Breakdown variables
+                const insPack = getSafeVal(b, ['نوع التأمين', 'Insurance Package']) || 'Basic';
+                const baseRent = parseCurrency(b['الايجار اليومى']);
+                const extras = parseCurrency(b['إضافات أخري (ملاّك)']);
+
+                let hoverText = `
+                    <div style="text-align:right; font-family:'Cairo', sans-serif;">
+                        <b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b><hr style="margin:8px 0; border-top:1px solid #444;">
+                        <div style="margin-bottom:4px;"><span style="color:#888;">العميل:</span> <b style="color:white">${b['اسم العميل']}</b></div>
+                        
+                        <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333; margin-top:10px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;">
+                                <span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:10px; font-size:11px; color:#aaa;">
+                            <div><span style="color:#888;">قيمة الإيجار:</span> ${baseRent.toLocaleString()} EGP/Day</div>
+                            <div><span style="color:#888;">باقة التأمين:</span> ${insPack}</div>
+                            <div><span style="color:#888;">إضافات أخرى:</span> ${extras.toLocaleString()} EGP</div>
+                        </div>
+                    </div>`;
+                const infoIcon = `<i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px; margin-left:8px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText).replace(/'/g, "%27")}')" onmouseleave="hideGanttTooltip()"></i>`;
+
                 if (paid > 0) {
                     kpiRev += paid;
                     if(activeV360Types.has('income')) {
-                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
+                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--success)" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
                     }
                 }
                 if (debt > 0) {
@@ -1288,60 +1352,7 @@
                 if (deposit > 0) {
                     kpiDep += deposit;
                     if(activeV360Types.has('deposit')) {
-                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
-                    }
-                }
-
-            // 1. Parse Bookings
-            APP_DATA.bookings.forEach(b => {
-                const cid = String(b['كود السيارة']);
-                if(!selectedV360Cars.has(cid)) return;
-                const startDate = b['بداية التعاقد']?.split(' ')[0];
-                if(!isDateInFilter(startDate)) return;
-
-                // Search Validation
-                const searchData = `${b['اسم العميل']} ${b.id} ${b['كود العميل']}`.toLowerCase();
-                if(searchStr && !searchData.includes(searchStr)) return;
-
-                const total = parseCurrency(b['إجمالي المستحق (Total)']); 
-                const paid = parseCurrency(b['المدفوع EGP']);
-                const debt = Math.max(0, total - paid);
-                const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
-                
-                let hoverText = `
-                    <div style="text-align:right; font-family:'Cairo', sans-serif;">
-                        <b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b><hr style="margin:8px 0; border-top:1px solid #444;">
-                        <div style="margin-bottom:4px;"><span style="color:#888;">العميل:</span> <b style="color:white">${b['اسم العميل']}</b></div>
-                        <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span style="color:#888;">إجمالي القيمة:</span> <b>${total.toLocaleString()} EGP</b>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span style="color:#888;">إيرادات مدفوعة:</span> <b style="color:var(--success)">${paid.toLocaleString()} EGP</b>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;">
-                                <span style="color:#888;">متبقي ديون:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}">${debt.toLocaleString()} EGP</b>
-                            </div>
-                        </div>
-                    </div>`;
-                const infoIcon = `<i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px; margin-left:8px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText).replace(/'/g, "%27")}')" onmousemove="moveGanttTooltip(event)" onmouseleave="hideGanttTooltip()"></i>`;
-
-                if (paid > 0) {
-                    kpiRev += paid;
-                    if(activeV360Types.has('income')) {
-                        timeline.push({ typeCode: 'income', type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(), desc: `<div style="display:flex; justify-content:space-between;"><b class="clickable-obj" style="color:var(--success)">Order #${b.id} - <span style="color:white">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
-                    }
-                }
-                if (debt > 0) {
-                    kpiDebt += debt;
-                    if(activeV360Types.has('debt')) {
-                        timeline.push({ typeCode: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:var(--danger)">Unpaid Balance - <span style="color:white">${b['اسم العميل']}</span></b><div style="display:flex; gap:10px;"><button class="clickable-obj" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>${infoIcon}</div></div>` });
-                    }
-                }
-                if (deposit > 0) {
-                    kpiDep += deposit;
-                    if(activeV360Types.has('deposit')) {
-                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between;"><b class="clickable-obj" style="color:#f1c40f">Deposit Held - <span style="color:white">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
+                        timeline.push({ typeCode: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2, desc: `<div style="display:flex; justify-content:space-between; align-items:center;"><b class="clickable-obj" style="color:#f1c40f" onclick="openQuickModal('order', '${b.id}', '${b['اسم العميل']}')">Deposit Held - <span style="color:white" onclick="event.stopPropagation(); openQuickModal('client', '${b['كود العميل']}', '${b['اسم العميل']}')">${b['اسم العميل']}</span></b>${infoIcon}</div>` });
                     }
                 }
             });
@@ -1366,7 +1377,7 @@
                 else { kpiOther += amt; badge = `<span class="badge" style="background:#e67e22; color:white;">OTHER EXP</span>`; amtColor = '#e67e22'; tCode = 'other'; }
 
                 if(activeV360Types.has(tCode)) {
-                    timeline.push({ typeCode: tCode, type: badge, date: dateStr, carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(), desc: `<span class="clickable-obj" style="color:#ddd;">${details || 'Expense Record'}</span>` });
+                    timeline.push({ typeCode: tCode, type: badge, date: dateStr, carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(), desc: `<span class="clickable-obj" style="color:#ddd;" onclick="openQuickModal('car', '${cid}', '${details}')">${details || 'Expense Record'}</span>` });
                 }
             });
 
