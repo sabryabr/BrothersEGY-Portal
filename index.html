@@ -265,7 +265,7 @@
                 <span style="font-weight: 800; letter-spacing: 1px; font-size: 16px;">BROTHERS EGY</span>
             </div>
             <div class="nav-tabs">
-                <button class="top-btn access-quote" onclick="loadFrame('https://sabryabr.github.io/Brothers-Quotation/', this)">Price Proposal</button>
+                <button class="top-btn access-quote" onclick="route('proposal', this)">Price Proposal</button>
                 <button class="top-btn access-en" onclick="route('en-contract', this)">EN Contract</button>
                 <button class="top-btn access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">AR Contract</button>
                 <button class="top-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
@@ -484,6 +484,91 @@
                 </div>
             </div>
 
+            <div id="view-proposal" class="view-section">
+                <div class="cp-body">
+                    <h2 style="margin-top:0;"><i class="fa-solid fa-file-invoice"></i> Smart Price Proposal (CRM Linked)</h2>
+                    
+                    <div class="section-head">1. Client Selection (From CRM)</div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background:rgba(4, 80, 157, 0.1); border:1px solid var(--primary); padding:10px; border-radius:8px;">
+                        <div style="flex-grow:1;">
+                            <label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> Search Client Database</label>
+                            <input list="client-list" id="prop_crm_search" class="contract-input" placeholder="Type Name or Passport to Search..." onchange="autoFillPropClient()" style="border-color:var(--primary);">
+                        </div>
+                    </div>
+                    <input type="hidden" id="prop_client_id">
+                    <div class="grid-4">
+                        <div><label class="contract-label">First Name</label><input type="text" id="prop_fname" class="contract-input" readonly></div>
+                        <div><label class="contract-label">Last Name</label><input type="text" id="prop_sname" class="contract-input" readonly></div>
+                        <div><label class="contract-label">Phone</label><input type="text" id="prop_phone" class="contract-input" readonly></div>
+                        <div><label class="contract-label">Email</label><input type="text" id="prop_email" class="contract-input" readonly></div>
+                    </div>
+
+                    <div class="section-head">2. Dates & Location</div>
+                    <div class="grid-4">
+                        <div><label class="contract-label">Pickup Date/Time</label><input type="datetime-local" id="prop_start" class="contract-input" onchange="runPropCalc()"></div>
+                        <div><label class="contract-label">Dropoff Date/Time</label><input type="datetime-local" id="prop_end" class="contract-input" onchange="runPropCalc()"></div>
+                        <div><label class="contract-label">Pickup Location</label><input type="text" id="prop_p_loc" class="contract-input" placeholder="Airport/Office..."></div>
+                        <div><label class="contract-label">Dropoff Location</label><input type="text" id="prop_d_loc" class="contract-input" placeholder="Airport/Office..."></div>
+                    </div>
+
+                    <div class="section-head">3. Vehicle & Rates</div>
+                    <div class="grid-4">
+                        <div style="grid-column: span 2;">
+                            <label class="contract-label">Select From Live Fleet</label>
+                            <select id="prop_car" class="contract-input" onchange="updatePropRate()"><option value="">-- Load Active Fleet --</option></select>
+                        </div>
+                        <div><label class="contract-label">Daily Rent (EGP)</label><input type="number" id="prop_rate" class="contract-input" value="0" oninput="runPropCalc()"></div>
+                        <div><label class="contract-label">Duration (Days)</label><input type="text" id="prop_days_val" class="contract-input" readonly style="opacity:0.7;"></div>
+                    </div>
+
+                    <div class="section-head">4. Add-ons & Insurance</div>
+                    <div class="grid-4">
+                        <div><label class="contract-label">KM Package</label>
+                            <select id="prop_km_type" class="contract-input" onchange="runPropCalc()">
+                                <option value="Standard" data-km="0">Standard (120 KM/Day)</option>
+                                <option value="500 KM Extra" data-km="500">500 KM Package</option>
+                                <option value="1000 KM Extra" data-km="1000">1000 KM Package</option>
+                                <option value="Unlimited" data-km="999999">Unlimited KM</option>
+                            </select>
+                        </div>
+                        <div><label class="contract-label">KM Cost</label><input type="number" id="prop_km_cost" class="contract-input" value="0" oninput="runPropCalc()"></div>
+                        <div><label class="contract-label">Insurance Plan</label>
+                            <select id="prop_ins_pack" class="contract-input" onchange="suggestPropInsFee()">
+                                <option value="Basic">Basic (100% Liability)</option>
+                                <option value="Intermediate">Intermediate (70/30)</option>
+                                <option value="Full Protection">Full Protection (Zero Liab)</option>
+                            </select>
+                        </div>
+                        <div><label class="contract-label">Ins. Fee (Daily EGP)</label><input type="number" id="prop_ins_fee" class="contract-input" value="0" oninput="runPropCalc()"></div>
+                    </div>
+                    
+                    <div class="grid-4" style="margin-top:10px;">
+                        <div><label class="contract-label">Delivery/Pickup Fee</label><input type="number" id="prop_del" class="contract-input" value="0" oninput="runPropCalc()"></div>
+                        <div><label class="contract-label">Security Deposit</label><input type="number" id="prop_dep" class="contract-input" value="0"></div>
+                        <div style="display:flex; align-items:center; gap:5px; margin-top:15px;">
+                            <input type="checkbox" id="prop_chk_seat" onchange="runPropCalc()" style="width:15px; height:15px; margin:0;">
+                            <span style="font-size:12px; font-weight:bold; color:white;">Child Seat</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:5px; margin-top:15px;">
+                            <input type="checkbox" id="prop_chk_driver" onchange="runPropCalc()" style="width:15px; height:15px; margin:0;">
+                            <span style="font-size:12px; font-weight:bold; color:white;">Add. Driver</span>
+                        </div>
+                    </div>
+
+                    <div class="balance-box" style="margin-top:20px; flex-direction:row; align-items:center;">
+                        <div style="font-size:18px; font-weight:bold;">PROPOSAL GRAND TOTAL:</div>
+                        <div id="prop_grand_total" style="font-size:24px; font-weight:900; color:var(--accent);">0 EGP</div>
+                    </div>
+
+                    <div style="display:flex; gap:15px;">
+                        <button class="btn-gen" onclick="executePropPreview()" style="flex:1;"><i class="fa-solid fa-eye"></i> 1. Generate Proposal</button>
+                        <button class="btn-gen" onclick="window.print()" style="flex:1; background:var(--success); display:none;" id="btn_print_prop"><i class="fa-solid fa-print"></i> 2. Print / PDF</button>
+                    </div>
+                </div>
+                
+                <div id="proposalOutput" style="display:none; margin-top:20px; padding-bottom:50px; flex-direction:column; gap:20px; align-items:center;"></div>
+            </div>
+                    
             <div id="view-en-contract" class="view-section">
                 <div class="cp-body">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -871,6 +956,7 @@
             if(viewId === 'crm') buildCRM();
             if(viewId === 'risk') buildRiskRadar();
             if(viewId === 'en-contract') prepNativeContract();
+            if(viewId === 'proposal') prepProposal();
         }
 
         function loadFrame(url, btnEl) {
@@ -2351,6 +2437,153 @@
             document.getElementById('quick-modal').classList.remove('show');
         }
 
+        // ================= BLOCK 1: NATIVE PROPOSAL ENGINE =================
+        function prepProposal() {
+            populateClientList(); // Ensure CRM is loaded
+            const sel = document.getElementById('prop_car');
+            sel.innerHTML = '<option value="">-- Select Active Fleet --</option>';
+            
+            APP_DATA.cars.forEach(c => {
+                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
+                if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
+                
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                let rate = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
+                
+                let opt = document.createElement('option'); 
+                opt.value = c.id; 
+                opt.setAttribute('data-rate', rate);
+                opt.text = `[#${c.id}] ${carName} - ${pNum} (${rate} EGP/Day)`;
+                sel.add(opt);
+            });
+        }
+
+        function autoFillPropClient() {
+            const searchVal = document.getElementById('prop_crm_search').value;
+            const list = document.getElementById('client-list');
+            let selectedId = null;
+            for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
+            if(!selectedId) return;
+
+            const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(c) {
+                document.getElementById('prop_client_id').value = c.id;
+                document.getElementById('prop_fname').value = c['الاسم الأول'] || '';
+                document.getElementById('prop_sname').value = c['الاسم الأخير'] || '';
+                document.getElementById('prop_phone').value = c['رقم التليفون'] || '';
+                document.getElementById('prop_email').value = c['عنوان البريد الإلكتروني'] || '';
+            }
+        }
+
+        function updatePropRate() {
+            const sel = document.getElementById('prop_car');
+            if(sel.selectedIndex > 0) {
+                document.getElementById('prop_rate').value = sel.options[sel.selectedIndex].getAttribute('data-rate');
+                runPropCalc();
+            }
+        }
+
+        function suggestPropInsFee() {
+            const plan = document.getElementById('prop_ins_pack').value;
+            const feeInput = document.getElementById('prop_ins_fee');
+            if (plan === "Basic") feeInput.value = 0;
+            else if (plan === "Intermediate") feeInput.value = 400;
+            else if (plan === "Full Protection") feeInput.value = 900;
+            runPropCalc();
+        }
+
+        function propNum(id) { const el = document.getElementById(id); return el ? parseFloat(el.value) || 0 : 0; }
+
+        function runPropCalc() {
+            const sStr = document.getElementById('prop_start').value;
+            const eStr = document.getElementById('prop_end').value;
+            let days = 1;
+            if (sStr && eStr) {
+                const s = new Date(sStr), e = new Date(eStr);
+                if (e > s) { days = Math.ceil(Math.abs(e - s) / 86400000); if (days < 1) days = 1; }
+            }
+            document.getElementById('prop_days_val').value = days + " Days";
+
+            const rate = propNum('prop_rate');
+            const kmCost = propNum('prop_km_cost');
+            const insFee = propNum('prop_ins_fee') * days;
+            const delFee = propNum('prop_del');
+            const seatFee = document.getElementById('prop_chk_seat').checked ? 250 * days : 0;
+            const driverFee = document.getElementById('prop_chk_driver').checked ? 500 * days : 0;
+
+            const totalBase = rate * days;
+            const grandTotal = totalBase + kmCost + insFee + delFee + seatFee + driverFee;
+
+            document.getElementById('prop_grand_total').innerText = grandTotal.toLocaleString() + " EGP";
+            return { days, rate, kmCost, insFee, delFee, seatFee, driverFee, totalBase, grandTotal };
+        }
+
+        function executePropPreview() {
+            const math = runPropCalc();
+            if (math.days === 0) { alert("Please select Pickup and Dropoff dates."); return; }
+
+            const name = document.getElementById('prop_fname').value + " " + document.getElementById('prop_sname').value;
+            const ref = "PR-" + Math.floor(Math.random()*90000);
+            
+            const sel = document.getElementById('prop_car');
+            const carText = sel.selectedIndex > 0 ? sel.options[sel.selectedIndex].text : "Vehicle TBD";
+            
+            const kmSel = document.getElementById('prop_km_type');
+            const pkgKMValue = parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km'));
+            const totalKM = pkgKMValue >= 999999 ? "Unlimited" : (math.days * 120 + pkgKMValue).toLocaleString() + " KM Total";
+
+            let table = `<tr><td>Base Rental</td><td>${math.rate.toLocaleString()} x ${math.days} Days</td><td align="right">${math.totalBase.toLocaleString()}</td></tr>`;
+            if(math.insFee > 0) table += `<tr><td>Insurance Fees</td><td>Daily x ${math.days} Days</td><td align="right">${math.insFee.toLocaleString()}</td></tr>`;
+            if(math.kmCost > 0) table += `<tr><td>KM Package</td><td>Flat Fee</td><td align="right">${math.kmCost.toLocaleString()}</td></tr>`;
+            if(math.seatFee > 0) table += `<tr><td>Child Car Seat</td><td>250 x ${math.days} Days</td><td align="right">${math.seatFee.toLocaleString()}</td></tr>`;
+            if(math.driverFee > 0) table += `<tr><td>Additional Driver</td><td>500 x ${math.days} Days</td><td align="right">${math.driverFee.toLocaleString()}</td></tr>`;
+            if(math.delFee > 0) table += `<tr><td>Logistics Fee</td><td>Fixed Fee</td><td align="right">${math.delFee.toLocaleString()}</td></tr>`;
+
+            const html = `
+            <div class="a4-page" style="display:block;">
+                <div class="page-content">
+                    <div class="doc-head" style="border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 15px;">
+                        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:45px;">
+                        <div style="text-align: right;">
+                            <h2 style="margin: 0; color: var(--primary); font-size: 16pt;">PRICE PROPOSAL</h2>
+                            <p style="margin: 0; font-weight: bold; font-size: 10pt;">Ref: ${ref} | Date: ${new Date().toLocaleDateString('en-GB')}</p>
+                        </div>
+                    </div>
+                    <div class="box-section"><span class="bs-title">CLIENT & PERIOD</span>
+                        <table class="pt">
+                            <tr><th width="15%">Client Name</th><td colspan="3">${name}</td></tr>
+                            <tr><th>Phone</th><td>${document.getElementById('prop_phone').value}</td><th>Email</th><td>${document.getElementById('prop_email').value}</td></tr>
+                            <tr><th width="15%">Pickup</th><td width="35%">${document.getElementById('prop_start').value.replace('T', ' ')}</td><th width="15%">Dropoff</th><td width="35%">${document.getElementById('prop_end').value.replace('T', ' ')}</td></tr>
+                            <tr><th>Duration</th><td>${math.days} Days</td><th>KM Allowance</th><td>${totalKM}</td></tr>
+                        </table>
+                    </div>
+                    <div class="box-section"><span class="bs-title">VEHICLE DETAILS</span>
+                        <table class="pt"><tr><th width="15%">Model</th><td colspan="3">${carText}</td></tr></table>
+                    </div>
+                    <div class="box-section"><span class="bs-title">FINANCIAL BREAKDOWN</span>
+                        <table class="pt">
+                            <thead><tr><th>Description</th><th>Details</th><th style="text-align:right;">Total (EGP)</th></tr></thead>
+                            <tbody>${table}</tbody>
+                            <tfoot>
+                                <tr style="font-weight:bold; background:#f0f0f0;"><td colspan="2" align="right">TOTAL PROPOSAL VALUE:</td><td align="right">${math.grandTotal.toLocaleString()} EGP</td></tr>
+                                <tr><td colspan="2" align="right">Security Deposit (Held):</td><td align="right">${propNum('prop_dep').toLocaleString()} EGP</td></tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="box-section"><span class="bs-title">INSURANCE: ${document.getElementById('prop_ins_pack').value.toUpperCase()}</span>
+                        <p style="margin:0; font-size:8.5pt;">${insDetails[document.getElementById('prop_ins_pack').value]}</p>
+                    </div>
+                </div>
+            </div>`;
+
+            document.getElementById('proposalOutput').innerHTML = html;
+            document.getElementById('proposalOutput').style.display = 'flex';
+            document.getElementById('btn_print_prop').style.display = 'block';
+            
+            setTimeout(() => { document.getElementById('proposalOutput').scrollIntoView({ behavior: 'smooth' }); }, 100);
+        }
+        
     </script>
 </body>
 </html>
