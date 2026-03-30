@@ -397,6 +397,18 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div style="flex: 1;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Record Type</label>
+                        <select id="v360-type-filter" class="contract-input" onchange="buildV360()" style="height: 44px; font-weight:bold;">
+                            <option value="all">All Records (الكل)</option>
+                            <option value="income">Income (إيرادات)</option>
+                            <option value="debt">Pending Debt (ديون)</option>
+                            <option value="deposit">Deposits (ودائع)</option>
+                            <option value="expense">Expenses (مصروفات)</option>
+                        </select>
+                    </div>
+
                     <div style="flex: 1;">
                         <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Month</label>
                         <select id="v360-month" class="contract-input" onchange="buildV360()" style="height: 44px; font-weight:bold;">
@@ -1189,9 +1201,11 @@
         }
 
         // --- VEHICLE 360 GRANULAR LEDGER ENGINE ---
+        // --- VEHICLE 360 GRANULAR LEDGER ENGINE ---
         function buildV360() {
             const monthFilter = document.getElementById('v360-month').value; 
             const yearFilter = parseInt(document.getElementById('v360-year').value);
+            const typeFilter = document.getElementById('v360-type-filter').value;
             const body = document.getElementById('v360-body'); body.innerHTML = '';
             
             let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiMaint = 0, kpiDocs = 0, kpiOther = 0, timeline = [];
@@ -1222,10 +1236,15 @@
 
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
                 let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
+                let colorName = getSafeVal(c, ['اللون', 'Color']);
+                let colorHex = getCarColorHex(colorName);
                 
                 return `<div class="clickable-obj" onclick="showToast('Open Car Profile: ID ${c.id}')" style="display:flex; flex-direction:column; align-items:flex-end;">
-                            <span style="color:white; font-weight:bold; font-size:13px;">${carName} (${cYear})</span>
-                            <span style="color:var(--accent); font-size:11px;">${fullPlate} [${c.id}]</span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="color:white; font-weight:bold; font-size:13px;">${carName} (${cYear})</span>
+                                <div class="color-dot" title="${colorName}" style="background: ${colorHex}; width:12px; height:12px; border-radius:50%; display:inline-block; border:1px solid #555;"></div>
+                            </div>
+                            <span style="color:var(--accent); font-size:11px; margin-top:2px;">${fullPlate} [${c.id}]</span>
                         </div>`;
             };
 
@@ -1243,7 +1262,7 @@
                 const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
                 const method = getSafeVal(b, ['طريقة الدفع', 'Payment Method']) || "Cash/Transfer";
                 
-                // Hover Details (Rich Tooltip)
+                // UNIFIED RICH TOOLTIP FOR ALL BOOKING ROWS
                 let hoverText = `
                     <div style="text-align:right; font-family:'Cairo', sans-serif;">
                         <b style="color:var(--accent); font-size:14px;">Order #${b.id} Details</b>
@@ -1263,45 +1282,56 @@
                             </div>
                         </div>
                     </div>`;
+                const encodedHover = encodeURIComponent(hoverText);
+                const infoIcon = `<i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px; margin-left:8px;" onmouseenter="showGanttTooltip(event, '${encodedHover}')" onmousemove="moveGanttTooltip(event)" onmouseleave="hideGanttTooltip()"></i>`;
 
+                // A. Actual Collected Income
                 if (paid > 0) {
                     kpiRev += paid;
                     timeline.push({ 
-                        id: b.id, type: `<span class="badge bg-green">INCOME (CASH)</span>`, date: startDate, 
+                        id: b.id, filterGroup: 'income', type: `<span class="badge bg-green">INCOME (COLLECTED)</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(),
                         desc: `<div style="display:flex; justify-content:space-between;">
                                    <b class="clickable-obj" style="color:var(--success)" onclick="showToast('Open Order #${b.id}')">Order #${b.id} - <span style="color:white" onclick="event.stopPropagation(); showToast('Client: ${b['اسم العميل']}')">${b['اسم العميل']}</span></b>
-                                   <i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText)}')" onmouseleave="hideGanttTooltip()"></i>
+                                   ${infoIcon}
                                </div>
-                               <div style="font-size:11px; color:#aaa; margin-top:4px;">Collected via ${method} | Breakdown: Base + Insurance + Extras Included</div>`
+                               <div style="font-size:11px; color:#aaa; margin-top:4px;">Collected via ${method} | Breakdown: Base + Extras Included</div>`
                     });
                 }
+
+                // B. Pending Debt
                 if (debt > 0) {
                     kpiDebt += debt;
                     timeline.push({ 
-                        id: b.id, type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, 
+                        id: b.id, filterGroup: 'debt', type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1,
                         desc: `<div style="display:flex; justify-content:space-between; align-items:center;">
-                                   <b class="clickable-obj" style="color:var(--danger)" onclick="showToast('Open Order #${b.id}')">Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); showToast('Client: ${b['اسم العميل']}')">${b['اسم العميل']}</span></b>
-                                   <div style="display:flex; gap:10px;">
+                                   <b class="clickable-obj" style="color:var(--danger)" onclick="showToast('Open Order #${b.id}')">Order #${b.id} Unpaid Balance - <span style="color:white" onclick="event.stopPropagation(); showToast('Client: ${b['اسم العميل']}')">${b['اسم العميل']}</span></b>
+                                   <div style="display:flex; align-items:center; gap:10px;">
                                        <button class="clickable-obj" onclick="showToast('Add Payment UI for Order #${b.id}')" style="background:var(--success); border:none; color:white; border-radius:4px; padding:4px 10px; font-size:10px; font-weight:bold;">+ Add Payment</button>
-                                       <i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px;" onmouseenter="showGanttTooltip(event, '${encodeURIComponent(hoverText)}')" onmouseleave="hideGanttTooltip()"></i>
+                                       ${infoIcon}
                                    </div>
                                </div>
                                <div style="font-size:11px; color:#aaa; margin-top:4px;">Total Order: ${total.toLocaleString()} EGP | Needs Collection</div>`
                     });
                 }
+
+                // C. Security Deposit
                 if (deposit > 0) {
                     kpiDep += deposit;
                     timeline.push({ 
-                        id: b.id, type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, 
+                        id: b.id, filterGroup: 'deposit', type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, 
                         carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2,
-                        desc: `<b class="clickable-obj" style="color:#f1c40f" onclick="showToast('Open Order #${b.id}')">Security Deposit Held - <span style="color:white">${b['اسم العميل']}</span></b><br><span style="font-size:10px; color:#aaa;">To be refunded upon safe return.</span>`
+                        desc: `<div style="display:flex; justify-content:space-between;">
+                                   <b class="clickable-obj" style="color:#f1c40f" onclick="showToast('Open Order #${b.id}')">Order #${b.id} Deposit Held - <span style="color:white">${b['اسم العميل']}</span></b>
+                                   ${infoIcon}
+                               </div>
+                               <div style="font-size:11px; color:#aaa; margin-top:4px;">To be refunded upon safe return.</div>`
                     });
                 }
             });
 
-            // 2. Parse Expenses & Categorize Safely
+            // 2. Parse Expenses
             APP_DATA.car_expenses.forEach(e => {
                 const cid = String(e['كود السيارة'] || e['كود السيارة\r'] || "").trim();
                 if(!selectedV360Cars.has(cid)) return;
@@ -1325,32 +1355,35 @@
                 }
 
                 timeline.push({ 
-                    id: e.id || '-', type: badge, date: dateStr, 
+                    id: e.id || '-', filterGroup: 'expense', type: badge, date: dateStr, 
                     carDisplay: getCarDisplay(cid), amt: -amt, amtColor: amtColor, sortDate: new Date(dateStr).getTime(),
                     desc: `<span class="clickable-obj" onclick="showToast('Edit Expense Record')" style="color:#ddd;">${e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || 'Expense Record'}</span>`
                 });
             });
 
-            // 3. Update 8-Card Metrics UI
+            // 3. Update Metrics UI
             const kpiTotalExp = kpiMaint + kpiDocs + kpiOther;
             const netCashROI = kpiRev - kpiTotalExp;
 
             document.getElementById('v-rev').innerText = kpiRev.toLocaleString() + " EGP"; 
             document.getElementById('v-dep').innerText = kpiDep.toLocaleString() + " EGP"; 
             document.getElementById('v-debt').innerText = kpiDebt.toLocaleString() + " EGP"; 
-            
             document.getElementById('v-maint').innerText = kpiMaint.toLocaleString() + " EGP";
             document.getElementById('v-docs').innerText = kpiDocs.toLocaleString() + " EGP";
             document.getElementById('v-other').innerText = kpiOther.toLocaleString() + " EGP";
             document.getElementById('v-exp').innerText = kpiTotalExp.toLocaleString() + " EGP";
-
             document.getElementById('v-roi').innerText = netCashROI.toLocaleString() + " EGP";
             document.getElementById('v-roi').style.color = netCashROI >= 0 ? '#00d2ff' : 'var(--danger)';
 
-            // 4. Build Table
-            timeline.sort((a,b) => b.sortDate - a.sortDate);
+            // 4. Filter and Build Table
+            let filteredTimeline = timeline.filter(t => {
+                if(typeFilter === 'all') return true;
+                return t.filterGroup === typeFilter;
+            });
+
+            filteredTimeline.sort((a,b) => b.sortDate - a.sortDate);
             
-            timeline.forEach(t => { 
+            filteredTimeline.forEach(t => { 
                 const row = body.insertRow(); 
                 let displayAmt = t.amt > 0 ? `+${t.amt.toLocaleString()}` : `${t.amt.toLocaleString()}`;
                 row.innerHTML = `
@@ -1362,8 +1395,8 @@
                 `; 
             });
             
-            if (timeline.length === 0) {
-                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found for the selected vehicles and period.</td></tr>`;
+            if (filteredTimeline.length === 0) {
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found for the selected filters.</td></tr>`;
             }
         }
 
@@ -2168,26 +2201,55 @@
             }
         });
 
-        // --- SYNCHRONIZED DRAGGING ---
-        function initDragScroll() {
-            const sliders = document.querySelectorAll('.drag-scroll');
-            let isDown = false; let startX; let scrollLeft;
-
-            sliders.forEach(slider => {
-                slider.addEventListener('mousedown', (e) => {
-                    isDown = true; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft;
-                });
-                slider.addEventListener('mouseleave', () => { isDown = false; });
-                slider.addEventListener('mouseup', () => { isDown = false; });
-                slider.addEventListener('mousemove', (e) => {
-                    if (!isDown) return;
-                    e.preventDefault();
-                    const walk = (e.pageX - slider.offsetLeft - startX) * 1.5; 
-                    let currentScrollOffset = scrollLeft - walk;
-                    sliders.forEach(s => s.scrollLeft = currentScrollOffset);
-                });
-            });
+        // --- BULLETPROOF GLOBAL TOOLTIP ENGINE ---
+        function showGanttTooltip(e, encodedHTML) {
+            let t = document.getElementById('global-tooltip');
+            if(!t) {
+                t = document.createElement('div'); t.id = 'global-tooltip';
+                document.body.appendChild(t);
+            }
+            t.innerHTML = decodeURIComponent(encodedHTML);
+            t.style.visibility = 'visible'; t.style.opacity = '1';
+            moveGanttTooltip(e);
         }
+
+        function moveGanttTooltip(e) {
+            let t = document.getElementById('global-tooltip');
+            if (t && t.style.visibility === 'visible') {
+                let tWidth = t.offsetWidth || 250;
+                let tHeight = t.offsetHeight || 150;
+                
+                let x = e.clientX + 15; 
+                let y = e.clientY + 15;
+                
+                if (x + tWidth > window.innerWidth - 20) x = e.clientX - tWidth - 15;
+                if (y + tHeight > window.innerHeight - 20) y = e.clientY - tHeight - 15;
+                
+                t.style.left = x + 'px'; 
+                t.style.top = y + 'px';
+            }
+        }
+
+        function hideGanttTooltip() {
+            let t = document.getElementById('global-tooltip');
+            if(t) { t.style.visibility = 'hidden'; t.style.opacity = '0'; }
+        }
+
+        // Fleet Radar Gantt Bar Listeners
+        document.addEventListener('mouseover', function(e) {
+            let bar = e.target.closest('.gantt-bar');
+            if (bar && bar.hasAttribute('data-info')) {
+                showGanttTooltip(e, encodeURIComponent(bar.getAttribute('data-info')));
+            }
+        });
+        document.addEventListener('mousemove', function(e) {
+            let bar = e.target.closest('.gantt-bar');
+            if (bar) moveGanttTooltip(e);
+        });
+        document.addEventListener('mouseout', function(e) {
+            let bar = e.target.closest('.gantt-bar');
+            if (bar) hideGanttTooltip();
+        });
 
         // Center the view on "Today"
         function scrollToToday() {
