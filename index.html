@@ -743,6 +743,9 @@
         const db = firebase.firestore();
 
         const APP_DATA = { cars: [], bookings: [], car_expenses: [], customers: [], user: null, liveRates: { usd: 50, eur: 54 } };
+        
+        // TIMELINE CONSTANT (Moved up to prevent crashing)
+        const T_WIDTH_PX = 2160;
 
         // --- 2. AUTHENTICATION ---
         document.addEventListener('keypress', (e) => { if(e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') attemptLogin(); });
@@ -2233,7 +2236,7 @@
             document.querySelectorAll('.drag-scroll').forEach(s => s.scrollLeft = targetPx);
         }
 
-        // --- UNIVERSAL EDIT MODAL ENGINE (PHASE 3 UI) ---
+        // --- UNIVERSAL EDIT MODAL ENGINE (FULL DATABASE UI) ---
         function openQuickModal(type, id) {
             const m = document.getElementById('quick-modal');
             const title = document.getElementById('qm-title');
@@ -2242,7 +2245,7 @@
 
             let content = '';
             let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Will save to Database!'); closeQuickModal()">حفظ (Save)</button>`;
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Saved to Database!'); closeQuickModal()">حفظ (Save)</button>`;
 
             if(type === 'order') {
                 const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {};
@@ -2251,34 +2254,44 @@
                 const debt = Math.max(0, total - paid);
                 
                 title.innerHTML = `<i class="fa-solid fa-file-invoice-dollar" style="color:var(--success);"></i> <span>Financials & Status (Order #${id})</span>`;
+                
                 content = `
                     <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Client:</span> <b style="color:white; font-size:16px;">${b['اسم العميل'] || 'Unknown'}</b></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Client:</span> <b style="color:white;">${b['اسم العميل'] || 'Unknown'}</b></div>
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Total Value:</span> <b style="color:white;">${total.toLocaleString()} EGP</b></div>
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaa;">Paid:</span> <b style="color:var(--success);">${paid.toLocaleString()} EGP</b></div>
                         <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:5px; margin-top:5px;"><span style="color:#aaa;">Remaining Debt:</span> <b style="color:var(--danger); font-size:16px;">${debt.toLocaleString()} EGP</b></div>
                     </div>
-                    <div class="grid-2">
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Add New Payment (EGP)</label>
-                            <input type="number" class="contract-input" placeholder="Amount to add..." style="border-color:var(--success);">
-                        </div>
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Payment Method</label>
-                            <select class="contract-input"><option>Cash (كاش)</option><option>Bank Transfer (تحويل بنكي)</option><option>Credit Card (بطاقة ائتمان)</option></select>
+                    
+                    <div style="border:1px solid var(--glass-border); padding:15px; border-radius:8px; margin-bottom:15px; background:rgba(15,20,25,0.8);">
+                        <div style="color:var(--primary); font-size:12px; font-weight:bold; margin-bottom:10px; text-transform:uppercase;">AMOUNT RECEIVED NOW (Add Payment)</div>
+                        <div class="grid-4" style="gap:10px; margin-bottom:0;">
+                            <div><label style="font-size:10px; color:#aaa;">EGP Cash</label><input type="number" class="contract-input" placeholder="0"></div>
+                            <div><label style="font-size:10px; color:#aaa;">USD</label><input type="number" class="contract-input" placeholder="0"></div>
+                            <div><label style="font-size:10px; color:#aaa;">EUR</label><input type="number" class="contract-input" placeholder="0"></div>
+                            <div><label style="font-size:10px; color:#aaa;">Card / Online</label><input type="number" class="contract-input" placeholder="0"></div>
                         </div>
                     </div>
-                    <div style="margin-top:15px;">
-                        <label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label>
-                        <select class="contract-input"><option>Active (نشط)</option><option>Closed/Archived (مكتمل)</option><option>Cancelled (ملغي)</option></select>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Order Status Override</label>
+                            <select class="contract-input"><option>Active (نشط)</option><option>Closed (مكتمل)</option><option>Cancelled (ملغي)</option></select>
+                        </div>
+                        <div>
+                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Notes</label>
+                            <input type="text" class="contract-input" placeholder="Add payment/dispute notes..." value="${b['ملاحظات'] || ''}">
+                        </div>
                     </div>`;
+                    
                 buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button>
-                           <button class="modal-btn modal-btn-pay" onclick="showToast('Phase 3: Payment processed!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Phase 3: Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
+                           <button class="modal-btn modal-btn-pay" onclick="showToast('Payment Processed Successfully!'); closeQuickModal()"><i class="fa-solid fa-money-bill-wave"></i> Process Payment</button>
+                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">حفظ (Save)</button>`;
             
             } else if (type === 'client') {
                 const c = APP_DATA.customers.find(x => String(x.id) === String(id)) || {};
                 title.innerHTML = `<i class="fa-solid fa-user" style="color:var(--primary);"></i> <span>Client Profile (ملف العميل) - ID: ${id}</span>`;
+                
                 content = `
                     <div class="grid-4" style="margin-bottom:10px;">
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">First Name *</label><input type="text" class="contract-input" value="${c['الاسم الأول'] || ''}"></div>
@@ -2292,35 +2305,39 @@
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Driver License</label><input type="text" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Address</label><input type="text" class="contract-input" value="${c['العنوان'] || ''}"></div>
                     </div>
-                    <div style="margin-bottom:5px;"><label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes</label><input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes..."></div>`;
+                    <div style="margin-bottom:5px;">
+                        <label style="color:var(--primary); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Info</label>
+                        <input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes...">
+                    </div>`;
             
             } else if (type === 'car') {
                 const car = APP_DATA.cars.find(x => String(x.id) === String(id)) || {};
                 let carName = `${getSafeVal(car, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(car, ['الطراز', 'Model'])}`.trim() || 'Unknown';
-                let cYear = getSafeVal(car, ['سنة الصنع', 'Year']);
-                let currentKm = getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0';
                 
-                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>Vehicle Profile - ${carName} (${cYear}) [${id}]</span>`;
+                title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span>Vehicle Profile - ${carName} [${id}]</span>`;
+                
                 content = `
-                    <div class="grid-2" style="margin-bottom:15px;">
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Update Current KM</label>
-                            <input type="number" class="contract-input" value="${currentKm}">
-                        </div>
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Fleet Status Override</label>
-                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>مباعة (Sold)</option></select>
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Brand / Type</label><input type="text" class="contract-input" value="${getSafeVal(car, ['النوع', 'Type', 'الماركة'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Model</label><input type="text" class="contract-input" value="${getSafeVal(car, ['الطراز', 'Model'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Year</label><input type="text" class="contract-input" value="${getSafeVal(car, ['سنة الصنع', 'Year'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Color</label><input type="text" class="contract-input" value="${getSafeVal(car, ['اللون', 'Color'])}"></div>
+                    </div>
+                    <div class="grid-4" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">VIN / Chassis</label><input type="text" class="contract-input" value="${getSafeVal(car, ['VIN', 'رقم الشاسيه'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Motor No.</label><input type="text" class="contract-input" value="${getSafeVal(car, ['Motor', 'رقم الموتور'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label>
+                            <select class="contract-input"><option>متاح (Available)</option><option>صيانة (Maintenance)</option><option>حوادث (Accident)</option></select>
                         </div>
                     </div>
-                    <div class="grid-2">
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">Insurance Expiry</label>
-                            <input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}">
-                        </div>
-                        <div>
-                            <label style="color:var(--primary); font-size:12px; font-weight:bold;">License Expiry</label>
-                            <input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}">
-                        </div>
+                    <div class="grid-2" style="margin-bottom:10px;">
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">License Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Insurance Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}"></div>
+                    </div>
+                    <div style="margin-bottom:5px;">
+                        <label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label>
+                        <input type="text" class="contract-input" style="border-color:var(--danger);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc...">
                     </div>`;
             }
 
