@@ -1282,7 +1282,7 @@
                             </div>
                         </div>
                     </div>`;
-                const encodedHover = encodeURIComponent(hoverText);
+                const encodedHover = encodeURIComponent(hoverText).replace(/'/g, "%27");
                 const infoIcon = `<i class="fa-solid fa-circle-info clickable-obj" style="color:var(--accent); font-size:16px; margin-left:8px;" onmouseenter="showGanttTooltip(event, '${encodedHover}')" onmousemove="moveGanttTooltip(event)" onmouseleave="hideGanttTooltip()"></i>`;
 
                 // A. Actual Collected Income
