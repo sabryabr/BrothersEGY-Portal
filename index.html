@@ -201,6 +201,15 @@
 
         /* Super Global Tooltip (Escapes all traps) */
         #global-tooltip { position: fixed; visibility: hidden; opacity: 0; background: rgba(15, 20, 25, 0.98); color: white; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid var(--primary); z-index: 999999; text-align: right; direction: rtl; line-height: 1.6; box-shadow: 0 10px 30px rgba(0,0,0,0.9); pointer-events: none; transition: opacity 0.1s ease-out; width: max-content; min-width: 220px; top: 0; left: 0; }
+
+        /* ================= VEHICLE 360 MULTI-SELECT CSS ================= */
+        .multi-dropdown-container { position: relative; width: 100%; font-family: 'Cairo', sans-serif; direction: rtl; text-align: right; }
+        .multi-dropdown-header { background: rgba(0,0,0,0.5); border: 1px solid var(--primary); border-radius: 8px; padding: 12px 15px; color: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; }
+        .multi-dropdown-body { position: absolute; top: 110%; left: 0; right: 0; background: rgba(15, 20, 25, 0.95); border: 1px solid var(--glass-border); border-radius: 8px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.9); padding: 10px; display: none; }
+        .multi-dropdown-body.show { display: block; }
+        .multi-item { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: bold; color: #ddd; transition: 0.2s; }
+        .multi-item:hover { background: rgba(4, 80, 157, 0.2); color: white; }
+        .multi-item input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; accent-color: var(--primary); }
         
     </style>
 </head>
@@ -371,8 +380,22 @@
                 <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: flex-end;">
                     <div style="flex: 2;">
                         <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Select Vehicle(s)</label>
-                        <select id="v360-select" class="contract-input" onchange="buildV360()" style="height: 44px; font-weight:bold; font-family:'Cairo', sans-serif; direction:rtl;">
-                            </select>
+                        
+                        <div class="multi-dropdown-container" id="v360-container">
+                            <div class="multi-dropdown-header" onclick="toggleV360Dropdown()">
+                                <span id="v360-header-text">-- Select Cars (اختر السيارات) --</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="multi-dropdown-body" id="v360-dropdown">
+                                <input type="text" id="v360-search" class="contract-input" placeholder="بحث باللوحة أو الموديل..." onkeyup="filterV360Cars()" style="height:35px; margin-bottom:10px; font-size:12px; border-color:#555;">
+                                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                    <button onclick="v360SelectAll(true)" style="flex:1; padding:6px; background:var(--success); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Select All (الكل)</button>
+                                    <button onclick="v360SelectAll(false)" style="flex:1; padding:6px; background:var(--danger); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Clear (مسح)</button>
+                                </div>
+                                <div id="v360-checkbox-list" style="max-height:250px; overflow-y:auto; padding-left:5px;">
+                                    </div>
+                            </div>
+                        </div>
                     </div>
                     <div style="flex: 1;">
                         <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Month</label>
@@ -388,18 +411,20 @@
                         <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Year</label>
                         <input type="number" id="v360-year" onchange="buildV360()" class="contract-input" style="height: 44px; font-weight:bold; text-align:center;">
                     </div>
+                    <button onclick="buildV360()" style="background:var(--primary); color:white; border:none; height:44px; padding:0 25px; border-radius:8px; cursor:pointer; font-weight:bold;"><i class="fa-solid fa-rotate-right"></i> Run</button>
                 </div>
 
-                <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <div class="m-card" style="border-top: 4px solid var(--success);"><label>Total Revenue (إجمالي الإيرادات)</label><div class="val" id="v-rev" style="color:var(--success)">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid var(--danger);"><label>Maintenance (تكاليف صيانة)</label><div class="val" id="v-maint" style="color:var(--danger)">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid var(--accent);"><label>Other Exp / Owners (مصروفات أخرى)</label><div class="val" id="v-other" style="color:var(--accent)">0 EGP</div></div>
-                    <div class="m-card" style="border-top: 4px solid #00d2ff;"><label>Net ROI (العائد الصافي)</label><div class="val" id="v-roi" style="color:#00d2ff">0 EGP</div></div>
+                <div class="metrics-grid" style="grid-template-columns: repeat(5, 1fr);">
+                    <div class="m-card" style="border-top: 4px solid var(--success);"><label>Collected Income (الإيرادات)</label><div class="val" id="v-rev" style="color:var(--success)">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 4px solid var(--danger);"><label>Pending Debt (ديون معلقة)</label><div class="val" id="v-debt" style="color:var(--danger)">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 4px solid #f1c40f;"><label>Deposits Held (الودائع)</label><div class="val" id="v-dep" style="color:#f1c40f">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 4px solid var(--accent);"><label>Total Expenses (مصروفات)</label><div class="val" id="v-exp" style="color:var(--accent)">0 EGP</div></div>
+                    <div class="m-card" style="border-top: 4px solid #00d2ff; background:rgba(0, 210, 255, 0.05);"><label>Net Cash ROI (الصافي)</label><div class="val" id="v-roi" style="color:#00d2ff">0 EGP</div></div>
                 </div>
 
-                <div class="table-responsive">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                     <table class="data-table">
-                        <thead><tr>
+                        <thead style="position: sticky; top: 0; background: #111; z-index: 10;"><tr>
                             <th style="width: 10%;">Date</th>
                             <th style="width: 15%;">Record Type</th>
                             <th style="width: 25%; text-align:right;">Vehicle Identity</th>
@@ -1081,49 +1106,88 @@
             });
         }
 
+        // --- VEHICLE 360 MULTI-SELECT ENGINE ---
+        let selectedV360Cars = new Set();
+
+        function toggleV360Dropdown() {
+            document.getElementById('v360-dropdown').classList.toggle('show');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const container = document.getElementById('v360-container');
+            if (container && !container.contains(event.target)) {
+                document.getElementById('v360-dropdown').classList.remove('show');
+            }
+        });
+
         function populateV360Select() {
-            const select = document.getElementById('v360-select');
-            if(select.options.length > 0) return; // Prevent rebuilding if already populated
-            
-            select.innerHTML = '<option value="all">-- All Active Fleet (السجل الشامل للأسطول) --</option>';
+            const list = document.getElementById('v360-checkbox-list');
+            if (list.innerHTML !== '') return; 
             
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
                 if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
 
-                let n4 = getSafeVal(c, ['Field_28']), n3 = getSafeVal(c, ['Field_27']), n2 = getSafeVal(c, ['Field_26']), n1 = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                // EXACT ARABIC PLATE LOGIC PROVIDED BY USER
+                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
                 let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
-                
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" ");
                 let lets = [l3, l2, l1].filter(Boolean).join(" ");
                 let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
-                
+
                 let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim() || 'Unknown';
                 let cYear = getSafeVal(c, ['سنة الصنع', 'Year']);
-                
-                const opt = document.createElement('option'); 
-                opt.value = c.id;
-                opt.innerText = `${carName} (${cYear}) ${fullPlate} [${c.id}]`;
-                select.appendChild(opt);
+                let displayName = `${carName} (${cYear}) ${fullPlate} [${c.id}]`;
+
+                let div = document.createElement('label');
+                div.className = 'multi-item';
+                div.innerHTML = `<input type="checkbox" value="${c.id}" class="v360-check" onchange="updateV360Selection()"> <span>${displayName}</span>`;
+                list.appendChild(div);
             });
             
-            // Set default year & month to current
             const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
             document.getElementById('v360-year').value = now.getFullYear();
             document.getElementById('v360-month').value = (now.getMonth() + 1).toString();
         }
 
+        function filterV360Cars() {
+            const filter = document.getElementById('v360-search').value.toLowerCase();
+            const items = document.querySelectorAll('.multi-item');
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.includes(filter) ? "flex" : "none";
+            });
+        }
+
+        function v360SelectAll(select) {
+            document.querySelectorAll('.v360-check').forEach(cb => cb.checked = select);
+            updateV360Selection();
+        }
+
+        function updateV360Selection() {
+            selectedV360Cars.clear();
+            document.querySelectorAll('.v360-check:checked').forEach(cb => selectedV360Cars.add(cb.value));
+            
+            const header = document.getElementById('v360-header-text');
+            if (selectedV360Cars.size === 0) header.innerText = "-- Select Cars (اختر السيارات) --";
+            else if (selectedV360Cars.size === document.querySelectorAll('.v360-check').length) header.innerText = "All Active Fleet Selected";
+            else header.innerText = `${selectedV360Cars.size} Vehicles Selected`;
+        }
+
+        // --- VEHICLE 360 CASH-BASIS LEDGER ENGINE ---
         function buildV360() {
-            const carId = document.getElementById('v360-select').value;
             const monthFilter = document.getElementById('v360-month').value; 
             const yearFilter = parseInt(document.getElementById('v360-year').value);
+            const body = document.getElementById('v360-body'); body.innerHTML = '';
             
-            const body = document.getElementById('v360-body'); 
-            body.innerHTML = '';
-            
-            let totalRev = 0, totalMaint = 0, totalOther = 0, timeline = [];
+            let kpiRev = 0, kpiDebt = 0, kpiDep = 0, kpiExp = 0, timeline = [];
 
-            // Helper to check if a date string matches the UI filters
+            if (selectedV360Cars.size === 0) {
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Please select at least one vehicle from the dropdown above.</td></tr>`;
+                return;
+            }
+
             const isDateInFilter = (dateStr) => {
                 if(!dateStr) return false;
                 const d = new Date(dateStr);
@@ -1133,96 +1197,88 @@
                 return true;
             };
 
-            // Helper to get formatted Car Name for the table
             const getCarDisplay = (cid) => {
                 const c = APP_DATA.cars.find(x => x.id == cid);
                 if(!c) return `<span style="color:#888;">[ID: ${cid}]</span>`;
-                let n1 = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
-                let l1 = getSafeVal(c, ['احرف اللوحة']);
+                let n1 = getSafeVal(c, ['رقم اللوحة', 'Field_28']); let l1 = getSafeVal(c, ['احرف اللوحة', 'Field_24']);
                 let cName = getSafeVal(c, ['الطراز', 'Model']) || 'Vehicle';
                 return `<span style="color:white; font-weight:bold;">${cName}</span> <span style="color:var(--accent); font-size:11px;">${l1} ${n1} [${c.id}]</span>`;
             };
 
-            // 1. Process Bookings (Revenue)
+            // 1. Process Bookings (Cash-Basis Split)
             APP_DATA.bookings.forEach(b => {
-                if(carId !== 'all' && String(b['كود السيارة']) !== String(carId)) return;
+                const cid = String(b['كود السيارة']);
+                if(!selectedV360Cars.has(cid)) return;
+                
                 const startDate = b['بداية التعاقد']?.split(' ')[0];
                 if(!isDateInFilter(startDate)) return;
 
-                const rev = parseCurrency(b['إجمالي المستحق (Total)']); 
+                const total = parseCurrency(b['إجمالي المستحق (Total)']); 
                 const paid = parseCurrency(b['المدفوع EGP']);
-                
-                totalRev += rev; 
-                
-                let badge = paid >= rev 
-                    ? `<span class="badge bg-green">INCOME (PAID)</span>` 
-                    : `<span class="badge bg-orange">INCOME (DEBT)</span>`;
-                
-                timeline.push({ 
-                    id: b.id, 
-                    type: badge, 
-                    date: startDate, 
-                    carDisplay: getCarDisplay(b['كود السيارة']),
-                    desc: `<b class="clickable-obj" style="color:var(--accent)" onclick="showToast('Open Order #${b.id}')">Order #${b.id} - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#888;">Ends: ${b['نهاية التعاقد']?.split(' ')[0]} | Paid: ${paid.toLocaleString()} / Total: ${rev.toLocaleString()}</span>`, 
-                    amt: rev,
-                    amtColor: 'var(--success)',
-                    sortDate: new Date(startDate).getTime()
-                });
+                const debt = Math.max(0, total - paid);
+                const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit']));
+                const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
+
+                // A. Actual Collected Income
+                if (paid > 0) {
+                    kpiRev += paid;
+                    timeline.push({ 
+                        id: b.id, type: `<span class="badge bg-green">INCOME (COLLECTED)</span>`, date: startDate, 
+                        carDisplay: getCarDisplay(cid), amt: paid, amtColor: 'var(--success)', sortDate: new Date(startDate).getTime(),
+                        desc: `<b class="clickable-obj" style="color:var(--success)">Order #${b.id} - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Insurance: ${insPack} | Base Rent + Extras Included</span>`
+                    });
+                }
+
+                // B. Pending Debt (Does NOT add to cash ROI)
+                if (debt > 0) {
+                    kpiDebt += debt;
+                    timeline.push({ 
+                        id: b.id, type: `<span class="badge bg-red">PENDING DEBT</span>`, date: startDate, 
+                        carDisplay: getCarDisplay(cid), amt: debt, amtColor: 'var(--danger)', sortDate: new Date(startDate).getTime() + 1,
+                        desc: `<b style="color:var(--danger)">Outstanding Balance - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Total Order Value was ${total.toLocaleString()} EGP</span>`
+                    });
+                }
+
+                // C. Security Deposit (Liability, NOT Income)
+                if (deposit > 0) {
+                    kpiDep += deposit;
+                    timeline.push({ 
+                        id: b.id, type: `<span class="badge" style="background:#f1c40f; color:#000;">LIABILITY (DEPOSIT)</span>`, date: startDate, 
+                        carDisplay: getCarDisplay(cid), amt: deposit, amtColor: '#f1c40f', sortDate: new Date(startDate).getTime() + 2,
+                        desc: `<b style="color:#f1c40f">Security Deposit Held - ${b['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">To be refunded upon safe return.</span>`
+                    });
+                }
             });
 
-            // 2. Process Expenses (Maintenance vs Other)
+            // 2. Process Expenses
             APP_DATA.car_expenses.forEach(e => {
                 const cid = String(e['كود السيارة'] || e['كود السيارة\r'] || "").trim();
-                if(carId !== 'all' && cid !== String(carId)) return;
+                if(!selectedV360Cars.has(cid)) return;
                 
-                // Construct date from Year/Month/Day fields if a single 'Date' field doesn't exist
                 let dateStr = e.Date || `${e['سنة']}-${String(e['شهر']).padStart(2,'0')}-${String(e['يوم']).padStart(2,'0')}`;
                 if(!isDateInFilter(dateStr)) return;
 
                 const amt = parseCurrency(e['قيمة المصروف']); 
-                
-                // Identify if it's Maintenance or Other
-                let isMaint = false;
-                if (e['بيان الصيانة'] && String(e['بيان الصيانة']).trim() !== "") isMaint = true;
-                if (String(e['نوع المصروف']).includes('صيانة')) isMaint = true;
-                
-                let badge, amtColor, descText;
-                if(isMaint) {
-                    totalMaint += amt;
-                    badge = `<span class="badge bg-red">MAINTENANCE</span>`;
-                    amtColor = 'var(--danger)';
-                    descText = e['بيان الصيانة'] || 'Maintenance Record';
-                } else {
-                    totalOther += amt;
-                    badge = `<span class="badge" style="background:#e67e22; color:white; border:1px solid #d35400;">OTHER / OWNER</span>`;
-                    amtColor = 'var(--accent)';
-                    descText = e['بيان النثريات'] || e['التفاصيل'] || 'Expense Record';
-                }
+                kpiExp += amt;
 
                 timeline.push({ 
-                    id: e.id || '-', 
-                    type: badge, 
-                    date: dateStr, 
-                    carDisplay: getCarDisplay(cid),
-                    desc: `<span style="color:#ddd;">${descText}</span>`, 
-                    amt: -amt, // Negative so the math looks like a bank statement
-                    amtColor: amtColor,
-                    sortDate: new Date(dateStr).getTime()
+                    id: e.id || '-', type: `<span class="badge" style="background:#555; color:white;">EXPENSE / MAINT.</span>`, date: dateStr, 
+                    carDisplay: getCarDisplay(cid), amt: -amt, amtColor: '#ff7675', sortDate: new Date(dateStr).getTime(),
+                    desc: `<span style="color:#ddd;">${e['بيان الصيانة'] || e['بيان النثريات'] || e['التفاصيل'] || 'Maintenance / Operations Expense'}</span>`
                 });
             });
 
             // 3. Update Metrics UI
-            const netROI = totalRev - totalMaint - totalOther;
+            const netCashROI = kpiRev - kpiExp; // True cash in pocket
 
-            document.getElementById('v-rev').innerText = totalRev.toLocaleString() + " EGP"; 
-            document.getElementById('v-maint').innerText = totalMaint.toLocaleString() + " EGP"; 
-            document.getElementById('v-other').innerText = totalOther.toLocaleString() + " EGP";
-            document.getElementById('v-roi').innerText = netROI.toLocaleString() + " EGP";
-            
-            // Dynamic ROI Color (Blue for Profit, Red for Loss)
-            document.getElementById('v-roi').style.color = netROI >= 0 ? '#00d2ff' : 'var(--danger)';
+            document.getElementById('v-rev').innerText = kpiRev.toLocaleString() + " EGP"; 
+            document.getElementById('v-debt').innerText = kpiDebt.toLocaleString() + " EGP"; 
+            document.getElementById('v-dep').innerText = kpiDep.toLocaleString() + " EGP"; 
+            document.getElementById('v-exp').innerText = kpiExp.toLocaleString() + " EGP";
+            document.getElementById('v-roi').innerText = netCashROI.toLocaleString() + " EGP";
+            document.getElementById('v-roi').style.color = netCashROI >= 0 ? '#00d2ff' : 'var(--danger)';
 
-            // 4. Build Table (Sorted Newest to Oldest)
+            // 4. Build Table
             timeline.sort((a,b) => b.sortDate - a.sortDate);
             
             timeline.forEach(t => { 
@@ -1238,7 +1294,7 @@
             });
             
             if (timeline.length === 0) {
-                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found for this period.</td></tr>`;
+                body.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">No financial records found for the selected vehicles and period.</td></tr>`;
             }
         }
 
