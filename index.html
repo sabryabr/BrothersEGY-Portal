@@ -223,11 +223,11 @@
                 <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" height="32">
                 <span style="font-weight: 800; letter-spacing: 1px; font-size: 16px;">BROTHERS EGY</span>
             </div>
-            <div class="nav-tabs">
+           <div class="nav-tabs">
                 <button class="top-btn access-quote" onclick="route('proposal', this)">Price Proposal</button>
                 <button class="top-btn access-en" onclick="route('en-contract', this)">EN Contract</button>
-                <button class="top-btn access-ar" onclick="loadFrame('https://sabryabr.github.io/BrothersEGY-AR-Contract/', this)">AR Contract</button>
-                <button class="top-btn access-rec" onclick="loadFrame('receipt.html', this)">Digital Receipt</button>
+                <button class="top-btn access-ar" onclick="route('ar-contract', this)">AR Contract</button>
+                <button class="top-btn access-rec" onclick="route('receipt', this)">Digital Receipt</button>
             </div>
             <div style="display:flex; align-items:center; gap:15px;">
                 <div id="global-rates-panel" style="display:flex; gap:10px; align-items:center;">
@@ -706,6 +706,195 @@
                 <button id="btnRealPrint" onclick="window.print()" class="btn-final-print" style="margin-bottom:50px; display:none;"><i class="fa-solid fa-print"></i> 2. CONFIRM & SAVE PDF</button>
             </div>
 
+            <div id="view-ar-contract" class="view-section" dir="rtl" style="text-align:right;">
+                <div class="cp-body">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 style="margin:0; font-family:'Cairo', sans-serif;"><i class="fa-solid fa-file-contract"></i> إنشاء عقد تأجير (عربي)</h2>
+                    </div>
+                    
+                    <div class="section-head">1. العقد والفرع</div>
+                    <div class="grid-3">
+                        <div><label class="contract-label">فرع الإصدار</label><select class="contract-input" id="ar_branch" onchange="runARContractCalc()"><option value="HRG">فرع الغردقة</option><option value="ALX">الإسكندرية (المركز الرئيسي)</option><option value="CAI">فرع القاهرة</option><option value="RSD">فرع رشيد</option></select></div>
+                        <div><label class="contract-label">نظام الإيجار</label><select class="contract-input" id="ar_mode" onchange="document.getElementById('ar_lbl_rate').innerText = this.value === 'Monthly' ? 'الإيجار الشهري (ج.م)' : 'الإيجار اليومي (ج.م)'; runARContractCalc();"><option value="Daily">يومي (قصير الأمد)</option><option value="Monthly">شهري (طويل الأمد)</option></select></div>
+                        <div><label class="contract-label">نوع الاتفاقية</label><select class="contract-input" id="ar_type" onchange="document.getElementById('ar_prev').style.display = this.value === 'Extension' ? 'block' : 'none'; runARContractCalc();"><option value="New">اتفاقية جديدة</option><option value="Extension">تمديد</option></select><input type="text" class="contract-input" id="ar_prev" placeholder="رقم العقد السابق..." style="display:none; margin-top:5px; border-color:var(--accent);" oninput="runARContractCalc()"></div>
+                    </div>
+
+                    <div class="section-head">2. تفاصيل المركبة</div>
+                    <div class="grid-2">
+                        <div><label class="contract-label">اختر من الأسطول</label><select class="contract-input" id="ar_carSelect" onchange="arLoadCar()"><option value="">-- تحميل الأسطول المتاح... --</option></select></div>
+                        <div><label class="contract-label">إدخال الطراز يدويًا</label><input type="text" class="contract-input" id="ar_manModel"></div>
+                    </div>
+                    <input type="hidden" id="ar_plate"><input type="hidden" id="ar_year"><input type="hidden" id="ar_vin"><input type="hidden" id="ar_motor">
+
+                    <div class="grid-4">
+                        <div><label class="contract-label">عداد الخروج</label><input type="number" class="contract-input" id="ar_kmOut" value="0" oninput="runARContractCalc()"></div>
+                        <div><label class="contract-label">مستوى الوقود</label><select class="contract-input" id="ar_fuelOut"><option>ممتلئ (8/8)</option><option>3/4</option><option>1/2</option><option>1/4</option><option>احتياطي</option></select></div>
+                        <div><label class="contract-label" id="ar_lbl_rate">الإيجار اليومي (ج.م)</label><input type="number" class="contract-input" id="ar_rateRent" value="0" oninput="runARContractCalc()"></div>
+                        <div><label class="contract-label">رسوم التأمين (يومي)</label><input type="number" class="contract-input" id="ar_rateIns" value="0" oninput="runARContractCalc()"></div>
+                    </div>
+
+                    <div class="section-head">3. العميل والتواريخ (مرتبط بـ CRM)</div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background:rgba(4, 80, 157, 0.1); border:1px solid var(--primary); padding:10px; border-radius:8px;">
+                        <div style="flex-grow:1;"><label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> بحث وملء تلقائي</label><input list="client-list" id="ar_crm_search" class="contract-input" placeholder="اكتب الاسم أو جواز السفر للبحث..." onchange="autoFillARClient()" style="border-color:var(--primary);"></div>
+                    </div>
+                    <input type="hidden" id="ar_client_id" value="">
+                    
+                    <div class="grid-4">
+                        <div><label class="contract-label">الاسم الأول *</label><input type="text" class="contract-input" id="ar_fname" readonly></div>
+                        <div><label class="contract-label">اللقب *</label><input type="text" class="contract-input" id="ar_sname" readonly></div>
+                        <div><label class="contract-label">رقم الهوية / جواز السفر *</label><input type="text" class="contract-input" id="ar_pass" readonly></div>
+                        <div><label class="contract-label">الجنسية</label><input type="text" class="contract-input" id="ar_nation" readonly></div>
+                    </div>
+                    <div class="grid-4">
+                        <div><label class="contract-label">الهاتف *</label><div class="phone-group"><input type="text" class="contract-input" id="ar_ph_code" value="+20" readonly><input type="text" class="contract-input" id="ar_phone" readonly></div></div>
+                        <div><label class="contract-label">البريد الإلكتروني</label><input type="email" class="contract-input" id="ar_email" readonly></div>
+                        <div><label class="contract-label">رخصة القيادة</label><input type="text" class="contract-input" id="ar_lic" readonly></div>
+                        <div><label class="contract-label">العنوان</label><input type="text" class="contract-input" id="ar_addr" readonly></div>
+                    </div>
+
+                    <div class="grid-2" style="margin-top:10px;">
+                        <div><label class="contract-label">اسم سائق إضافي</label><input type="text" class="contract-input" id="ar_add_driver" placeholder="اختياري"></div>
+                        <div><label class="contract-label">رخصة السائق الإضافي</label><input type="text" class="contract-input" id="ar_add_lic" placeholder="اختياري"></div>
+                    </div>
+
+                    <div class="grid-4" style="margin-top:10px;">
+                        <div><label class="contract-label">تاريخ/وقت الاستلام</label><input type="datetime-local" class="contract-input" id="ar_p_time" onchange="runARContractCalc()"></div>
+                        <div><label class="contract-label">مكان الاستلام</label><select class="contract-input" id="ar_p_loc" onchange="runARContractCalc()"><option value="المكتب">المكتب</option><option value="المطار">المطار</option><option value="الفندق">الفندق</option></select><input type="text" class="contract-input" id="ar_p_addr" placeholder="عنوان محدد..." style="margin-top:5px;" oninput="runARContractCalc()"></div>
+                        <div><label class="contract-label">تاريخ/وقت التسليم</label><input type="datetime-local" class="contract-input" id="ar_d_time" onchange="runARContractCalc()"></div>
+                        <div><label class="contract-label">مكان التسليم</label><select class="contract-input" id="ar_d_loc" onchange="runARContractCalc()"><option value="المكتب">المكتب</option><option value="المطار">المطار</option><option value="الفندق">الفندق</option></select><input type="text" class="contract-input" id="ar_d_addr" placeholder="عنوان محدد..." style="margin-top:5px;" oninput="runARContractCalc()"></div>
+                    </div>
+
+                    <div class="section-head">4. المال والمدفوعات</div>
+                    <div style="display:flex; gap:15px; flex-direction:row-reverse;">
+                        <div style="flex:7;">
+                            <div class="grid-3">
+                                <div><label class="contract-label">رسوم التوصيل</label><input type="number" class="contract-input" id="ar_fee_del" value="0" oninput="runARContractCalc()"></div>
+                                <div><label class="contract-label">رسوم الاستلام</label><input type="number" class="contract-input" id="ar_fee_col" value="0" oninput="runARContractCalc()"></div>
+                                <div><label class="contract-label" style="color:var(--accent);">التأمين المطلوب</label><input type="number" class="contract-input" id="ar_req_deposit" value="0" oninput="runARContractCalc()"></div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.4); padding:10px; border-radius:6px; margin-bottom:10px; border: 1px solid rgba(255,255,255,0.1);">
+                                <div style="font-weight:bold; font-size:11px; margin-bottom:5px; color:var(--primary);">الإيجار المدفوع (الآن)</div>
+                                <div class="grid-4" style="margin:0;">
+                                    <div><label class="contract-label">كاش (ج.م)</label><input type="number" class="contract-input" id="ar_pay_rent_egp" placeholder="0" oninput="runARContractCalc()"></div>
+                                    <div><label class="contract-label">دولار (USD)</label><input type="number" class="contract-input" id="ar_pay_rent_usd" placeholder="0" oninput="runARContractCalc()"></div>
+                                    <div><label class="contract-label">يورو (EUR)</label><input type="number" class="contract-input" id="ar_pay_rent_eur" placeholder="0" oninput="runARContractCalc()"></div>
+                                    <div><label class="contract-label">بطاقة (ج.م)</label><input type="number" class="contract-input" id="ar_pay_rent_card" placeholder="0" oninput="runARContractCalc()"></div>
+                                </div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.4); padding:10px; border-radius:6px; margin-bottom:10px; border: 1px solid rgba(255,255,255,0.1);">
+                                <div style="font-weight:bold; font-size:11px; margin-bottom:5px; color:var(--accent);">التأمين المحتجز</div>
+                                <div class="grid-4" style="margin:0;">
+                                    <div><label class="contract-label">كاش (ج.م)</label><input type="number" class="contract-input" id="ar_pay_dep_egp" placeholder="0" oninput="runARContractCalc()"></div>
+                                    <div><label class="contract-label">دولار (USD)</label><input type="number" class="contract-input" id="ar_pay_dep_usd" placeholder="0" oninput="runARContractCalc()"></div>
+                                    <div><label class="contract-label">يورو (EUR)</label><input type="number" class="contract-input" id="ar_pay_dep_eur" placeholder="0" oninput="runARContractCalc()"></div>
+                                    <div><label class="contract-label">بطاقة (ج.م)</label><input type="number" class="contract-input" id="ar_pay_dep_card" placeholder="0" oninput="runARContractCalc()"></div>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div><label class="contract-label">باقة التأمين</label><select class="contract-input" id="ar_insPack" onchange="runARContractCalc()"><option value="No Insurance">بدون تأمين (مسؤولية 100%)</option><option value="Basic">أساسي (مسؤولية العميل 100%)</option><option value="Intermediate">متوسط (70% / 30%)</option><option value="Full Protection">حماية كاملة (مسؤولية صفر)</option></select></div>
+                                <div><label class="contract-label">الإضافات وباقة الكيلومترات</label>
+                                    <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
+                                        <div style="display:flex; align-items:center; gap:5px;">
+                                            <select class="contract-input" id="ar_km_pkg" onchange="runARContractCalc()" style="height:26px; font-size:11px; padding:0 5px;"><option value="0" data-km="0">قياسي (120 كم/يوم)</option><option value="1800" data-km="500">500 كم إضافي</option><option value="2700" data-km="750">750 كم إضافي</option><option value="3600" data-km="1000">1000 كم إضافي</option><option value="5400" data-km="1500">باقة 1500 كم</option><option value="7200" data-km="2000">باقة 2000 كم</option><option value="10800" data-km="3000">باقة 3000 كم</option><option value="500" data-km="999999">كيلومتر مفتوح (يوميًا)</option></select>
+                                            <input type="number" class="contract-input" id="ar_km_pkg_cost_manual" value="0" oninput="runARContractCalc()" placeholder="تعديل" style="height:26px; width:80px; padding:2px 5px;">
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="ar_add_dr" onchange="runARContractCalc()" style="width:15px; height:15px; margin:0;"><span style="font-size:12px; width:65px; color:#ccc;">سائق</span><input type="number" class="contract-input" id="ar_rate_dr" value="250" oninput="runARContractCalc()" style="height:26px; padding:2px 8px;"></div>
+                                        <div style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="ar_add_st" onchange="runARContractCalc()" style="width:15px; height:15px; margin:0;"><span style="font-size:12px; width:65px; color:#ccc;">كرسي طفل</span><input type="number" class="contract-input" id="ar_rate_st" value="250" oninput="runARContractCalc()" style="height:26px; padding:2px 8px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="balance-box" style="flex:3;">
+                            <div style="border-bottom:1px dashed rgba(255, 255, 255, 0.3); padding-bottom:10px; margin-bottom:10px; direction:ltr;">
+                                <div style="text-align:center; font-weight:bold; font-size:12px; margin-bottom:10px;">RENT ESTIMATE</div>
+                                <div class="bal-row"><span>Base:</span> <strong id="ar_c_rent">0</strong></div>
+                                <div class="bal-row"><span>Days:</span> <strong id="ar_c_days">0</strong></div>
+                                <div class="bal-row"><span>Fees/Addons:</span> <strong id="ar_c_fees">0</strong></div>
+                                <div style="text-align:center; font-size:18px; font-weight:bold; color:#e67e22; margin-top:10px;" id="ar_c_total_preview">0 EGP</div>
+                            </div>
+                            <div style="border-bottom:1px dashed rgba(255, 255, 255, 0.3); padding-bottom:10px; margin-bottom:10px; direction:ltr;">
+                                <div style="text-align:center; font-weight:bold; font-size:12px; margin-bottom:10px; color:var(--accent);">DEPOSIT</div>
+                                <div class="bal-row"><span>Target:</span> <strong id="ar_val_dep_req">0</strong></div>
+                                <div class="bal-row"><span>Held:</span> <strong id="ar_val_dep_paid">0</strong></div>
+                                <div style="background:rgba(0, 0, 0, 0.4); padding:5px; border-radius:4px; text-align:center; margin-top:5px;">
+                                    <div style="font-size:9px;">DEPOSIT STATUS</div>
+                                    <div id="ar_val_dep_pending" style="font-size:13px; font-weight:bold;">0</div>
+                                </div>
+                            </div>
+                            <div style="margin-top:auto; direction:ltr;">
+                                <div class="bal-row"><span>Due:</span> <strong id="ar_val_total_due">0</strong></div>
+                                <div class="bal-row"><span>Paid:</span> <strong id="ar_val_total_paid" style="color:var(--success);">0</strong></div>
+                                <div style="background:rgba(0, 0, 0, 0.4); padding:10px; border-radius:6px; text-align:center; margin-top:10px;">
+                                    <div style="font-size:10px;">RENT PENDING</div>
+                                    <div id="ar_val_rent_pending" style="font-size:18px; font-weight:bold; color:var(--danger);">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-gen" onclick="executeARContract()"><i class="fa-solid fa-eye"></i> 1. معاينة العقد</button>
+                </div>
+                <div id="arContractOutput" style="display:none; margin-top:20px; padding-bottom:50px; flex-direction:column; gap:20px; align-items:center; background:var(--bg); color:#333;"></div>
+                <button id="btnARPrint" onclick="window.print()" class="btn-final-print" style="margin-bottom:50px; display:none;"><i class="fa-solid fa-print"></i> 2. طباعة أو حفظ PDF</button>
+            </div>
+
+            <div id="view-receipt" class="view-section">
+                <div class="cp-body">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 style="margin:0;"><i class="fa-solid fa-file-invoice"></i> Smart Receipt Generator</h2>
+                    </div>
+                    
+                    <div class="section-head">1. Document Info</div>
+                    <div class="grid-3">
+                        <div><label class="contract-label">Existing Contract No.</label><input type="text" class="contract-input" id="rc_con_no" placeholder="BR-HRG-..."></div>
+                        <div><label class="contract-label">Receipt Date</label><input type="date" class="contract-input" id="rc_date"></div>
+                        <div><label class="contract-label">Receipt Title</label><input type="text" class="contract-input" id="rc_title" value="RENTAL PAYMENT"></div>
+                    </div>
+
+                    <div class="section-head">2. Client & Vehicle</div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center; background:rgba(4, 80, 157, 0.1); border:1px solid var(--primary); padding:10px; border-radius:8px;">
+                        <div style="flex-grow:1;"><label class="contract-label" style="color:var(--primary);"><i class="fa-solid fa-magnifying-glass"></i> Search Client</label><input list="client-list" id="rc_crm_search" class="contract-input" placeholder="Type Name or Passport to Search..." onchange="autoFillRcClient()" style="border-color:var(--primary);"></div>
+                    </div>
+                    <div class="grid-3">
+                        <div><label class="contract-label">Client Name</label><input type="text" class="contract-input" id="rc_name"></div>
+                        <div><label class="contract-label">Passport / ID</label><input type="text" class="contract-input" id="rc_pass"></div>
+                        <div><label class="contract-label">Phone</label><input type="text" class="contract-input" id="rc_phone"></div>
+                    </div>
+                    <div class="grid-3">
+                        <div><label class="contract-label">Select Fleet Vehicle</label><select class="contract-input" id="rc_carSelect" onchange="rcLoadCar()"><option value="">-- Custom Manual Input --</option></select></div>
+                        <div style="grid-column: span 2;"><label class="contract-label">Vehicle Text</label><input type="text" class="contract-input" id="rc_car_text" placeholder="MG ZS (2025) | Plate: 9413"></div>
+                    </div>
+                    <div class="grid-2">
+                        <div><label class="contract-label">Rental Period Start</label><input type="date" class="contract-input" id="rc_p_start"></div>
+                        <div><label class="contract-label">Rental Period End</label><input type="date" class="contract-input" id="rc_p_end"></div>
+                    </div>
+
+                    <div class="section-head">3. Payment & Balances</div>
+                    <div style="background:rgba(0,0,0,0.4); padding:15px; border-radius:6px; border: 1px solid rgba(255,255,255,0.1); margin-bottom:15px;">
+                        <div style="font-weight:bold; font-size:11px; margin-bottom:10px; color:var(--primary);">AMOUNT RECEIVED NOW</div>
+                        <div class="grid-4" style="margin:0;">
+                            <div><label class="contract-label">EGP</label><input type="number" class="contract-input" id="rc_pay_egp" placeholder="0" oninput="calcReceipt()"></div>
+                            <div><label class="contract-label">USD</label><input type="number" class="contract-input" id="rc_pay_usd" placeholder="0" oninput="calcReceipt()"></div>
+                            <div><label class="contract-label">EUR</label><input type="number" class="contract-input" id="rc_pay_eur" placeholder="0" oninput="calcReceipt()"></div>
+                            <div><label class="contract-label">Card (EGP)</label><input type="number" class="contract-input" id="rc_pay_card" placeholder="0" oninput="calcReceipt()"></div>
+                        </div>
+                        <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #555; display:flex; justify-content:space-between; align-items:center;">
+                            <div style="font-weight:bold; font-size:12px; color:white;">TOTAL RECEIVED (CALCULATED):</div>
+                            <div id="rc_display_total" style="font-size:20px; font-weight:bold; color:var(--success);">0 EGP</div>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div><label class="contract-label" style="color:var(--danger);">Outstanding / Pending Balance</label><input type="number" class="contract-input" id="rc_pending_amt" placeholder="e.g. 164000" style="border-color:var(--danger);"></div>
+                        <div style="display:flex; align-items:center; padding-top:15px;">
+                            <label style="font-size:13px; color:white; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="rc_auto_sign" checked style="width:20px; height:20px;"> <strong>Digitally Auto-Sign Receipt</strong></label>
+                        </div>
+                    </div>
+                    <button class="btn-gen" onclick="executeReceiptPreview()"><i class="fa-solid fa-receipt"></i> 1. GENERATE RECEIPT</button>
+                </div>
+                <div id="receiptOutput" style="display:none; margin-top:20px; padding-bottom:50px; flex-direction:column; gap:20px; align-items:center; background:var(--bg); color:#333;"></div>
+                <button id="btnRcPrint" onclick="window.print()" class="btn-final-print" style="margin-bottom:50px; display:none;"><i class="fa-solid fa-paper-plane"></i> 2. PRINT / SAVE PDF</button>
+            </div>
+                    
             <div id="view-frame" class="view-section" style="height:100%;">
                 <iframe id="content-frame" src=""></iframe>
             </div>
@@ -842,6 +1031,7 @@
             if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق") || str.includes("كحلي")) return "#02006c";
             if (str.includes("black") || str.includes("اسود") || str.includes("أسود")) return "#2c3e50";
             if (str.includes("silver") || str.includes("فضي")) return "#bdc3c7";
+            if (str.includes("light blue") || str.includes("سماوي")) return "#20a7db";
             if (str.includes("white") || str.includes("ابيض") || str.includes("أبيض")) return "#ffffff";
             if (str.includes("grey") || str.includes("gray") || str.includes("رمادي")) return "#7f8c8d";
             if (str.includes("ashen") || str.includes("فئراني") || str.includes("فيراني")) return "#95a5a6";
@@ -880,6 +1070,8 @@
             if(viewId === 'risk') buildRiskRadar();
             if(viewId === 'proposal') prepProposal();
             if(viewId === 'en-contract') prepNativeContract();
+            if(viewId === 'ar-contract') prepARContract();
+            if(viewId === 'receipt') prepReceipt();
         }
 
         function loadFrame(url, btnEl) {
@@ -1509,6 +1701,189 @@
             document.getElementById('contractOutput').innerHTML = html; document.getElementById('contractOutput').style.display = "flex"; document.getElementById('btnRealPrint').style.display = "block";
             setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('contractOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
         }
+
+        // ================= BLOCK 3: NATIVE AR CONTRACT ENGINE =================
+        function prepARContract() {
+            populateClientList(); 
+            const sel = document.getElementById('ar_carSelect'); sel.innerHTML = '<option value="">-- تحميل الأسطول المتاح... --</option>';
+            APP_DATA.cars.forEach(c => {
+                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase();
+                if(!contractStr.includes('valid') && !contractStr.includes('ساري')) return; 
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${carName} - ${pNum}`; sel.add(opt);
+            });
+            runARContractCalc();
+        }
+
+        function arLoadCar() {
+            const id = document.getElementById('ar_carSelect').value; const c = APP_DATA.cars.find(x => String(x.id) === String(id));
+            if(c) {
+                document.getElementById('ar_manModel').value = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
+                let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                document.getElementById('ar_plate').value = `${lets} | ${nums}`.trim();
+                document.getElementById('ar_year').value = getSafeVal(c, ['سنة الصنع', 'Year']); document.getElementById('ar_vin').value = getSafeVal(c, ['VIN', 'رقم الشاسيه']); document.getElementById('ar_motor').value = getSafeVal(c, ['Motor', 'رقم الموتور']); document.getElementById('ar_rateRent').value = parseCurrency(getSafeVal(c, ['الايجار اليومى', 'Daily Rent']));
+                runARContractCalc();
+            }
+        }
+
+        function autoFillARClient() {
+            const searchVal = document.getElementById('ar_crm_search').value; const list = document.getElementById('client-list'); let selectedId = null;
+            for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
+            if(!selectedId) return; const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(c) {
+                document.getElementById('ar_client_id').value = c.id; document.getElementById('ar_fname').value = c['الاسم الأول'] || ''; document.getElementById('ar_sname').value = c['الاسم الأخير'] || ''; document.getElementById('ar_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || ''; document.getElementById('ar_phone').value = c['رقم التليفون'] || ''; document.getElementById('ar_email').value = c['عنوان البريد الإلكتروني'] || ''; document.getElementById('ar_lic').value = c['رقم رخصة القيادة'] || ''; document.getElementById('ar_addr').value = c['العنوان'] || ''; document.getElementById('ar_nation').value = c['رمز الدولة'] || '';
+            }
+        }
+
+        function runARContractCalc() {
+            try {
+                const rateUsd = parseFloat(document.getElementById('global_usd').value) || 50; const rateEur = parseFloat(document.getElementById('global_eur').value) || 54;
+                const pStr = document.getElementById('ar_p_time').value; const dStr = document.getElementById('ar_d_time').value; const mode = document.getElementById('ar_mode').value;
+                let days = 1; if (pStr && dStr) { const p = new Date(pStr), d = new Date(dStr); if (d > p) { days = Math.ceil(Math.abs(d - p) / 86400000); if (days < 1) days = 1; } }
+                let mult = (mode === "Monthly") ? ((days / 30).toFixed(1) < 1 ? 1 : parseFloat((days / 30).toFixed(1))) : days;
+                const r = conNum('ar_rateRent'), i = conNum('ar_rateIns'), fee_d = conNum('ar_fee_del'), fee_c = conNum('ar_fee_col');
+                let adds = 0; let addOnsList = [];
+                const kmSel = document.getElementById('ar_km_pkg'); const pkgKM = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
+                let kmPackageCost = conNum('ar_km_pkg_cost_manual') || (kmSel ? parseFloat(kmSel.value) : 0);
+
+                if (pkgKM === 999999) { adds += (kmPackageCost * days); addOnsList.push(`باقة كم مفتوح`); } else if (kmPackageCost > 0) { adds += kmPackageCost; addOnsList.push(`باقة كم إضافي`); }
+                if (document.getElementById('ar_add_dr').checked) { adds += (conNum('ar_rate_dr') * days); addOnsList.push(`سائق`); }
+                if (document.getElementById('ar_add_st').checked) { adds += (conNum('ar_rate_st') * days); addOnsList.push(`كرسي طفل`); }
+                let addOnsStr = addOnsList.length > 0 ? addOnsList.join(", ") : "None";
+
+                let totalRentOnly = (mode === "Monthly") ? (r * mult) + (i * days) + adds : ((r + i) * mult) + adds;
+                let totalDue = Math.round(totalRentOnly + fee_d + fee_c);
+                let totalRentPaid = Math.round(conNum('ar_pay_rent_egp') + (conNum('ar_pay_rent_usd') * rateUsd) + (conNum('ar_pay_rent_eur') * rateEur) + conNum('ar_pay_rent_card'));
+                let rentPending = totalDue - totalRentPaid;
+                let reqDep = conNum('ar_req_deposit');
+                let totalDepPaid = Math.round(conNum('ar_pay_dep_egp') + (conNum('ar_pay_dep_usd') * rateUsd) + (conNum('ar_pay_dep_eur') * rateEur) + conNum('ar_pay_dep_card'));
+                let depPending = reqDep - totalDepPaid;
+
+                document.getElementById('ar_c_days').innerText = days; document.getElementById('ar_c_rent').innerText = Math.round(totalRentOnly).toLocaleString(); document.getElementById('ar_c_fees').innerText = Math.round(fee_d + fee_c).toLocaleString(); document.getElementById('ar_c_total_preview').innerText = totalDue.toLocaleString() + " ج.م"; document.getElementById('ar_val_total_due').innerText = totalDue.toLocaleString(); document.getElementById('ar_val_total_paid').innerText = totalRentPaid.toLocaleString(); document.getElementById('ar_val_dep_req').innerText = reqDep.toLocaleString(); document.getElementById('ar_val_dep_paid').innerText = totalDepPaid.toLocaleString();
+
+                let rPenEl = document.getElementById('ar_val_rent_pending');
+                if (rentPending > 0) rPenEl.innerHTML = `<span style="color:#e74c3c">${rentPending.toLocaleString()} ج.م</span>`; else if (rentPending < 0) rPenEl.innerHTML = `<span style="color:#2ecc71">+${Math.abs(rentPending).toLocaleString()} ج.م</span>`; else rPenEl.innerHTML = `<span style="color:white">0 (تم الدفع)</span>`;
+
+                let dPenEl = document.getElementById('ar_val_dep_pending');
+                if (depPending > 0) dPenEl.innerHTML = `<span style="color:#e74c3c">${depPending.toLocaleString()} ج.م</span>`; else if (depPending < 0) dPenEl.innerHTML = `<span style="color:#2ecc71">+${Math.abs(depPending).toLocaleString()} ج.م</span>`; else dPenEl.innerHTML = `<span style="color:white">0</span>`;
+
+                return { days, mult, r, i, adds, fee_d, fee_c, totalDue, mode, totalRentPaid, rentPending, depPending, reqDep, addOnsStr, totalRentOnly, kmPackageCost, rateUsd, rateEur };
+            } catch(e) { console.error(e); }
+        }
+
+        function executeARContract() {
+            const c = runARContractCalc(); if (!c || c.days === 0) return alert("Please select dates first.");
+            const val_branch = document.getElementById('ar_branch').value || "HRG"; let now = new Date(); let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0'); let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            const cid = `BR-${val_branch}-${dStr}-${tStr}`; const today = now.toLocaleDateString('ar-EG');
+            const formatDT = (dtString) => { if(!dtString) return ""; const d = new Date(dtString); if(isNaN(d)) return dtString; return `${d.toLocaleDateString('ar-EG')} ${d.toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}`; };
+
+            const buildPayStr = (pfx) => { let egp = conNum(pfx + '_egp'), u = conNum(pfx + '_usd'), e = conNum(pfx + '_eur'), card = conNum(pfx + '_card'); let total = egp + (u * c.rateUsd) + (e * c.rateEur) + card; let parts = []; if (egp > 0) parts.push(egp + " كاش (ج.م)"); if (u > 0) parts.push(u + " دولار (سعر: " + c.rateUsd + ")"); if (e > 0) parts.push(e + " يورو (سعر: " + c.rateEur + ")"); if (card > 0) parts.push(card + " بطاقة (ج.م)"); let detail = parts.length > 0 ? `(${parts.join(' + ')})` : ""; return { total: total, text: `<strong>${Math.round(total).toLocaleString('ar-EG')} ج.م</strong> <span style="font-size:8.5pt; font-weight:normal;">${detail}</span>`, breakdownDetails: detail }; };
+
+            let rentInfo = buildPayStr('ar_pay_rent'); let depInfo = buildPayStr('ar_pay_dep');
+            let totalDepPaid = conNum('ar_pay_dep_egp') + (conNum('ar_pay_dep_usd') * c.rateUsd) + (conNum('ar_pay_dep_eur') * c.rateEur) + conNum('ar_pay_dep_card');
+
+            let rateTxt = c.mode === 'Monthly' ? `${c.r} x ${c.mult} شهر` : `${c.r} x ${c.days} يوم`; let base = c.mode === 'Monthly' ? (c.r * c.mult) : (c.r * c.days);
+            let pText = conVal('ar_p_loc') + (conVal('ar_p_addr') ? " (" + conVal('ar_p_addr') + ")" : ""); let dText = conVal('ar_d_loc') + (conVal('ar_d_addr') ? " (" + conVal('ar_d_addr') + ")" : "");
+
+            const insKey = conVal('ar_insPack') || "Basic";
+            const insClass = insKey === 'Full Protection' ? 'ins-full' : (insKey === 'Intermediate' ? 'ins-inter' : (insKey === 'No Insurance' ? 'ins-none' : 'ins-basic'));
+            const simpleInsTextAr = { "No Insurance": "بدون تأمين: مسؤولية العميل 100% عن جميع الأضرار والحوادث.", "Basic": "تأمين أساسي: مسؤولية العميل 100% عن الأضرار.", "Intermediate": "تأمين متوسط: مسؤولية العميل 70% / تغطية الشركة 30%.", "Full Protection": "حماية كاملة: إعفاء كامل من مبلغ التحمل (تطبق الحدود القصوى)." };
+            const insNamesAr = { "No Insurance": "بدون تأمين", "Basic": "تأمين أساسي", "Intermediate": "تأمين متوسط", "Full Protection": "حماية كاملة" };
+            const insContentAr = { "No Insurance": `<strong>بدون تأمين.</strong> المستأجر مسؤول مسؤولية كاملة (100%) عن جميع الأضرار، الحوادث، والسرقة.`, "Basic": `<strong>مسؤولية عالية.</strong> تدفع 100% عن أضرار الزجاج والإطارات والهيكل السفلي.`, "Intermediate": `<strong>مسؤولية مخفضة.</strong> يدفع العميل 70% من تكاليف الإصلاح. تدفع الشركة 30%.`, "Full Protection": `<strong>إعفاء كامل من مبلغ التحمل (Waiver).</strong> يقلل المسؤولية إلى الصفر للأصناف المغطاة.` };
+            
+            const extHtml = conVal('ar_type') === 'Extension' ? `<div style="font-size:10pt; font-weight:bold; margin-top:3px;">(تمديد للعقد رقم ${conVal('ar_prev')})</div>` : '';
+            const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png"; const carSrc = "https://brothersegy.com/wp-content/uploads/2026/02/car-template.png";
+            const kmSel = document.getElementById('ar_km_pkg'); const pkgKMValue = kmSel && kmSel.selectedIndex >= 0 ? parseInt(kmSel.options[kmSel.selectedIndex].getAttribute('data-km')) : 0;
+            const kmAllowedTotal = pkgKMValue >= 999999 ? "مفتوح" : (120 * c.days + pkgKMValue).toLocaleString('ar-EG') + " كم إجمالي";
+            
+            const branchNamesAr = { "HRG": "الغردقة", "ALX": "الإسكندرية", "CAI": "القاهرة", "RSD": "رشيد" }; const currentBranchName = branchNamesAr[val_branch] || "الغردقة";
+
+            let html = `
+            <div class="a4-page" dir="rtl" style="text-align:right;">
+                <div class="watermark"><img src="${logoSrc}"></div>
+                <div class="page-content">
+                    <div class="doc-head"><img src="${logoSrc}" class="logo"><div style="text-align:center"><h1 style="margin:0; font-size:18pt; color:#04509D">عقد تأجير سيارة (رسمي)</h1><div style="font-weight:bold; font-size:12pt;">${cid}</div>${extHtml}</div><div class="hq-info" style="text-align:left;"><strong>إدارة بروذر إيجي Brothers EGY</strong><br>بطاقة ضريبية: 589-464-418<br>سجل تجاري: 10770<br>الفرع: ${currentBranchName}</div></div>
+                    <div style="font-size:9pt; margin-bottom:10px; text-align:right; font-weight:bold; border-bottom:1px solid #000; padding-bottom:5px;">إنه في يوم: ${now.toLocaleDateString('ar-EG', { weekday: 'long' })} | الموافق: ${today} <br>تم تحرير هذا العقد بين كل من:</div>
+                    <div class="box-section" style="margin-bottom:5px;"><span class="bs-title" style="left:-1px; right:auto;">الأطراف</span><div style="font-size:8.5pt; line-height:1.4;"><strong>أولاً (المؤجر):</strong> شركة الأخوة المتحدون (أي جي) بصفتها وكيلاً عن المالك بإدارة السيارة. <br><strong>ثانياً (المستأجر):</strong> السيد/ <b>${conVal('ar_fname')} ${conVal('ar_sname')}</b> <br>جواز سفر / رقم بطاقة الرقم القومى: ${conVal('ar_pass')} | الصادرة من: ${conVal('ar_nation')} | هاتف: ${conVal('ar_ph_code')} ${conVal('ar_phone')} <br>الكائن بالعنوان: ${conVal('ar_addr')} | بريد إلكتروني: ${conVal('ar_email')} <br>رخصة قيادة رقم: ${conVal('ar_lic')}</div></div>
+                    <div style="font-size:8pt; margin:5px 0; text-align:center; background:#eee; padding:3px; border-radius:3px;">بعد أن أقر الطرفان بأهليتهما للتصرف والتعاقد قانونياً، اتفقا على ما يلي:</div>
+                    <div class="box-section"><span class="bs-title" style="left:-1px; right:auto;">البند الثاني: بيانات السيارة موضوع التعاقد</span><table class="pt" style="font-size:8pt;"><tr><th>نوع السيارة</th><td>${conVal('ar_manModel')}</td><th>الموديل</th><td>${conVal('ar_year')}</td><th>اللوحة</th><td dir="ltr" style="text-align:right;"><b>${conVal('ar_plate')}</b></td></tr><tr><th>موتور رقم</th><td>${conVal('ar_motor')}</td><th>شاسيه رقم</th><td>${conVal('ar_vin')}</td><th>العداد</th><td>${conVal('ar_kmOut')}</td></tr></table></div>
+                    <div class="box-section"><span class="bs-title" style="left:-1px; right:auto;">البند الثالث والخامس: الفترة والمسافة</span><table class="pt" style="font-size:8pt;"><tr><th>تاريخ الاستلام</th><td>${formatDT(conVal('ar_p_time'))}</td><th>تاريخ التسليم</th><td>${formatDT(conVal('ar_d_time'))}</td><th>المدة</th><td>${c.days} يوم</td></tr><tr><th>مكان الاستلام</th><td>${pText}</td><th>مكان التسليم</th><td>${dText}</td><th>المسموح</th><td><strong>${kmAllowedTotal}</strong></td></tr></table></div>
+                    <div class="box-section"><span class="bs-title" style="left:-1px; right:auto;">البند الرابع: البيان المالي</span><table class="pt" style="font-size:8pt;"><tr><th>وصف البند</th><th>السعر / الاحتساب</th><th style="text-align:left">المبلغ (ج.م)</th></tr><tr><td>القيمة الإيجارية للمدة</td><td>${rateTxt}</td><td align="left">${Math.round(base).toLocaleString('ar-EG')}</td></tr>${c.kmPackageCost > 0 ? `<tr><td>باقة الكيلومترات</td><td>رسوم الباقة</td><td align="left">${c.kmPackageCost.toLocaleString('ar-EG')}</td></tr>` : ''}${c.i > 0 ? `<tr><td>رسوم التأمين المختارة</td><td>${c.i} x ${c.days} يوم</td><td align="left">${(c.i * c.days).toLocaleString('ar-EG')}</td></tr>` : ''}${c.fee_d + c.fee_c > 0 ? `<tr><td>رسوم التوصيل/الاستلام</td><td>خدمات لوجستية</td><td align="left">${(c.fee_d + c.fee_c).toLocaleString('ar-EG')}</td></tr>` : ''}<tr style="font-weight:bold; border-top:2px solid #000; background:#eee;"><td colspan="2" align="left">إجمالي قيمة العقد:</td><td align="left">${Math.round(c.totalDue).toLocaleString('ar-EG')} ج.م</td></tr></table><div class="${insClass}" style="border:1px solid #000; padding:5px; text-align:center; font-size:8.5pt; margin-top:2px; border-radius:4px;">${simpleInsTextAr[insKey]}</div><div style="background:#eee; padding:5px; text-align:center; font-size:8.5pt;">مدفوع الآن: ${rentInfo.text} <br> <span style="color:${c.rentPending > 0 ? '#c0392b' : '#27ae60'}; font-weight:bold;">المتبقي: ${Math.round(c.rentPending).toLocaleString('ar-EG')} ج.م</span></div></div>
+                    ${(c.reqDep > 0 || totalDepPaid > 0) ? `<div style="border:2px solid orange; padding:5px; margin-bottom:5px; font-size:8.5pt;"><strong>التأمين المحتجز:</strong> ${depInfo.text} <span style="float:left; font-weight:bold; color:${c.depPending > 0 ? '#c0392b' : '#27ae60'}">${c.depPending > 0 ? Math.round(c.depPending).toLocaleString('ar-EG') + ' متبقي' : 'محتجز بالكامل'}</span></div>` : ''}
+                    <div style="margin-top:auto; border-top:2px solid #000; padding-top:10px; margin-bottom: 20px;"><div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;"><div style="width:40%;">توقيع المؤجر<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">التاريخ: ........................</div></div><div style="width:40%;">توقيع المستأجر<br><br><br>____________________<div style="font-size:9pt; margin-top:5px;">التاريخ: ........................</div></div></div></div>
+                </div>
+            </div>`;
+
+            html += `<div class="a4-page" dir="rtl" style="text-align:right;"><div class="watermark"><img src="${logoSrc}"></div><div class="page-content"><div class="doc-head"><strong>البنود العامة للشروط والأحكام</strong><span>صفحة 2/4</span></div><div class="terms-grid"><div class="term-p"><span class="term-h">1. التمهيد والأطراف</span>الطرف الأول بصفته وكيلاً عن المالك بإدارة السيارة بالتوكيل الرسمي المذكور ببيانات العقد، ورغبة من الطرف الثاني في استلام السيارة لاستخدامها لشخصه فقط.<br>التمهيد السابق جزء لا يتجزأ من هذا العقد ومكملاً لجميع بنوده.</div><div class="term-p"><span class="term-h">2. بيانات التعاقد</span>المعلومات المذكورة بالصفحة الأولى (المركبة، الفترة، المبالغ) جزء لا يتجزأ من شروط العقد.</div><div class="term-p"><span class="term-h">3. حالة السيارة</span>أقر الطرف الثاني بأنه تسلم السيارة وهي بحالة جيدة مستوفاة لجميع الاشتراطات اللازمة للتسيير وكذا شروط الصلاحية الفنية والمرورية وأصبح مسئولا عنها مسئولية قانونية منذ توقيعه علي هذا العقد.</div><div class="term-p"><span class="term-h">4. المخالفات والحوادث</span>أقر الطرف الثاني بأنه ملتزم بدفع كافة المخالفات المرورية وغيرها طوال فترة الإعارة وكذا تكلفة أي حادث ((لا قدر الله)) والقيمة الإيجارية لفترة الأصلاح.</div><div class="term-p" style="border:2px solid #e67e22; padding:5px; background:#fff8e1; break-inside:avoid;"><span class="term-h" style="color:#e67e22; border-bottom-color:#e67e22;">11. باقة التأمين المختارة: ${insNamesAr[insKey]}</span><div style="font-weight:normal; font-size:7.5pt; margin-top:5px; line-height:1.3;">${insContentAr[insKey]}</div></div><div class="term-p"><span class="term-h">6. الأنظمة والقوانين</span>أقر الطرف الثاني بأنه علي علم كامل بقوانين المرور والأمن العام ويتعهد بتنفيذها بكل دقة وكذا بالتعديلات الواردة بقانون المرور رقم 66 لسنة 1973 وتعديلاته.</div><div class="term-p"><span class="term-h">10. الحوادث والإصلاح</span>في حالة وقوع حادث، يجب إعلام الطرف الأول فوراً، ولا يحق للمستأجر إصلاح السيارة إلا في المراكز التي يحددها المؤجر، وإلا تحمل كامل التكاليف والغرامات.</div><div class="term-p"><span class="term-h">12. محظورات الاستخدام</span>يمنع استخدام السيارة في: السباقات، نقل الركاب بالأجر، الطرق غير الممهدة، أو تحت تأثير الكحول، أو أي أعمال مخالفة للقانون.</div><div class="term-p"><span class="term-h">14. فض المنازعات</span>تختص محكمة ${currentBranchName} بالنظر في أي نزاع ينشأ حول بنود هذا العقد لا قدر الله.</div></div><div style="margin-top:auto; padding:5px; border-top:1px solid #000; font-weight:bold; text-align:center;"><strong>أقر أنا المستأجر بأنني قرأت وفهمت جميع الشروط والأحكام المذكورة أعلاه وأوافق عليها.</strong> <br><div style="display:flex; justify-content:space-between; margin-top:10px; font-size:9pt;"><div style="width:45%;">توقيع المستأجر<br><br>____________________</div><div style="width:45%;">توقيع الموظف<br><br>____________________</div></div></div></div></div>`;
+
+            const chkRow = (lbl) => `<div class="v-insp-row"><span class="v-label">${lbl}</span><div class="v-check-group"><div class="v-check-box v-green"></div><div class="v-check-box v-red"></div></div></div>`;
+            const checklistGroups = `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; direction:ltr;"><div style="width:48%;"><div class="insp-group-head">PASSENGER</div>${chkRow('(D) FEND F')}${chkRow('(L) DOOR F')}${chkRow('(K) DOOR R')}${chkRow('(J) FEND R')}</div><div style="width:48%;"><div class="insp-group-head">FRONT</div>${chkRow('(E) BUMPER')}${chkRow('(F) HOOD')}${chkRow('(W) WINDSH')}</div><div style="width:48%;"><div class="insp-group-head">REAR</div>${chkRow('(Q) TRUNK')}${chkRow('(H) BUMPER')}${chkRow('(I) LIGHTS')}</div><div style="width:48%;"><div class="insp-group-head">DRIVER</div>${chkRow('(M) FEND F')}${chkRow('(C) DOOR F')}${chkRow('(B) DOOR R')}${chkRow('(A) FEND R')}</div></div>`;
+
+            let pickupHtmlClean = `<div class="insp-left-col"><div class="insp-section-head">بيان الاستلام (بدء الإيجار)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr style="background:#eee;"><th width="45%">وقت وتاريخ الاستلام</th><td align="center">${safeVal('ar_p_time').replace('T', ' ')}</td></tr><tr style="background:#eee;"><th>عداد الخروج</th><td align="center">${conVal('ar_kmOut')}</td></tr><tr style="background:#eee;"><th>مستوى الوقود</th><td align="center">${conVal('ar_fuelOut')}</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">الأضرار الموجودة:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>الإطار:</strong> _________________</div></div>${checklistGroups}<div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;"><div style="font-size:7pt; font-weight:bold;">ملاحظات / إضافات:</div><div style="font-size:7pt;">إطار احتياطي [ ] كوريك [ ] طفاية حريق [ ] مثلث [ ]</div></div></div>`;
+            const returnHtml = `<div class="insp-right-col" style="border-right:1px dashed #000; border-left:none; padding-right:10px; padding-left:0;"><div class="insp-section-head">بيان العودة (نهاية الإيجار)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr style="background:#eee;"><th width="45%">وقت وتاريخ العودة</th><td>____________________</td></tr><tr style="background:#eee;"><th>عداد العودة (${kmAllowedTotal} كم)</th><td>____________________</td></tr><tr style="background:#eee;"><th>مستوى الوقود</th><td style="font-size:6.5pt; padding:2px 1px;">[ ] ممتلئ [ ] 3/4 [ ] 1/2 [ ] 1/4 [ ] فارغ</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">علّم الأضرار الجديدة:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>الإطار:</strong> _________________</div></div>${checklistGroups}<div class="box-section" style="margin-top:2px; margin-bottom:2px; padding:2px;"><span class="bs-title" style="left:-1px; right:auto; font-size:7pt;">التسوية النهائية</span><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr><th width="40%">وصف البند</th><th width="35%">السعر × الكمية</th><th width="25%">المبلغ</th></tr><tr style="background:#fff3e0;"><td colspan="2" align="left">وقت العودة الفعلية:</td><td align="left">_______</td></tr><tr><td>كم زائد</td><td align="center">___ x ___</td><td align="left">____</td></tr><tr><td>تأخير</td><td align="center">___ x ___</td><td align="left">____</td></tr><tr><td>أضرار/مخالفات</td><td align="center">-</td><td align="left">____</td></tr><tr style="font-weight:bold; background:#eee;"><td colspan="2" align="left">إجمالي المطلوب:</td><td align="left">____ ج.م</td></tr></table></div></div>`;
+
+            html += `<div class="a4-page" dir="rtl" style="text-align:right;"><div class="watermark"><img src="${logoSrc}"></div><div class="page-content"><div class="doc-head"><strong>المقر بما فيه (تقارير الفحص)</strong><span>صفحة 3/4</span></div><div style="margin: 0 0 5px 0; padding: 5px; border: 1.5px solid #000; background: #fff; line-height: 1.35; font-size: 8.5pt;">اقر انا : <b>${conVal('ar_fname')} ${conVal('ar_sname')}</b> &nbsp;&nbsp;&nbsp; بطاقة رقم : <b>${conVal('ar_pass')}</b> <br>بأنني استأجرت السيارة وأنها على مسؤوليتي الشخصية ، وأنا مسؤول مسؤولية كاملة عن السيارة ابتداءً من تاريخ وساعة استلامها.</div><div class="insp-two-col" style="flex-direction:row-reverse;">${returnHtml}${pickupHtmlClean}</div><div style="margin-top:5px; font-size:8pt; border-top:1px solid #000; padding-top:5px;"><div style="font-weight:bold; margin-bottom:5px; color:#e67e22; font-size:7.5pt;">هام: إذا لم يتم إغلاق/توقيع تقرير العودة، يحتفظ المستأجر بالمسؤولية الكاملة.</div><div style="display:flex; justify-content:space-between; align-items:flex-end;"><div style="width:50%; background:#f9f9f9; padding:5px; border:1px solid #000; border-radius:3px; font-size:9pt; line-height:1.4;"><strong>المقر بما فيه (المستأجر)</strong><br>الاسم: ${conVal('ar_fname')} ${conVal('ar_sname')} <br>التوقيع: ____________________</div><div style="width:45%; text-align:center; font-size:9pt;"><strong>العودة: الموظف</strong><br><br>____________________</div></div></div></div></div>`;
+
+            document.getElementById('arContractOutput').innerHTML = html; document.getElementById('arContractOutput').style.display = "flex"; document.getElementById('btnARPrint').style.display = "block";
+            setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('arContractOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
+        }
+
+        // ================= BLOCK 4: NATIVE RECEIPT ENGINE =================
+        function prepReceipt() {
+            populateClientList(); document.getElementById('rc_date').valueAsDate = new Date();
+            const sel = document.getElementById('rc_carSelect'); sel.innerHTML = '<option value="">-- Custom Manual Input --</option>';
+            APP_DATA.cars.forEach(c => {
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                let pNum = getSafeVal(c, ['رقم اللوحة', 'Plate', 'plate']);
+                let opt = document.createElement('option'); opt.value = c.id; opt.text = `[#${c.id}] ${carName} - ${pNum}`; sel.add(opt);
+            });
+        }
+
+        function rcLoadCar() {
+            const id = document.getElementById('rc_carSelect').value; const c = APP_DATA.cars.find(x => String(x.id) === String(id));
+            if (c) { 
+                let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']);
+                let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
+                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" ");
+                let carName = `${getSafeVal(c, ['النوع', 'Type', 'الماركة'])} ${getSafeVal(c, ['الطراز', 'Model'])}`.trim();
+                document.getElementById('rc_car_text').value = `${carName} (${getSafeVal(c, ['سنة الصنع', 'Year'])}) | Plate: ${lets} | ${nums}`; 
+            }
+        }
+
+        function autoFillRcClient() {
+            const searchVal = document.getElementById('rc_crm_search').value; const list = document.getElementById('client-list'); let selectedId = null;
+            for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } }
+            if(!selectedId) return; const c = APP_DATA.customers.find(x => x.id === selectedId);
+            if(c) { document.getElementById('rc_name').value = `${c['الاسم الأول'] || ''} ${c['الاسم الأخير'] || ''}`.trim(); document.getElementById('rc_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || ''; document.getElementById('rc_phone').value = `${c['رقم التليفون'] || ''}`; }
+        }
+
+        function calcReceipt() {
+            const usd = parseFloat(document.getElementById('global_usd').value) || 50; const eur = parseFloat(document.getElementById('global_eur').value) || 54;
+            let egp = parseFloat(document.getElementById('rc_pay_egp').value)||0, u = parseFloat(document.getElementById('rc_pay_usd').value)||0, e = parseFloat(document.getElementById('rc_pay_eur').value)||0, card = parseFloat(document.getElementById('rc_pay_card').value)||0;
+            let total = egp + (u * usd) + (e * eur) + card;
+            document.getElementById('rc_display_total').innerText = Math.round(total).toLocaleString() + " EGP"; return total;
+        }
+
+        function executeReceiptPreview() {
+            const totalAmt = calcReceipt(); const usd = parseFloat(document.getElementById('global_usd').value) || 50; const eur = parseFloat(document.getElementById('global_eur').value) || 54;
+            let egp = parseFloat(document.getElementById('rc_pay_egp').value)||0, u = parseFloat(document.getElementById('rc_pay_usd').value)||0, e = parseFloat(document.getElementById('rc_pay_eur').value)||0, card = parseFloat(document.getElementById('rc_pay_card').value)||0;
+            let parts = []; if (egp > 0) parts.push(egp + " Cash (EGP)"); if (u > 0) parts.push(u + " USD (Rate: " + usd + ")"); if (e > 0) parts.push(e + " EUR (Rate: " + eur + ")"); if (card > 0) parts.push(card + " Card (EGP)");
+            let detailStr = parts.length > 0 ? `(${parts.join(' + ')})` : "";
+
+            const recTitle = document.getElementById('rc_title').value || "RENTAL PAYMENT"; const isDeposit = recTitle.toUpperCase().includes("DEPOSIT"); const autoSign = document.getElementById('rc_auto_sign').checked; const pendingAmt = parseFloat(document.getElementById('rc_pending_amt').value)||0;
+            const rDateInput = document.getElementById('rc_date').value; const recDateStr = rDateInput ? new Date(rDateInput).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
+            let pStart = document.getElementById('rc_p_start').value; let pEnd = document.getElementById('rc_p_end').value; if(pStart) pStart = new Date(pStart).toLocaleDateString('en-GB'); if(pEnd) pEnd = new Date(pEnd).toLocaleDateString('en-GB');
+            const periodStr = (pStart && pEnd) ? `${pStart} to ${pEnd}` : "-"; const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png";
+
+            const singleRecHtml = (copyType) => `<div class="receipt-half"><div class="rec-header"><table style="width:100%; border-collapse:collapse;"><tr><td width="20%" align="right"><img src="${logoSrc}" style="height:45px; object-fit:contain;"></td><td width="60%" align="center"><div class="rec-title">OFFICIAL RECEIPT</div><div style="font-size:9pt;">${copyType}</div></td><td width="20%" align="left"><img src="https://api.qrserver.com/v1/create-qr-code/?data=https://brothersegy.com&size=80x80" style="height:45px;"></td></tr></table><div style="text-align:left; font-size:9pt; margin-top:5px;">DATE: ${recDateStr}</div><div style="text-align:left; font-weight:bold;">${recTitle}</div></div><div class="rec-body-grid"><div class="rec-col"><div class="rec-row"><span class="rec-label">RECEIVED FROM</span><span class="rec-val">${document.getElementById('rc_name').value || '-'}</span></div><div class="rec-row"><span class="rec-label">PASSPORT / ID</span><span class="rec-val">${document.getElementById('rc_pass').value || '-'}</span></div><div class="rec-row"><span class="rec-label">PHONE</span><span class="rec-val">${document.getElementById('rc_phone').value || '-'}</span></div></div><div class="rec-col"><div class="rec-row"><span class="rec-label">CONTRACT NO</span><span class="rec-val">${document.getElementById('rc_con_no').value || '-'}</span></div><div class="rec-row"><span class="rec-label">VEHICLE</span><span class="rec-val" dir="ltr" style="text-align:right;">${document.getElementById('rc_car_text').value || '-'}</span></div>${isDeposit ? '' : `<div class="rec-row"><span class="rec-label">PERIOD</span><span class="rec-val" style="font-size:8pt;">${periodStr}</span></div>`}</div></div><div class="rec-amount-box"><div class="rec-amount-row"><span class="rec-amount-lbl">AMOUNT RECEIVED</span><span class="rec-amount-val">${Math.round(totalAmt).toLocaleString()} EGP</span></div><div class="rec-amount-row" style="margin-bottom:0;"><span class="rec-amount-lbl" style="font-size:8pt;">PAYMENT DETAILS</span><span class="rec-val" style="font-size:8pt; font-weight:normal;">${detailStr || "-"}</span></div></div><div style="font-size:7pt; color:#666; margin-top:5px;">${isDeposit ? "<strong style='color:#c0392b;'>* Fully refundable if returned in same condition. Deductions apply for damages/fines.</strong><br>" : "<strong>Breakdown:</strong> Base Tariff + Added Services (Insurance, Delivery, Logistics).<br>"}${!isDeposit && pendingAmt > 0 ? `<span style="color:#c0392b; font-weight:bold;">⚠ OUTSTANDING BALANCE: ${Math.round(pendingAmt).toLocaleString()} EGP</span>` : ''}</div><div class="rec-footer" style="padding-top:10px;"><div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;"><div style="width:40%; text-align:center; font-weight:bold; font-size:9pt;">CLIENT SIGNATURE<br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div><div class="rec-sig-line">${autoSign ? `<div style="position:absolute; top:-28px; left:0; right:0; text-align:center; font-family:'Brush Script MT', cursive; font-size:26px; color:#04509D; transform:rotate(-3deg); pointer-events:none;">Brothers EGY</div>` : ''}AUTHORIZED SIGNATURE<div style="font-size:8pt; margin-top:2px;">Date: ${recDateStr}</div></div></div></div></div>`;
+
+            let html = `<div class="a4-page"><div class="page-content">${singleRecHtml('CLIENT COPY')}<div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>${singleRecHtml('COMPANY COPY')}</div></div>`;
+            document.getElementById('receiptOutput').innerHTML = html; document.getElementById('receiptOutput').style.display = "flex"; document.getElementById('btnRcPrint').style.display = "block";
+            setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('receiptOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
+        }
     </script>
 </body>
-</html>    
+</html>
