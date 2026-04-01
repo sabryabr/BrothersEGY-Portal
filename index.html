@@ -427,10 +427,16 @@
 
         function applyPermissions(accessArray) {
             const map = {1:'.access-quote', 2:'.access-en', 3:'.access-ar', 4:'.access-rec'};
-            Object.keys(map).forEach(key => { if(accessArray.includes(parseInt(key))) document.querySelectorAll(map[key]).forEach(el => el.style.display = 'block'); });
-            if(accessArray.includes(7)) document.getElementById('nav-fin').style.display = 'flex';
+            Object.keys(map).forEach(key => { if(accessArray && accessArray.includes(parseInt(key))) document.querySelectorAll(map[key]).forEach(el => el.style.display = 'block'); });
+            if(accessArray && accessArray.includes(7)) document.getElementById('nav-fin').style.display = 'flex';
+            
+            // SHOW ADMIN AUDIT LOG
+            if (APP_DATA.user && APP_DATA.user.role === 'Admin') {
+                if (document.getElementById('nav-admin-header')) document.getElementById('nav-admin-header').style.display = 'block';
+                if (document.getElementById('nav-audit')) document.getElementById('nav-audit').style.display = 'flex';
+            }
         }
-
+    
         async function fetchLiveRates() {
             try {
                 const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD'); const d = await r.json();
@@ -887,7 +893,6 @@
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase(); 
-                // FIX: "Active Fleet" now includes Valid, Maintenance, and Accident. Only ignores "Finished".
                 const isActiveFleet = ['valid', 'active', 'ساري', 'maintenance', 'accident'].some(s => contractStr.includes(s));
                 if(filter === 'active' && !isActiveFleet) return;
                 
@@ -896,26 +901,41 @@
                 let carName = getCarName(c, 'ar'); let cYear = getSafeVal(c, ['سنة الصنع', 'Year']); let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
                 const carHTML = `<div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')"><span>${carName} (${cYear}) ${fullPlate} [${c.id}]</span><div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div></div>`;
 
-                let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id)); carBookings.sort((a,b) => new Date(a['بداية التعاقد']).getTime() - new Date(b['بداية التعاقد']).getTime());
-                let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)"; let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
-                let currentActiveBooking = null, nextFutureBooking = null;
-
-                for (let b of carBookings) {
-                    const start = new Date(b['بداية التعاقد']).getTime(); const end = new Date(b['نهاية التعاقد']).getTime();
+                let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id)); 
+                
+                // Identify the active booking
+                let activeBookings = carBookings.filter(b => {
                     let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
-                    if (nowMs >= start && nowMs <= end && !isClosed) { currentActiveBooking = b; break; }
-                    if (nowMs > end && !isClosed) { currentActiveBooking = b; break; } // OVERDUE CATCH
-                    if (start > nowMs && !nextFutureBooking && !isClosed) { nextFutureBooking = b; }
+                    // AUTO-CLOSE IF FULLY PAID AND EXPIRED
+                    let paid = parseCurrency(b['المدفوع EGP']); let total = parseCurrency(b['إجمالي المستحق (Total)']); let endMs = new Date(b['نهاية التعاقد']).getTime();
+                    if (paid >= total && total > 0 && nowMs > endMs) isClosed = true;
+                    return !isClosed;
+                });
+                
+                activeBookings.sort((a,b) => new Date(b['بداية التعاقد']).getTime() - new Date(a['بداية التعاقد']).getTime());
+                let currentActiveBooking = null, nextFutureBooking = null;
+                if (activeBookings.length > 0) {
+                    currentActiveBooking = activeBookings[0];
+                    if (new Date(currentActiveBooking['بداية التعاقد']).getTime() > nowMs) { nextFutureBooking = currentActiveBooking; currentActiveBooking = null; }
                 }
 
+                let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)"; let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
+
+                // Check Car DB Level Status First
+                if (contractStr.includes('accident')) { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; assignmentText = '<span style="color:#c0392b; font-weight:bold;">Out of Service (Accident)</span>'; } 
+                else if (contractStr.includes('maintenance') || contractStr.includes('صيانة')) { masterStatusClass = "status-maint"; masterStatusText = "صيانة (MAINT)"; assignmentText = '<span style="color:#2d3436; font-weight:bold;">In Garage (Maintenance)</span>'; }
+
+                // Override with Booking Status
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
-                    let isAccident = String(currentActiveBooking['حالة الطلب'] || '').toLowerCase().includes('accident') || contractStr.includes('accident');
+                    let isAccidentOrder = String(currentActiveBooking['حالة الطلب'] || '').toLowerCase().includes('accident');
                     
-                    if (isAccident) { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
-                    else if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
-                    else if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
-                    else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
+                    if (isAccidentOrder || masterStatusClass === "status-accident") { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
+                    else if (masterStatusClass !== "status-maint") {
+                        if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
+                        else if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
+                        else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
+                    }
                     assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']).getTime(); const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
@@ -924,48 +944,51 @@
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
                     assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${nextFutureBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
-                } else { counts.ready++; }
+                } else if (masterStatusClass === "status-ready") { counts.ready++; }
 
                 let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left: 33.33%;"></div>`;
                 let occupiedLevels = [];
 
                 for (let b of carBookings) {
                     let bStart = new Date(b['بداية التعاقد']).getTime(); let bEnd = new Date(b['نهاية التعاقد']).getTime();
+                    let paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']);
+                    
                     let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
+                    if (paid >= staticTotal && staticTotal > 0 && nowMs > bEnd) isClosed = true; // Auto-close visually
+                    
                     let isAccident = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
                     
                     if (bEnd > T_START && bStart < T_END) {
                         let renderStart = Math.max(bStart, T_START); 
                         let actualEnd = bEnd;
 
-                        // FIX OVERLAP: If it's overdue, only stretch it until the NEXT booking starts!
                         if (!isClosed && nowMs > bEnd) {
-                            let nextStart = nowMs + 86400000; // default to stretching to today
-                            for (let other of carBookings) {
-                                let oStart = new Date(other['بداية التعاقد']).getTime();
-                                if (oStart > bStart && oStart < nextStart) { nextStart = oStart; }
-                            }
+                            let nextStart = nowMs + 86400000; 
+                            for (let other of carBookings) { let oStart = new Date(other['بداية التعاقد']).getTime(); if (oStart > bStart && oStart < nextStart) { nextStart = oStart; } }
                             actualEnd = Math.min(nowMs + 86400000, nextStart);
                         }
 
                         let renderEnd = Math.min(actualEnd, T_END);
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100; let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
-                        const paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']); 
-                        
-                        // FIX 0 EGP PENALTY: Calculate daily rent if missing
                         let estDays = Math.max(1, Math.ceil((bEnd - bStart)/86400000));
-                        const dailyRent = parseCurrency(b['الايجار اليومى']) || (staticTotal / estDays);
+                        let dailyRent = parseCurrency(b['الايجار اليومى']);
+                        if (!dailyRent || dailyRent <= 0) dailyRent = staticTotal / estDays;
                         
-                        let dynamicTotal = staticTotal; let latePenaltyStr = "";
+                        let dynamicTotal = staticTotal; let latePenaltyStr = ""; let overdueHtml = "";
                         
-                        // ONGOING DEBT CALCULATION
                         if (!isClosed && actualEnd > bEnd) {
                             let lateDays = Math.floor((actualEnd - bEnd) / 86400000);
                             if (lateDays > 0) {
                                 let latePenalty = lateDays * dailyRent;
                                 dynamicTotal += latePenalty;
                                 latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Late Penalty (${lateDays} Days):</span> <b style="font-size:12px;">${Math.round(latePenalty).toLocaleString()} EGP</b></div>`;
+                                
+                                // VISUAL OVERDUE STRIPING
+                                if (renderEnd > bEnd) {
+                                    let overdueWidthPct = ((renderEnd - Math.max(bEnd, renderStart)) / (renderEnd - renderStart)) * 100;
+                                    overdueHtml = `<div style="position:absolute; right:0; top:0; bottom:0; width:${overdueWidthPct}%; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.6), rgba(0,0,0,0.6) 8px, transparent 8px, transparent 16px); border-left: 2px solid rgba(0,0,0,0.8); border-radius:0 4px 4px 0;"></div>`;
+                                }
                             }
                         }
                         
@@ -1005,7 +1028,7 @@
                                 <div style="margin-top:8px; font-size:9px; color:#666; text-align:center;">Click bar to edit order</div>
                             </div>`;
 
-                        timelineHTML += `<div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" data-tooltip-id="${ttId}" onclick="openQuickModal('order', '${b.id}')"></div>`;
+                        timelineHTML += `<div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" data-tooltip-id="${ttId}" onclick="openQuickModal('order', '${b.id}')">${overdueHtml}</div>`;
                     }
                 }
                 timelineHTML += `</div></div>`;
