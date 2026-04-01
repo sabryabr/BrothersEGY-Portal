@@ -471,12 +471,15 @@
         
         function getCarColorHex(colorStr) {
             const str = String(colorStr || "").toLowerCase().trim();
-            if (str.includes("red") || str.includes("احمر")) return "#e74c3c";
-            if (str.includes("blue") || str.includes("ازرق") || str.includes("كحلي")) return "#02006c";
-            if (str.includes("black") || str.includes("اسود")) return "#2c3e50";
+            if (str.includes("red") || str.includes("احمر") || str.includes("أحمر")) return "#e74c3c";
+            if (str.includes("blue") || str.includes("ازرق") || str.includes("أزرق") || str.includes("كحلي")) return "#02006c";
+            if (str.includes("black") || str.includes("اسود") || str.includes("أسود")) return "#2c3e50";
             if (str.includes("silver") || str.includes("فضي")) return "#bdc3c7";
-            if (str.includes("white") || str.includes("ابيض")) return "#ffffff";
-            if (str.includes("grey") || str.includes("رمادي")) return "#7f8c8d";
+            if (str.includes("light blue") || str.includes("سماوي")) return "#20a7db";
+            if (str.includes("white") || str.includes("ابيض") || str.includes("أبيض")) return "#ffffff";
+            if (str.includes("grey") || str.includes("gray") || str.includes("رمادي")) return "#7f8c8d";
+            if (str.includes("ashen") || str.includes("فئراني") || str.includes("فيراني")) return "#95a5a6";
+            if (str.includes("brown") || str.includes("بني")) return "#8d6e63";
             return "#2ecc71"; // Default
         }
 
@@ -545,7 +548,7 @@
         // --- 6. UNIVERSAL EDIT MODAL ENGINE & SETTLEMENT DESK ---
         function openQuickModal(type, id) {
             const m = document.getElementById('quick-modal'); const title = document.getElementById('qm-title'); const body = document.getElementById('qm-body'); const footer = document.getElementById('qm-footer');
-            let content = ''; let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button><button class="modal-btn modal-btn-save" onclick="showToast('Saved!'); closeQuickModal()">حفظ (Save)</button>`;
+            let content = ''; let buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">إلغاء (Cancel)</button><button class="modal-btn modal-btn-save" onclick="closeQuickModal()">حفظ (Save)</button>`;
 
             if(type === 'order') {
                 const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {}; 
@@ -577,23 +580,15 @@
                             <div style="color:var(--primary); font-size:10px; font-weight:bold; margin-bottom:8px; text-transform:uppercase;">Timeline & Logistics</div>
                             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><span style="color:#888;">Start:</span> <b style="color:white;">${b['بداية التعاقد'] || '-'}</b></div>
                             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><span style="color:#888;">End:</span> <b style="color:white;">${b['نهاية التعاقد'] || '-'}</b></div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; border-top:1px dashed #333; padding-top:4px;"><span style="color:#888;">Pickup Loc:</span> <b style="color:#ccc;">${b['مكان الاستلام'] || 'Office'}</b></div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><span style="color:#888;">Dropoff Loc:</span> <b style="color:#ccc;">${b['مكان التسليم'] || 'Office'}</b></div>
                         </div>
                         <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                             <div style="color:var(--primary); font-size:10px; font-weight:bold; margin-bottom:8px; text-transform:uppercase;">Add-ons & Insurance</div>
                             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><span style="color:#888;">Insurance:</span> <b style="color:white;">${getSafeVal(b, ['نوع التأمين', 'Insurance Package']) || 'Basic'}</b></div>
                             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><span style="color:#888;">Deposit:</span> <b style="color:${deposit > 0 ? 'var(--accent)' : 'var(--success)'};">${deposit > 0 ? deposit + ' EGP (Held)' : 'Returned'}</b></div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; border-top:1px dashed #333; padding-top:4px;"><span style="color:#888;">Extra Driver:</span> <b style="color:#ccc;">${b['سائق اضافى'] || 'None'}</b></div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><span style="color:#888;">Child Seat:</span> <b style="color:#ccc;">${b['كرسي اطفال'] || 'No'}</b></div>
                         </div>
                     </div>
                     
                     <div style="background:rgba(15,20,25,0.8); padding:15px; border-radius:8px; border:1px solid #333; margin-top:15px; direction:ltr; text-align:left;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:8px; margin-bottom:8px;">
-                            <div style="color:var(--success); font-size:12px; font-weight:bold; text-transform:uppercase;">Financial Summary</div>
-                            <button onclick="alert('Phase 3: Add Payment Logic linking to Digital Receipt.')" style="background:var(--success); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;"><i class="fa-solid fa-plus"></i> Add Payment</button>
-                        </div>
                         <div class="grid-3" style="text-align:center; gap:5px; margin-bottom:0;">
                             <div style="background:rgba(255,255,255,0.02); padding:8px; border-radius:4px;">
                                 <div style="font-size:10px; color:#888; text-transform:uppercase;">Total Value</div>
@@ -613,7 +608,10 @@
                     <div class="grid-2" style="margin-top:15px; direction:ltr; text-align:left;">
                         <div><label style="color:var(--primary); font-size:11px; font-weight:bold; text-transform:uppercase;">Order Status Override</label>
                             <select class="contract-input" id="modal_order_status" style="background:#1a202c;">
-                                <option value="Active">Active</option><option value="Internal Use">Internal Use (Employee)</option><option value="Dispute">Dispute</option><option value="Accident">Accident</option><option value="Car Switch">Car Switch</option><option value="Cancelled">Cancelled</option>
+                                <option value="${b['حالة الطلب'] || 'Active'}" selected hidden>${b['حالة الطلب'] || 'Active'}</option>
+                                <option value="Active">Active</option>
+                                <option value="Accident">Accident (Closes Order)</option>
+                                <option value="Cancelled">Cancelled (Closes Order)</option>
                             </select>
                         </div>
                         <div><label style="color:var(--primary); font-size:11px; font-weight:bold; text-transform:uppercase;">Notes / Disputes</label><input type="text" id="modal_order_notes" class="contract-input" placeholder="Add notes..." value="${b['ملاحظات'] || ''}" style="background:#1a202c;"></div>
@@ -626,7 +624,7 @@
                 const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {}; const outKm = parseCurrency(b['عداد الخروج'] || 0); const days = 3; const baseRent = parseCurrency(b['الايجار اليومى']);
                 title.innerHTML = `<i class="fa-solid fa-scale-balanced" style="color:var(--danger);"></i> <span style="font-family:'Inter', sans-serif;">SETTLEMENT DESK (Order #${id})</span>`;
                 content = `<div class="grid-2" style="direction:ltr; text-align:left;"><div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333;"><label style="color:var(--primary); font-size:12px; font-weight:bold;">Return KM</label><input type="number" id="settle_in_km" class="contract-input" oninput="calcSettlement(${outKm}, ${days}, ${baseRent})"><div style="font-size:10px; color:#aaa; margin-top:5px;">Out KM: ${outKm} | Allowed: ${days * 120}</div></div><div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333;"><label style="color:var(--primary); font-size:12px; font-weight:bold;">Return Fuel Level</label><select id="settle_in_fuel" class="contract-input" onchange="calcSettlement(${outKm}, ${days}, ${baseRent})"><option value="8">Full (8/8)</option><option value="6">3/4 (6/8)</option><option value="4">1/2 (4/8)</option><option value="2">1/4 (2/8)</option><option value="1">Reserve</option><option value="0">Empty</option></select><div style="font-size:10px; color:#aaa; margin-top:5px;">Target: Full (8/8)</div></div></div><div class="grid-2" style="margin-top:10px; direction:ltr; text-align:left;"><div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid #333;"><label style="color:var(--primary); font-size:12px; font-weight:bold;">Return Date & Time</label><input type="datetime-local" id="settle_in_time" class="contract-input" onchange="calcSettlement(${outKm}, ${days}, ${baseRent})"></div><div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:8px; border:1px solid var(--danger);"><label style="color:var(--danger); font-size:12px; font-weight:bold;">Missing Items & Damages</label><div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;"><label style="display:flex; gap:5px; color:#ddd; font-size:11px; text-transform:none;"><input type="checkbox" id="chk_dirty" onchange="calcSettlement(${outKm}, ${days}, ${baseRent})"> Car Needs Cleaning (350 EGP)</label><label style="display:flex; gap:5px; color:#ddd; font-size:11px; text-transform:none;"><input type="checkbox" id="chk_key" onchange="calcSettlement(${outKm}, ${days}, ${baseRent})"> Lost Car Key ($400)</label><label style="display:flex; gap:5px; color:#ddd; font-size:11px; text-transform:none;"><input type="checkbox" id="chk_lic" onchange="calcSettlement(${outKm}, ${days}, ${baseRent})"> Lost Car License ($250)</label></div></div></div><div style="background:#f9f9f9; padding:15px; border-radius:8px; margin-top:15px; color:#111; direction:ltr; text-align:left;"><div style="font-weight:bold; font-size:12px; color:var(--primary); border-bottom:1px solid #ccc; padding-bottom:5px; margin-bottom:5px;">AUTOMATED SETTLEMENT PENALTIES</div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:3px;"><span>Excess KM Penalty:</span> <b id="st_km_fee">0 EGP</b></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:3px;"><span>Fuel Shortage Penalty:</span> <b id="st_fuel_fee">0 EGP</b></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:3px;"><span>Late Return Penalty:</span> <b id="st_late_fee">0 EGP</b></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:3px;"><span>Missing Items Penalty:</span> <b id="st_items_fee">0 EGP</b></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; margin-top:10px; border-top:2px solid #111; padding-top:5px;"><span>TOTAL NEW DEBT:</span> <b id="st_total_fee" style="color:var(--danger);">0 EGP</b></div></div>`;
-                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">Cancel</button><button class="modal-btn modal-btn-save" style="background:var(--danger);" onclick="showToast('Contract Closed & Penalties Applied!'); closeQuickModal()"><i class="fa-solid fa-lock"></i> FINALIZE & CLOSE CONTRACT</button>`;
+                buttons = `<button class="modal-btn" style="background:#555; color:white;" onclick="closeQuickModal()">Cancel</button><button class="modal-btn modal-btn-save" style="background:var(--danger);" onclick="updateRecordInDB('settle', '${id}')"><i class="fa-solid fa-lock"></i> FINALIZE & CLOSE CONTRACT</button>`;
             
             } else if (type === 'client') {
                 const c = APP_DATA.customers.find(x => String(x.id) === String(id) || String(x['الرقم القومى']) === String(id)) || {};
@@ -634,43 +632,37 @@
                 content = `
                     <div style="background:rgba(15,20,25,0.4); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.05); direction:ltr; text-align:left;">
                         <div class="grid-4" style="margin-bottom:10px;">
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">First Name *</label><input type="text" class="contract-input" value="${c['الاسم الأول'] || ''}" style="background:#1a202c; border-color:#444;"></div>
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Surname *</label><input type="text" class="contract-input" value="${c['الاسم الأخير'] || ''}" style="background:#1a202c; border-color:#444;"></div>
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Passport / ID *</label><input type="text" class="contract-input" value="${c['رقم جواز السفر'] || c['الرقم القومى'] || ''}" style="background:#1a202c; border-color:#444;"></div>
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Nationality</label><input type="text" class="contract-input" value="${c['رمز الدولة'] || ''}" style="background:#1a202c; border-color:#444;"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">First Name *</label><input type="text" id="modal_client_fname" class="contract-input" value="${c['الاسم الأول'] || ''}" style="background:#1a202c; border-color:#444;"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Surname *</label><input type="text" id="modal_client_sname" class="contract-input" value="${c['الاسم الأخير'] || ''}" style="background:#1a202c; border-color:#444;"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Passport / ID *</label><input type="text" id="modal_client_pass" class="contract-input" value="${c['رقم جواز السفر'] || c['الرقم القومى'] || ''}" style="background:#1a202c; border-color:#444;"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Nationality</label><input type="text" id="modal_client_nat" class="contract-input" value="${c['رمز الدولة'] || ''}" style="background:#1a202c; border-color:#444;"></div>
                         </div>
                         <div class="grid-4" style="margin-bottom:10px;">
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Phone *</label><input type="text" class="contract-input" value="${c['رقم التليفون'] || ''}" style="background:#1a202c; border-color:#444;" dir="ltr"></div>
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Email Address</label><input type="email" class="contract-input" value="${c['عنوان البريد الإلكتروني'] || ''}" style="background:#1a202c; border-color:#444;" dir="ltr"></div>
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Driver License</label><input type="text" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}" style="background:#1a202c; border-color:#444;"></div>
-                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Address</label><input type="text" class="contract-input" value="${c['العنوان'] || ''}" style="background:#1a202c; border-color:#444;"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Phone *</label><input type="text" id="modal_client_phone" class="contract-input" value="${c['رقم التليفون'] || ''}" style="background:#1a202c; border-color:#444;" dir="ltr"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Email Address</label><input type="email" id="modal_client_email" class="contract-input" value="${c['عنوان البريد الإلكتروني'] || ''}" style="background:#1a202c; border-color:#444;" dir="ltr"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Driver License</label><input type="text" id="modal_client_lic" class="contract-input" value="${c['رقم رخصة القيادة'] || ''}" style="background:#1a202c; border-color:#444;"></div>
+                            <div><label style="color:#888; font-size:10px; font-weight:bold;">Address</label><input type="text" id="modal_client_addr" class="contract-input" value="${c['العنوان'] || ''}" style="background:#1a202c; border-color:#444;"></div>
                         </div>
-                        <div style="margin-bottom:5px;"><label style="color:var(--danger); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Alerts</label><input type="text" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes..." style="border-color:var(--danger); background:rgba(231, 76, 60, 0.05);"></div>
+                        <div style="margin-bottom:5px;"><label style="color:var(--danger); font-size:10px; font-weight:bold;">CRM Notes / Blacklist Alerts</label><input type="text" id="modal_client_notes" class="contract-input" value="${c['ملاحظات'] || ''}" placeholder="Add private notes..." style="border-color:var(--danger); background:rgba(231, 76, 60, 0.05);"></div>
                     </div>`;
+                buttons = `<button class="modal-btn" style="background:#444; color:white;" onclick="closeQuickModal()">Close</button>
+                           <button class="modal-btn modal-btn-save" onclick="updateRecordInDB('client', '${id}')">Save Changes</button>`;
+
             } else if (type === 'car') {
                 const car = APP_DATA.cars.find(x => String(x.id) === String(id)) || {}; 
                 let carBrand = getSafeVal(car, ['Brand', 'Type', 'النوع', 'الماركة']); let carModel = getSafeVal(car, ['Model', 'الطراز']); let carName = `${carBrand} ${carModel}`.trim() || 'Unknown';
                 title.innerHTML = `<i class="fa-solid fa-car" style="color:#00d2ff;"></i> <span style="font-family:'Inter', sans-serif;">Vehicle Profile - [${id}] ${carName}</span>`;
                 content = `
                     <div class="grid-4" style="margin-bottom:10px; direction:ltr; text-align:left;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Brand</label><input type="text" class="contract-input" value="${carBrand}" style="background:#1a202c;"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Model</label><input type="text" class="contract-input" value="${carModel}" style="background:#1a202c;"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Year</label><input type="text" class="contract-input" value="${getSafeVal(car, ['سنة الصنع', 'Year'])}" style="background:#1a202c;"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Color</label><input type="text" class="contract-input" value="${getSafeVal(car, ['اللون', 'Color'])}" style="background:#1a202c;"></div>
-                    </div>
-                    <div class="grid-4" style="margin-bottom:10px; direction:ltr; text-align:left;">
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">VIN / Chassis</label><input type="text" class="contract-input" value="${getSafeVal(car, ['VIN', 'رقم الشاسيه'])}" style="background:#1a202c;"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Motor No.</label><input type="text" class="contract-input" value="${getSafeVal(car, ['Motor', 'رقم الموتور'])}" style="background:#1a202c;"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Brand</label><input type="text" class="contract-input" value="${carBrand}" readonly style="background:#111; color:#888;"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Model</label><input type="text" class="contract-input" value="${carModel}" readonly style="background:#111; color:#888;"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" id="modal_car_km" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}" style="background:#1a202c; color:var(--accent); font-weight:bold;"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label>
-                            <select class="contract-input" id="modal_car_status" style="background:#1a202c;"><option value="Valid">Active</option><option value="Maintenance">Maintenance</option><option value="Accident">Accident</option><option value="Finished">Contract Finished</option></select>
+                            <select class="contract-input" id="modal_car_status" style="background:#1a202c;">
+                                <option value="${getSafeVal(car, ['Contract', 'حاله التعاقد']) || 'Valid'}" selected hidden>${getSafeVal(car, ['Contract', 'حاله التعاقد']) || 'Valid'}</option>
+                                <option value="Valid">Active (Valid)</option><option value="Maintenance">Maintenance</option><option value="Accident">Accident</option><option value="Finished">Contract Finished</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="grid-4" style="margin-bottom:10px; border-top:1px dashed #444; padding-top:10px; direction:ltr; text-align:left;">
-                        <div><label style="color:#888; font-size:10px; font-weight:bold;">Lic. Start Date</label><input type="date" class="contract-input" value="${getSafeVal(car, ['بداية الترخيص'])}" style="background:#1a202c;"></div>
-                        <div><label style="color:#888; font-size:10px; font-weight:bold;">Lic. Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية الترخيص'])}" style="background:#1a202c;"></div>
-                        <div><label style="color:#888; font-size:10px; font-weight:bold;">Ins. Start Date</label><input type="date" class="contract-input" value="${getSafeVal(car, ['بداية التأمين'])}" style="background:#1a202c;"></div>
-                        <div><label style="color:#888; font-size:10px; font-weight:bold;">Ins. Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}" style="background:#1a202c;"></div>
                     </div>
                     <div style="margin-bottom:5px; direction:ltr; text-align:left;"><label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label><input type="text" id="modal_car_notes" class="contract-input" style="border-color:var(--danger); background:rgba(231, 76, 60, 0.05);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc..."></div>`;
                 buttons = `<button class="modal-btn" style="background:#444; color:white;" onclick="closeQuickModal()">Close</button>
@@ -690,15 +682,45 @@
                 if (type === 'order') {
                     const statusVal = document.getElementById('modal_order_status').value;
                     const notesVal = document.getElementById('modal_order_notes').value;
+                    const b = APP_DATA.bookings.find(x => String(x.id) === String(id));
                     
-                    await db.collection('bookings').doc(id).update({
+                    let updates = {
                         "حالة الطلب": statusVal,
                         "ملاحظات": notesVal,
                         "_sys_updated": new Date().toISOString()
-                    });
+                    };
+
+                    // If changed to Accident or Cancelled, STOP the clock
+                    if (statusVal === 'Accident' || statusVal === 'Cancelled') {
+                        updates['closed'] = true;
+                    } else if (statusVal === 'Active') {
+                        updates['closed'] = false;
+                    }
+
+                    await db.collection('bookings').doc(id).update(updates);
+                    
+                    // CASCADE: If the order is in an accident, update the physical car status too!
+                    if (b && b['كود السيارة'] && statusVal === 'Accident') {
+                        await db.collection('fleet').doc(b['كود السيارة']).update({
+                            "Contract": "Accident",
+                            "حاله التعاقد": "Accident"
+                        });
+                        logAction('EDIT', 'Fleet Radar', `Auto-Cascaded Car #${b['كود السيارة']} to Accident`);
+                    }
+
                     logAction('EDIT', 'Order Book', `Updated Status/Notes for Order #${id}`);
                     showToast('Order Successfully Updated!');
                 } 
+                else if (type === 'settle') {
+                    // Quick close an order from the settlement desk
+                    await db.collection('bookings').doc(id).update({
+                        "حالة الطلب": "Closed",
+                        "closed": true,
+                        "_sys_updated": new Date().toISOString()
+                    });
+                    logAction('EDIT', 'Order Book', `Contract Closed & Settled for Order #${id}`);
+                    showToast('Contract Officially Closed!');
+                }
                 else if (type === 'car') {
                     const statusVal = document.getElementById('modal_car_status').value;
                     const kmVal = document.getElementById('modal_car_km').value;
@@ -714,10 +736,30 @@
                     logAction('EDIT', 'Fleet Radar', `Updated Status/KM for Car #${id}`);
                     showToast('Vehicle Successfully Updated!');
                 }
+                else if (type === 'client') {
+                    const fName = document.getElementById('modal_client_fname').value;
+                    const sName = document.getElementById('modal_client_sname').value;
+                    const pass = document.getElementById('modal_client_pass').value;
+                    const notes = document.getElementById('modal_client_notes').value;
+                    
+                    await db.collection('customers').doc(id).update({
+                        "الاسم الأول": fName,
+                        "الاسم الأخير": sName,
+                        "رقم جواز السفر": pass,
+                        "الرقم القومى": pass,
+                        "رقم التليفون": document.getElementById('modal_client_phone').value,
+                        "عنوان البريد الإلكتروني": document.getElementById('modal_client_email').value,
+                        "العنوان": document.getElementById('modal_client_addr').value,
+                        "ملاحظات": notes,
+                        "_sys_updated": new Date().toISOString()
+                    });
+                    logAction('EDIT', 'CRM Hub', `Updated Profile for Client ${fName} ${sName}`);
+                    showToast('Client Profile Updated!');
+                }
                 closeQuickModal();
             } catch (error) {
                 console.error(error);
-                showToast('Error saving to Database!');
+                showToast('❌ Error saving to Database! Check permissions.');
             }
         }
 
@@ -726,18 +768,21 @@
             const entry = {
                 timestamp: new Date().getTime(),
                 timeStr: new Date().toLocaleString('en-GB'),
-                user: APP_DATA.user ? (APP_DATA.user.name || 'Admin') : 'System',
-                action: actionType, // LOGIN, VIEW, EDIT, ADD
+                user: APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name || 'Admin') : 'System',
+                action: actionType, 
                 module: moduleName,
                 details: detailsStr
             };
             
-            APP_DATA.audit_logs.unshift(entry); // Add to local array for UI
-            
-            // Rebuild the Audit Table if open
+            // Push to local array to update the UI instantly
+            APP_DATA.audit_logs.unshift(entry); 
             if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') {
                 buildAuditLogs();
             }
+
+            // --- SAVE DIRECTLY TO FIREBASE ---
+            db.collection('logs').add(entry)
+                .catch(err => console.error("Failed to save audit log:", err));
         }
 
         function buildAuditLogs() {
