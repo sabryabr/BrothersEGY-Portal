@@ -18,9 +18,11 @@
         }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Inter', 'Cairo', sans-serif; background: transparent; color: white; overflow: hidden; }
         
+        /* Video Background */
         .video-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: #000; pointer-events: none; }
         #bg-video { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); transition: object-position 0.8s ease-in-out; }
 
+        /* Login Screen */
         #login-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
         .login-box { background: rgba(15, 15, 15, 0.85); padding: 50px 40px; border-radius: 30px; border: 1px solid var(--glass-border); text-align: center; width: 350px; box-shadow: 0 25px 50px rgba(0,0,0,0.8); }
         .login-box img { height: 75px; margin-bottom: 20px; }
@@ -28,6 +30,7 @@
         .login-box button { width: 100%; padding: 14px; margin-top: 15px; border-radius: 12px; border: none; background: var(--primary); color: white; font-weight: 800; cursor: pointer; transition: 0.3s; }
         .login-box button:hover { background: #0560bd; }
 
+        /* Layout & Navigation */
         #app-layout { display: none; height: 100vh; width: 100vw; }
         .navbar { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; z-index: 100; box-sizing: border-box; }
         .nav-tabs { display: flex; gap: 10px; }
@@ -235,7 +238,7 @@
                 <div class="table-responsive" style="overflow: visible;">
                     <table class="data-table"><thead id="radar-head"></thead><tbody id="radar-body"></tbody></table>
                 </div>
-            </div>
+            </div>    
 
             <div id="view-audit" class="view-section">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -244,16 +247,38 @@
                         <i class="fa-solid fa-circle-check"></i> Tracker Active
                     </div>
                 </div>
+                
                 <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
                     <div class="m-card"><label>Total Actions Logged</label><div class="val" id="audit_tot_actions" style="color:white">0</div></div>
                     <div class="m-card"><label>Active Session Time</label><div class="val" id="audit_session_time" style="color:var(--primary)">0m</div></div>
                     <div class="m-card"><label>Records Edited/Saved</label><div class="val" id="audit_tot_edits" style="color:var(--accent)">0</div></div>
                     <div class="m-card"><label>Current User</label><div class="val" id="audit_current_user" style="color:var(--success); font-size:20px; margin-top:14px;">-</div></div>
                 </div>
+
+                <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
+                    <div style="flex: 1;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Filter by Action</label>
+                        <select id="audit-filter" class="contract-input" onchange="buildAuditLogs()" style="height: 48px; font-weight:bold;">
+                            <option value="ALL">All Actions</option>
+                            <option value="LOGIN">Logins</option>
+                            <option value="VIEW">Views (Tabs & Modals)</option>
+                            <option value="EDIT">Edits & Saves</option>
+                        </select>
+                    </div>
+                    <div style="flex: 3;">
+                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search Logs</label>
+                        <input type="text" class="contract-input" id="search-audit" placeholder="Search user, action, or details..." onkeyup="searchTable('audit-body', 'search-audit')" style="height: 48px; margin-bottom:0;">
+                    </div>
+                </div>
+
                 <div class="table-responsive" style="max-height:600px; overflow-y:auto;">
                     <table class="data-table">
                         <thead style="position: sticky; top: 0; background: #111; z-index: 10;"><tr>
-                            <th style="width:15%">Timestamp</th><th style="width:15%">User</th><th style="width:10%">Action</th><th style="width:20%">Module</th><th style="width:40%">Details</th>
+                            <th style="width:15%">Timestamp</th>
+                            <th style="width:15%">User</th>
+                            <th style="width:10%">Action</th>
+                            <th style="width:20%">Module</th>
+                            <th style="width:40%">Details</th>
                         </tr></thead>
                         <tbody id="audit-body"></tbody>
                     </table>
@@ -313,51 +338,6 @@
                 <div class="table-responsive"><table class="data-table"><thead><tr><th>Vehicle</th><th>Risk Type</th><th>Expiration Date</th><th>Days Left</th><th>Severity</th></tr></thead><tbody id="risk-body"></tbody></table></div>
             </div>
 
-            <div id="view-audit" class="view-section">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2 style="margin:0;"><i class="fa-solid fa-clock-rotate-left"></i> System Logs & User Tracking</h2>
-                    <div style="background:rgba(46, 204, 113, 0.1); border:1px solid var(--success); padding:8px 15px; border-radius:8px; color:var(--success); font-weight:bold; font-size:12px;">
-                        <i class="fa-solid fa-circle-check"></i> Tracker Active
-                    </div>
-                </div>
-                
-                <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <div class="m-card"><label>Total Actions Logged</label><div class="val" id="audit_tot_actions" style="color:white">0</div></div>
-                    <div class="m-card"><label>Active Session Time</label><div class="val" id="audit_session_time" style="color:var(--primary)">0m</div></div>
-                    <div class="m-card"><label>Records Edited/Saved</label><div class="val" id="audit_tot_edits" style="color:var(--accent)">0</div></div>
-                    <div class="m-card"><label>Current User</label><div class="val" id="audit_current_user" style="color:var(--success); font-size:20px; margin-top:14px;">-</div></div>
-                </div>
-
-                <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
-                    <div style="flex: 1;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Filter by Action</label>
-                        <select id="audit-filter" class="contract-input" onchange="buildAuditLogs()" style="height: 48px; font-weight:bold;">
-                            <option value="ALL">All Actions</option>
-                            <option value="LOGIN">Logins</option>
-                            <option value="VIEW">Views (Tabs & Modals)</option>
-                            <option value="EDIT">Edits & Saves</option>
-                        </select>
-                    </div>
-                    <div style="flex: 3;">
-                        <label style="color:var(--primary); font-weight:bold; margin-bottom:5px; display:block;">Search Logs</label>
-                        <input type="text" class="contract-input" id="search-audit" placeholder="Search user, action, or details..." onkeyup="searchTable('audit-body', 'search-audit')" style="height: 48px; margin-bottom:0;">
-                    </div>
-                </div>
-
-                <div class="table-responsive" style="max-height:600px; overflow-y:auto;">
-                    <table class="data-table">
-                        <thead style="position: sticky; top: 0; background: #111; z-index: 10;"><tr>
-                            <th style="width:15%">Timestamp</th>
-                            <th style="width:15%">User</th>
-                            <th style="width:10%">Action</th>
-                            <th style="width:20%">Module</th>
-                            <th style="width:40%">Details</th>
-                        </tr></thead>
-                        <tbody id="audit-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
             <div id="view-proposal" class="view-section">
                 <div class="placeholder-box">
                     <h2><i class="fa-solid fa-file-invoice"></i> Price Proposal Engine</h2>
@@ -395,7 +375,7 @@
         </div>
     </div>
 
-    <script>
+<script>
         // --- 0. CLOCK & VIDEO ---
         document.addEventListener('DOMContentLoaded', () => {
             const vid = document.getElementById('bg-video');
@@ -435,6 +415,7 @@
                 const userDoc = await db.collection("users").doc(user).get();
                 if (userDoc.exists && userDoc.data().password === pass) {
                     APP_DATA.user = userDoc.data();
+                    APP_DATA.user.username = user; // Store username for branch logic
                     document.getElementById('login-overlay').style.display = 'none'; document.getElementById('data-loader').style.display = 'flex'; 
                     applyPermissions(APP_DATA.user.access); document.getElementById('display-role').innerText = APP_DATA.user.role || "Executive";
                     await fetchLiveRates(); await loadCloudData(); 
@@ -462,7 +443,9 @@
                 const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers) resolve(); };
 
                 db.collection('fleet').onSnapshot(snap => { APP_DATA.cars = []; snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.fleet = true; checkDone(); });
+                // Financials: Bookings (Income)
                 db.collection('bookings').onSnapshot(snap => { APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.bookings = true; checkDone(); });
+                // Financials: Expenses
                 db.collection('car_expenses').onSnapshot(snap => { APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() })); loaded.expenses = true; checkDone(); });
                 db.collection('customers').onSnapshot(snap => { 
                     APP_DATA.customers = []; snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() })); populateClientList(); loaded.customers = true; checkDone(); 
@@ -557,7 +540,7 @@
 
         document.addEventListener('mouseover', function(e) { let bar = e.target.closest('.gantt-bar'); if (bar && bar.hasAttribute('data-tooltip-id')) showGanttTooltip(e, bar.getAttribute('data-tooltip-id')); });
         document.addEventListener('mousemove', function(e) { let bar = e.target.closest('.gantt-bar'); if (bar) moveGanttTooltip(e); });
-        document.addEventListener('mouseout', function(e) { let bar = e.target.closest('.gantt-bar'); if (bar) hideGanttTooltip(); });
+        document.addEventListener('mouseout', function(e) { let bar = e.target.closest('.gantt-bar'); if (bar) hideGanttTooltip(); });                        
 
         // --- 6. UNIVERSAL EDIT MODAL ENGINE & SETTLEMENT DESK ---
         function openQuickModal(type, id) {
@@ -629,15 +612,15 @@
                     
                     <div class="grid-2" style="margin-top:15px; direction:ltr; text-align:left;">
                         <div><label style="color:var(--primary); font-size:11px; font-weight:bold; text-transform:uppercase;">Order Status Override</label>
-                            <select class="contract-input" style="background:#1a202c;">
-                                <option>Active</option><option>Internal Use (Employee)</option><option>Dispute</option><option>Accident</option><option>Car Switch</option><option>Cancelled</option>
+                            <select class="contract-input" id="modal_order_status" style="background:#1a202c;">
+                                <option value="Active">Active</option><option value="Internal Use">Internal Use (Employee)</option><option value="Dispute">Dispute</option><option value="Accident">Accident</option><option value="Car Switch">Car Switch</option><option value="Cancelled">Cancelled</option>
                             </select>
                         </div>
-                        <div><label style="color:var(--primary); font-size:11px; font-weight:bold; text-transform:uppercase;">Notes / Disputes</label><input type="text" class="contract-input" placeholder="Add notes..." value="${b['ملاحظات'] || ''}" style="background:#1a202c;"></div>
+                        <div><label style="color:var(--primary); font-size:11px; font-weight:bold; text-transform:uppercase;">Notes / Disputes</label><input type="text" id="modal_order_notes" class="contract-input" placeholder="Add notes..." value="${b['ملاحظات'] || ''}" style="background:#1a202c;"></div>
                     </div>`;
                 buttons = `<button class="modal-btn" style="background:#444; color:white;" onclick="closeQuickModal()">Close</button>
                            <button class="modal-btn modal-btn-save" onclick="openQuickModal('settle_order', '${id}')" style="background:var(--danger);"><i class="fa-solid fa-flag-checkered"></i> SETTLE & CLOSE CONTRACT</button>
-                           <button class="modal-btn modal-btn-save" onclick="showToast('Order Updated!'); closeQuickModal()">Save Changes</button>`;
+                           <button class="modal-btn modal-btn-save" onclick="updateRecordInDB('order', '${id}')">Save Changes</button>`;
             
             } else if (type === 'settle_order') {
                 const b = APP_DATA.bookings.find(x => String(x.id) === String(id)) || {}; const outKm = parseCurrency(b['عداد الخروج'] || 0); const days = 3; const baseRent = parseCurrency(b['الايجار اليومى']);
@@ -678,9 +661,9 @@
                     <div class="grid-4" style="margin-bottom:10px; direction:ltr; text-align:left;">
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">VIN / Chassis</label><input type="text" class="contract-input" value="${getSafeVal(car, ['VIN', 'رقم الشاسيه'])}" style="background:#1a202c;"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Motor No.</label><input type="text" class="contract-input" value="${getSafeVal(car, ['Motor', 'رقم الموتور'])}" style="background:#1a202c;"></div>
-                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}" style="background:#1a202c; color:var(--accent); font-weight:bold;"></div>
+                        <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Current KM</label><input type="number" id="modal_car_km" class="contract-input" value="${getSafeVal(car, ['كيلومتر تعاقد', 'Current KM']) || '0'}" style="background:#1a202c; color:var(--accent); font-weight:bold;"></div>
                         <div><label style="color:var(--primary); font-size:10px; font-weight:bold;">Status Override</label>
-                            <select class="contract-input" style="background:#1a202c;"><option>Active</option><option>Maintenance</option><option>Accident</option><option>Contract Finished</option></select>
+                            <select class="contract-input" id="modal_car_status" style="background:#1a202c;"><option value="Valid">Active</option><option value="Maintenance">Maintenance</option><option value="Accident">Accident</option><option value="Finished">Contract Finished</option></select>
                         </div>
                     </div>
                     <div class="grid-4" style="margin-bottom:10px; border-top:1px dashed #444; padding-top:10px; direction:ltr; text-align:left;">
@@ -689,7 +672,9 @@
                         <div><label style="color:#888; font-size:10px; font-weight:bold;">Ins. Start Date</label><input type="date" class="contract-input" value="${getSafeVal(car, ['بداية التأمين'])}" style="background:#1a202c;"></div>
                         <div><label style="color:#888; font-size:10px; font-weight:bold;">Ins. Expiry</label><input type="date" class="contract-input" value="${getSafeVal(car, ['نهاية التأمين'])}" style="background:#1a202c;"></div>
                     </div>
-                    <div style="margin-bottom:5px; direction:ltr; text-align:left;"><label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label><input type="text" class="contract-input" style="border-color:var(--danger); background:rgba(231, 76, 60, 0.05);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc..."></div>`;
+                    <div style="margin-bottom:5px; direction:ltr; text-align:left;"><label style="color:var(--danger); font-size:10px; font-weight:bold;">Accidents / Disputes / Notes</label><input type="text" id="modal_car_notes" class="contract-input" style="border-color:var(--danger); background:rgba(231, 76, 60, 0.05);" value="${getSafeVal(car, ['Notes', 'ملاحظات'])}" placeholder="Accident details, garage location, etc..."></div>`;
+                buttons = `<button class="modal-btn" style="background:#444; color:white;" onclick="closeQuickModal()">Close</button>
+                           <button class="modal-btn modal-btn-save" onclick="updateRecordInDB('car', '${id}')">Save Changes</button>`;
             }
             body.innerHTML = content; footer.innerHTML = buttons; m.classList.add('show');
         }
@@ -709,7 +694,7 @@
                     await db.collection('bookings').doc(id).update({
                         "حالة الطلب": statusVal,
                         "ملاحظات": notesVal,
-                        "_sys_updated": new Date().toLocaleString('en-GB')
+                        "_sys_updated": new Date().toISOString()
                     });
                     logAction('EDIT', 'Order Book', `Updated Status/Notes for Order #${id}`);
                     showToast('Order Successfully Updated!');
@@ -721,9 +706,10 @@
 
                     await db.collection('fleet').doc(id).update({
                         "حاله التعاقد": statusVal,
+                        "Contract": statusVal,
                         "كيلومتر تعاقد": kmVal,
                         "ملاحظات": notesVal,
-                        "_sys_updated": new Date().toLocaleString('en-GB')
+                        "_sys_updated": new Date().toISOString()
                     });
                     logAction('EDIT', 'Fleet Radar', `Updated Status/KM for Car #${id}`);
                     showToast('Vehicle Successfully Updated!');
@@ -836,7 +822,7 @@
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${nextFutureBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else { counts.ready++; }
 
                 let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left: 33.33%;"></div>`;
@@ -896,16 +882,37 @@
 
         // --- 8. ORDERS & CRM ---
         function buildOrderBook() {
-            const body = document.getElementById('orders-body'); const periodFilter = document.getElementById('order-period-filter').value; const now = new Date(); body.innerHTML = '';
+            const body = document.getElementById('orders-body'); 
+            const periodFilter = document.getElementById('order-period-filter').value; 
+            const now = new Date(); 
+            body.innerHTML = '';
+
+            const userRole = APP_DATA.user ? (APP_DATA.user.role || 'User') : 'User';
+            const userBranch = APP_DATA.user ? (APP_DATA.user.branch || 'HRG') : 'HRG';
+            const userAssigned = APP_DATA.user ? APP_DATA.user.username : '';
+
             APP_DATA.bookings.forEach(b => {
-                if(!b['بداية التعاقد']) return; const start = new Date(b['بداية التعاقد']);
+                if(!b['بداية التعاقد']) return; 
+                const start = new Date(b['بداية التعاقد']);
+                
                 if (periodFilter === 'this_month' && (start.getMonth() !== now.getMonth() || start.getFullYear() !== now.getFullYear())) return;
                 if (periodFilter === 'last_month') { const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1); if (start.getMonth() !== lastMonth.getMonth() || start.getFullYear() !== lastMonth.getFullYear()) return; }
                 if (periodFilter === 'this_year' && start.getFullYear() !== now.getFullYear()) return;
 
-                const isLegacy = start.getFullYear() < 2026; const total = parseCurrency(b['إجمالي المستحق (Total)']); let paid = parseCurrency(b['المدفوع EGP']);
-                let statusBadge = isLegacy ? '<span class="badge bg-green">LEGACY CLOSED</span>' : (paid >= total ? '<span class="badge bg-green">PAID</span>' : '<span class="badge bg-orange">PENDING</span>'); if(isLegacy) paid = total;
-                const row = body.insertRow(); row.innerHTML = `<td><b class="clickable-obj" onclick="openQuickModal('order', '${b.id}')">#${b.id}</b></td><td class="clickable-obj" style="color:var(--accent); font-weight:600;" onclick="openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل'] || '-'}</td><td class="clickable-obj" onclick="openQuickModal('car', '${b['كود السيارة']}')">Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
+                if (userRole !== 'Admin' && userRole !== 'Executive') {
+                    const orderBranch = getSafeVal(b, ['فرع الإصدار', 'branch']);
+                    const assignedTo = b.assigned_user;
+                    if (orderBranch !== userBranch && assignedTo !== userAssigned) return; 
+                }
+
+                const isLegacy = start.getFullYear() < 2026; 
+                const total = parseCurrency(b['إجمالي المستحق (Total)']); 
+                let paid = parseCurrency(b['المدفوع EGP']);
+                let statusBadge = isLegacy ? '<span class="badge bg-green">LEGACY CLOSED</span>' : (paid >= total ? '<span class="badge bg-green">PAID</span>' : '<span class="badge bg-orange">PENDING</span>'); 
+                if(isLegacy) paid = total;
+                
+                const row = body.insertRow(); 
+                row.innerHTML = `<td><b class="clickable-obj" onclick="openQuickModal('order', '${b.id}')">#${b.id}</b></td><td class="clickable-obj" style="color:var(--accent); font-weight:600;" onclick="openQuickModal('client', '${b['كود العميل']}')">${b['اسم العميل'] || '-'}</td><td class="clickable-obj" onclick="openQuickModal('car', '${b['كود السيارة']}')">Car #${b['كود السيارة']}</td><td><div style="font-size:12px; color:#aaa;">${b['بداية التعاقد']?.split(' ')[0] || ''}<br>to ${b['نهاية التعاقد']?.split(' ')[0] || ''}</div></td><td style="font-weight:bold;">${formatEGP(total)}</td><td style="color:var(--success); font-weight:bold;">${formatEGP(paid)}</td><td>${statusBadge}</td>`;
             });
         }
 
@@ -1191,7 +1198,7 @@
             const c = runContractCalc(); if (!c || c.days === 0) return alert("Please select dates first.");
             if (c.manualDiscount > MAX_DISCOUNT_PCT) return alert(`Discounts over ${MAX_DISCOUNT_PCT}% require Admin Approval.`);
 
-            const val_branch = document.getElementById('con_branch').value || "HRG"; let now = new Date(); let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0'); let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            const val_branch = document.getElementById('con_branch') ? document.getElementById('con_branch').value : "HRG"; let now = new Date(); let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0'); let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
             const cid = `BR-${val_branch}-${dStr}-${tStr}`; const today = now.toLocaleDateString('en-GB');
             const formatDT = (dtString) => { if(!dtString) return ""; const d = new Date(dtString); if(isNaN(d)) return dtString; return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}`; };
 
@@ -1221,7 +1228,7 @@
             const chkRow = (lbl) => `<div class="v-insp-row"><span class="v-label">${lbl}</span><div class="v-check-group"><div class="v-check-box v-green"></div><div class="v-check-box v-red"></div></div></div>`;
             const checklistGroups = `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;"><div style="width:48%;"><div class="insp-group-head">PASSENGER</div>${chkRow('(D) FEND F')}${chkRow('(L) DOOR F')}${chkRow('(K) DOOR R')}${chkRow('(J) FEND R')}</div><div style="width:48%;"><div class="insp-group-head">FRONT</div>${chkRow('(E) BUMPER')}${chkRow('(F) HOOD')}${chkRow('(W) WINDSH')}</div><div style="width:48%;"><div class="insp-group-head">REAR</div>${chkRow('(Q) TRUNK')}${chkRow('(H) BUMPER')}${chkRow('(I) LIGHTS')}</div><div style="width:48%;"><div class="insp-group-head">DRIVER</div>${chkRow('(M) FEND F')}${chkRow('(C) DOOR F')}${chkRow('(B) DOOR R')}${chkRow('(A) FEND R')}</div></div>`;
 
-            let pickupHtmlClean = `<div class="insp-left-col"><div class="insp-section-head">PICKUP CHECK (Start of Rental)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0;"><tr style="background:#eee;"><th>KM OUT</th><td align="center">${document.getElementById('con_kmOut').value}</td></tr><tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${document.getElementById('con_fuelOut').options[document.getElementById('con_fuelOut').selectedIndex].text}</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">EXISTING DAMAGES:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div></div>${checklistGroups}<div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;"><div style="font-size:7pt; font-weight:bold;">NOTES / ACCESSORIES:</div><div style="font-size:7pt;">Spare Tire [ ] Jack [ ] Fire Ext [ ] Triangle [ ]</div></div></div>`;
+            let pickupHtmlClean = `<div class="insp-left-col"><div class="insp-section-head">PICKUP CHECK (Start of Rental)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0;"><tr style="background:#eee;"><th>KM OUT</th><td align="center">${document.getElementById('con_kmOut').value}</td></tr><tr style="background:#eee;"><th>FUEL LEVEL</th><td align="center">${document.getElementById('con_fuelOut') ? document.getElementById('con_fuelOut').options[document.getElementById('con_fuelOut').selectedIndex].text : ''}</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">EXISTING DAMAGES:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div></div>${checklistGroups}<div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;"><div style="font-size:7pt; font-weight:bold;">NOTES / ACCESSORIES:</div><div style="font-size:7pt;">Spare Tire [ ] Jack [ ] Fire Ext [ ] Triangle [ ]</div></div></div>`;
             const returnHtml = `<div class="insp-right-col"><div class="insp-section-head">RETURN CHECK (End of Rental)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0;"><tr style="background:#eee;"><th>KM IN (${kmAllowedTotal} Max)</th><td><br>__________________</td></tr><tr style="background:#eee;"><th>FUEL LEVEL</th><td><span style="font-size:7pt;">[ ] Full [ ] 3/4 [ ] 1/2 [ ] 1/4 [ ] Empty</span></td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">MARK NEW DAMAGES:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>TIRE:</strong> _________________</div></div>${checklistGroups}<div class="box-section" style="margin-top:5px; margin-bottom:2px; padding:2px;"><span class="bs-title" style="font-size:7pt;">FINAL SETTLEMENT</span><table class="pt" style="font-size:8pt; margin-bottom:0;"><tr><th width="45%">Item Description</th><th width="30%">Rate x Qty</th><th width="25%">Total (EGP)</th></tr> <tr><td>Excess KM</td><td align="center">_______ x _______</td><td align="right">___________</td></tr><tr><td>Late Return</td><td align="center">_______ x _______</td><td align="right">___________</td></tr><tr><td>Cleaning Fees</td><td align="center">-</td><td align="right">___________</td></tr><tr><td>Fuel Shortage</td><td align="center">-</td><td align="right">___________</td></tr><tr><td>Traffic Fines</td><td align="center">-</td><td align="right">___________</td></tr><tr><td>New Damages</td><td align="center">-</td><td align="right">___________</td></tr><tr style="font-weight:bold; background:#eee;"><td colspan="2" align="right">TOTAL DEDUCTIONS:</td><td align="right">___________ EGP</td></tr></table></div><div style="font-size:7.5pt; font-weight:bold; margin-top:5px; border:1px solid #000; padding:3px; background:#fff3e0;">IMPORTANT: If the RETURN CHECK is not closed/signed, the Lessee retains full liability.</div></div>`;
 
             html += `<div class="a4-page"><div class="watermark"><img src="${logoSrc}"></div><div class="page-content"><div class="doc-head"><strong>VISUAL INSPECTION REPORT</strong><span>Page 3/4</span></div><div style="font-size:8pt; text-align:center; font-weight:bold; margin-bottom:5px;">Contract: ${cid} | Date: ${today}</div><div class="insp-two-col">${pickupHtmlClean}${returnHtml}</div><div style="margin-top:auto; border-top:2px solid #000; padding-top:10px;"><div style="display:flex; justify-content:space-between; text-align:center; font-weight:bold; font-size:10pt;"><div style="width:30%;">PICKUP: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div><div style="width:30%;">RETURN: Lessee<br><br><br><br>____________________<div style="font-size:8pt; margin-top:5px;">Date: ........................</div></div><div style="width:30%;">RETURN: Employee<br><br><br><br>____________________</div></div></div></div></div>`;
@@ -1239,7 +1246,32 @@
 
             document.getElementById('contractOutput').innerHTML = html; document.getElementById('contractOutput').style.display = "flex"; document.getElementById('btnRealPrint').style.display = "block";
             setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('contractOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
-            logAction('ADD', 'Contract Engine', `Generated EN Contract ${cid} for Client ID: ${document.getElementById('con_client_id').value}`);
+            const clientTrackerId = document.getElementById('con_client_id') ? document.getElementById('con_client_id').value : 'New';
+            logAction('ADD', 'Contract Engine', `Generated EN Contract ${cid} for Client ID: ${clientTrackerId}`);
+
+            // --- NEW: SAVE EN CONTRACT TO FIREBASE ---
+            const newContract = {
+                "اسم العميل": document.getElementById('con_fname').value + " " + document.getElementById('con_sname').value,
+                "كود العميل": document.getElementById('con_pass').value || "NEW", 
+                "كود السيارة": document.getElementById('con_carSelect').value,
+                "بداية التعاقد": document.getElementById('con_p_time').value.replace('T', ' '),
+                "نهاية التعاقد": document.getElementById('con_d_time').value.replace('T', ' '),
+                "مكان الاستلام": document.getElementById('con_p_loc').value,
+                "مكان التسليم": document.getElementById('con_d_loc').value,
+                "الايجار اليومى": c.r,
+                "إجمالي المستحق (Total)": c.totalDue,
+                "المدفوع EGP": c.totalRentPaid,
+                "الوديعة المعلقة لدينا": c.reqDep,
+                "نوع التأمين": document.getElementById('con_insPack').value,
+                "فرع الإصدار": val_branch,
+                "assigned_user": APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name) : "System",
+                "حالة الطلب": "Active",
+                "_sys_created": new Date().toISOString()
+            };
+
+            db.collection('bookings').doc(cid).set(newContract)
+                .then(() => showToast('✅ Contract Saved to Cloud Database!'))
+                .catch(err => { console.error("Database Error:", err); showToast('❌ Error saving to database!'); });
         }
 
         // -> 3. AR CONTRACT ENGINE
@@ -1265,7 +1297,8 @@
             const searchVal = document.getElementById('ar_crm_search').value; const list = document.getElementById('client-list'); let selectedId = null;
             for(let opt of list.options) { if(opt.value === searchVal) { selectedId = opt.getAttribute('data-id'); break; } } if(!selectedId) return; const c = APP_DATA.customers.find(x => x.id === selectedId);
             if(c) {
-                document.getElementById('ar_client_id').value = c.id; document.getElementById('ar_fname').value = c['الاسم الأول'] || ''; document.getElementById('ar_sname').value = c['الاسم الأخير'] || ''; document.getElementById('ar_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || ''; document.getElementById('ar_phone').value = c['رقم التليفون'] || ''; document.getElementById('ar_email').value = c['عنوان البريد الإلكتروني'] || ''; document.getElementById('ar_lic').value = c['رقم رخصة القيادة'] || ''; document.getElementById('ar_addr').value = c['العنوان'] || ''; document.getElementById('ar_nation').value = c['رمز الدولة'] || '';
+                if(document.getElementById('ar_client_id')) document.getElementById('ar_client_id').value = c.id; 
+                document.getElementById('ar_fname').value = c['الاسم الأول'] || ''; document.getElementById('ar_sname').value = c['الاسم الأخير'] || ''; document.getElementById('ar_pass').value = c['رقم جواز السفر'] || c['الرقم القومى'] || ''; document.getElementById('ar_phone').value = c['رقم التليفون'] || ''; document.getElementById('ar_email').value = c['عنوان البريد الإلكتروني'] || ''; document.getElementById('ar_lic').value = c['رقم رخصة القيادة'] || ''; document.getElementById('ar_addr').value = c['العنوان'] || ''; document.getElementById('ar_nation').value = c['رمز الدولة'] || '';
             }
         }
 
@@ -1309,7 +1342,7 @@
             const c = runARContractCalc(); if (!c || c.days === 0) return alert("الرجاء اختيار التواريخ.");
             if (c.manualDiscount > MAX_DISCOUNT_PCT) return alert(`الخصم أكبر من ${MAX_DISCOUNT_PCT}% يحتاج موافقة الإدارة.`);
 
-            const val_branch = document.getElementById('ar_branch').value || "HRG"; let now = new Date(); let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0'); let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            const val_branch = document.getElementById('ar_branch') ? document.getElementById('ar_branch').value : "HRG"; let now = new Date(); let dStr = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0'); let tStr = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
             const cid = `BR-${val_branch}-${dStr}-${tStr}`; const today = now.toLocaleDateString('ar-EG');
             const formatDT = (dtString) => { if(!dtString) return ""; const d = new Date(dtString); if(isNaN(d)) return dtString; return `${d.toLocaleDateString('ar-EG')} ${d.toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}`; };
 
@@ -1339,14 +1372,40 @@
             const chkRow = (lbl) => `<div class="v-insp-row"><span class="v-label">${lbl}</span><div class="v-check-group"><div class="v-check-box v-green"></div><div class="v-check-box v-red"></div></div></div>`;
             const checklistGroups = `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; direction:ltr;"><div style="width:48%;"><div class="insp-group-head">PASSENGER</div>${chkRow('(D) FEND F')}${chkRow('(L) DOOR F')}${chkRow('(K) DOOR R')}${chkRow('(J) FEND R')}</div><div style="width:48%;"><div class="insp-group-head">FRONT</div>${chkRow('(E) BUMPER')}${chkRow('(F) HOOD')}${chkRow('(W) WINDSH')}</div><div style="width:48%;"><div class="insp-group-head">REAR</div>${chkRow('(Q) TRUNK')}${chkRow('(H) BUMPER')}${chkRow('(I) LIGHTS')}</div><div style="width:48%;"><div class="insp-group-head">DRIVER</div>${chkRow('(M) FEND F')}${chkRow('(C) DOOR F')}${chkRow('(B) DOOR R')}${chkRow('(A) FEND R')}</div></div>`;
 
-            let pickupHtmlClean = `<div class="insp-left-col"><div class="insp-section-head">بيان الاستلام (بدء الإيجار)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr style="background:#eee;"><th width="45%">وقت وتاريخ الاستلام</th><td align="center">${document.getElementById('ar_p_time').value.replace('T', ' ')}</td></tr><tr style="background:#eee;"><th>عداد الخروج</th><td align="center">${document.getElementById('ar_kmOut').value}</td></tr><tr style="background:#eee;"><th>مستوى الوقود</th><td align="center">${document.getElementById('ar_fuelOut').options[document.getElementById('ar_fuelOut').selectedIndex].text}</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">الأضرار الموجودة:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>الإطار:</strong> _________________</div></div>${checklistGroups}<div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;"><div style="font-size:7pt; font-weight:bold;">ملاحظات / إضافات:</div><div style="font-size:7pt;">إطار احتياطي [ ] كوريك [ ] طفاية حريق [ ] مثلث [ ]</div></div></div>`;
+            let pickupHtmlClean = `<div class="insp-left-col"><div class="insp-section-head">بيان الاستلام (بدء الإيجار)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr style="background:#eee;"><th width="45%">وقت وتاريخ الاستلام</th><td align="center">${document.getElementById('ar_p_time').value.replace('T', ' ')}</td></tr><tr style="background:#eee;"><th>عداد الخروج</th><td align="center">${document.getElementById('ar_kmOut').value}</td></tr><tr style="background:#eee;"><th>مستوى الوقود</th><td align="center">${document.getElementById('ar_fuelOut') ? document.getElementById('ar_fuelOut').options[document.getElementById('ar_fuelOut').selectedIndex].text : ''}</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">الأضرار الموجودة:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>الإطار:</strong> _________________</div></div>${checklistGroups}<div style="margin-top:5px; border:1px solid #ccc; padding:2px; min-height:40px;"><div style="font-size:7pt; font-weight:bold;">ملاحظات / إضافات:</div><div style="font-size:7pt;">إطار احتياطي [ ] كوريك [ ] طفاية حريق [ ] مثلث [ ]</div></div></div>`;
             const returnHtml = `<div class="insp-right-col" style="border-right:1px dashed #000; border-left:none; padding-right:10px; padding-left:0;"><div class="insp-section-head">بيان العودة (نهاية الإيجار)</div><div class="box-section" style="padding:2px; margin-bottom:5px;"><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr style="background:#eee;"><th width="45%">وقت وتاريخ العودة</th><td>____________________</td></tr><tr style="background:#eee;"><th>عداد العودة (${kmAllowedTotal} كم)</th><td>____________________</td></tr><tr style="background:#eee;"><th>مستوى الوقود</th><td style="font-size:6.5pt; padding:2px 1px;">[ ] ممتلئ [ ] 3/4 [ ] 1/2 [ ] 1/4 [ ] فارغ</td></tr></table></div><div style="text-align:center; font-size:7pt; font-weight:bold;">علّم الأضرار الجديدة:</div><div class="car-img-container"><img src="${carSrc}"></div><div class="tire-img-wrapper"><div class="tire-img-container"><img src="https://brothersegy.com/wp-content/uploads/2026/02/wheel-tyre-illustration-png.png"></div><div style="font-size:7pt;"><strong>الإطار:</strong> _________________</div></div>${checklistGroups}<div class="box-section" style="margin-top:2px; margin-bottom:2px; padding:2px;"><span class="bs-title" style="left:-1px; right:auto; font-size:7pt;">التسوية النهائية</span><table class="pt" style="font-size:7pt; margin-bottom:0; width:100%;"><tr><th width="40%">وصف البند</th><th width="35%">السعر × الكمية</th><th width="25%">المبلغ</th></tr><tr style="background:#fff3e0;"><td colspan="2" align="left">وقت العودة الفعلية:</td><td align="left">_______</td></tr><tr><td>كم زائد</td><td align="center">___ x ___</td><td align="left">____</td></tr><tr><td>تأخير</td><td align="center">___ x ___</td><td align="left">____</td></tr><tr><td>أضرار/مخالفات</td><td align="center">-</td><td align="left">____</td></tr><tr style="font-weight:bold; background:#eee;"><td colspan="2" align="left">إجمالي المطلوب:</td><td align="left">____ ج.م</td></tr></table></div></div>`;
 
             html += `<div class="a4-page" dir="rtl" style="text-align:right;"><div class="watermark"><img src="${logoSrc}"></div><div class="page-content"><div class="doc-head"><strong>المقر بما فيه (تقارير الفحص)</strong><span>صفحة 3/4</span></div><div style="margin: 0 0 5px 0; padding: 5px; border: 1.5px solid #000; background: #fff; line-height: 1.35; font-size: 8.5pt;">اقر انا : <b>${document.getElementById('ar_fname').value} ${document.getElementById('ar_sname').value}</b> &nbsp;&nbsp;&nbsp; بطاقة رقم : <b>${document.getElementById('ar_pass').value}</b> <br>بأنني استأجرت السيارة وأنها على مسؤوليتي الشخصية.</div><div class="insp-two-col" style="flex-direction:row-reverse;">${returnHtml}${pickupHtmlClean}</div><div style="margin-top:5px; font-size:8pt; border-top:1px solid #000; padding-top:5px;"><div style="font-weight:bold; margin-bottom:5px; color:#e67e22; font-size:7.5pt;">هام: إذا لم يتم إغلاق/توقيع تقرير العودة، يحتفظ المستأجر بالمسؤولية الكاملة.</div><div style="display:flex; justify-content:space-between; align-items:flex-end;"><div style="width:50%; background:#f9f9f9; padding:5px; border:1px solid #000; border-radius:3px; font-size:9pt; line-height:1.4;"><strong>المقر بما فيه (المستأجر)</strong><br>الاسم: ${document.getElementById('ar_fname').value} ${document.getElementById('ar_sname').value} <br>التوقيع: ____________________</div><div style="width:45%; text-align:center; font-size:9pt;"><strong>العودة: الموظف</strong><br><br>____________________</div></div></div></div></div>`;
 
             document.getElementById('arContractOutput').innerHTML = html; document.getElementById('arContractOutput').style.display = "flex"; document.getElementById('btnARPrint').style.display = "block";
             setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('arContractOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
-            logAction('ADD', 'Contract Engine', `Generated AR Contract ${cid} for Client ID: ${document.getElementById('ar_client_id').value}`);
+            
+            const clientTrackerId = document.getElementById('ar_client_id') ? document.getElementById('ar_client_id').value : 'New';
+            logAction('ADD', 'Contract Engine', `Generated AR Contract ${cid} for Client ID: ${clientTrackerId}`);
+
+            // --- NEW: SAVE AR CONTRACT TO FIREBASE ---
+            const newARContract = {
+                "اسم العميل": document.getElementById('ar_fname').value + " " + document.getElementById('ar_sname').value,
+                "كود العميل": document.getElementById('ar_pass').value || "NEW",
+                "كود السيارة": document.getElementById('ar_carSelect').value,
+                "بداية التعاقد": document.getElementById('ar_p_time').value.replace('T', ' '),
+                "نهاية التعاقد": document.getElementById('ar_d_time').value.replace('T', ' '),
+                "مكان الاستلام": document.getElementById('ar_p_loc').value,
+                "مكان التسليم": document.getElementById('ar_d_loc').value,
+                "الايجار اليومى": c.r,
+                "إجمالي المستحق (Total)": c.totalDue,
+                "المدفوع EGP": c.totalRentPaid,
+                "الوديعة المعلقة لدينا": c.reqDep,
+                "نوع التأمين": document.getElementById('ar_insPack').value,
+                "فرع الإصدار": val_branch,
+                "assigned_user": APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name) : "System",
+                "حالة الطلب": "Active",
+                "_sys_created": new Date().toISOString()
+            };
+
+            db.collection('bookings').doc(cid).set(newARContract)
+                .then(() => showToast('✅ AR Contract Saved to Cloud Database!'))
+                .catch(err => { console.error("Database Error:", err); showToast('❌ Error saving to database!'); });
         }
 
         // -> 4. DIGITAL RECEIPT ENGINE
@@ -1389,7 +1448,7 @@
             let parts = []; if (egp > 0) parts.push(egp + " Cash (EGP)"); if (u > 0) parts.push(u + " USD (Rate: " + usd + ")"); if (e > 0) parts.push(e + " EUR (Rate: " + eur + ")"); if (card > 0) parts.push(card + " Card (EGP)");
             let detailStr = parts.length > 0 ? `(${parts.join(' + ')})` : "";
 
-            const recTitle = document.getElementById('rc_title').value || "RENTAL PAYMENT"; const isDeposit = recTitle.toUpperCase().includes("DEPOSIT"); const autoSign = document.getElementById('rc_auto_sign').checked; const pendingAmt = parseFloat(document.getElementById('rc_pending_amt').value)||0;
+            const recTitle = document.getElementById('rc_title').value || "RENTAL PAYMENT"; const isDeposit = recTitle.toUpperCase().includes("DEPOSIT"); const autoSign = document.getElementById('rc_auto_sign') ? document.getElementById('rc_auto_sign').checked : false; const pendingAmt = parseFloat(document.getElementById('rc_pending_amt').value)||0;
             const rDateInput = document.getElementById('rc_date').value; const recDateStr = rDateInput ? new Date(rDateInput).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
             let pStart = document.getElementById('rc_p_start').value; let pEnd = document.getElementById('rc_p_end').value; if(pStart) pStart = new Date(pStart).toLocaleDateString('en-GB'); if(pEnd) pEnd = new Date(pEnd).toLocaleDateString('en-GB');
             const periodStr = (pStart && pEnd) ? `${pStart} to ${pEnd}` : "-"; const logoSrc = "https://brothersegy.com/wp-content/uploads/2026/02/12345.png";
@@ -1399,7 +1458,24 @@
             let html = `<div class="a4-page"><div class="page-content">${singleRecHtml('CLIENT COPY')}<div style="text-align:center; border-top:1px dashed #999; color:#999; padding: 10px 0;">- - - - - DETACH HERE - - - - -</div>${singleRecHtml('COMPANY COPY')}</div></div>`;
             document.getElementById('receiptOutput').innerHTML = html; document.getElementById('receiptOutput').style.display = "flex"; document.getElementById('btnRcPrint').style.display = "block";
             setTimeout(() => { const ws = document.getElementById('main-workspace'); const out = document.getElementById('receiptOutput'); if (ws && out) { ws.scrollTo({ top: out.offsetTop - 80, behavior: 'smooth' }); } }, 100);
-            logAction('ADD', 'Receipt Engine', `Generated Receipt for ${document.getElementById('rc_name').value || 'Unknown Client'}`);
+            
+            const clientName = document.getElementById('rc_name').value || 'Unknown Client';
+            logAction('ADD', 'Receipt Engine', `Generated Receipt for ${clientName}`);
+
+            // --- NEW: SAVE RECEIPT TO FIREBASE ---
+            const recData = {
+                "Contract_No": document.getElementById('rc_con_no').value || 'N/A',
+                "Client_Name": clientName,
+                "Amount_EGP": totalAmt,
+                "Date": rDateInput || new Date().toISOString().split('T')[0],
+                "Type": isDeposit ? "Deposit" : "Income",
+                "assigned_user": APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name) : "System",
+                "_sys_created": new Date().toISOString()
+            };
+
+            db.collection('receipts').add(recData)
+                .then(() => showToast('✅ Receipt Recorded in Ledger!'))
+                .catch(err => { console.error("Database Error:", err); showToast('❌ Error saving receipt!'); });
         }
     </script>
 </body>
