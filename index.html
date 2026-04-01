@@ -446,23 +446,12 @@
 
         function loadCloudData() {
             return new Promise((resolve) => {
-                let loaded = { fleet: false, bookings: false, expenses: false, customers: false, logs: false };
-                const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers && loaded.logs) resolve(); };
+                let loaded = { fleet: false, bookings: false, expenses: false, customers: false };
+                const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers) resolve(); };
 
                 db.collection('fleet').onSnapshot(snap => { APP_DATA.cars = []; snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.fleet = true; checkDone(); });
                 db.collection('bookings').onSnapshot(snap => { APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.bookings = true; checkDone(); });
                 db.collection('car_expenses').onSnapshot(snap => { APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() })); loaded.expenses = true; checkDone(); });
-                
-                // --- FETCH LIVE LOGS ---
-                db.collection('logs').orderBy('timestamp', 'desc').limit(200).onSnapshot(snap => {
-                    APP_DATA.audit_logs = [];
-                    snap.forEach(doc => APP_DATA.audit_logs.push({ id: doc.id, ...doc.data() }));
-                    if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') buildAuditLogs();
-                    loaded.logs = true; checkDone();
-                }, err => {
-                    console.warn("Log read permission denied. Using local session logs only.");
-                    loaded.logs = true; checkDone();
-                });
 
                 db.collection('customers').onSnapshot(snap => { 
                     APP_DATA.customers = []; snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() })); populateClientList(); loaded.customers = true; checkDone(); 
@@ -471,6 +460,13 @@
                     if(document.getElementById('view-ar-contract').style.display === 'block') prepARContract();
                     if(document.getElementById('view-receipt').style.display === 'block') prepReceipt();
                 });
+
+                // INDEPENDENT REAL-TIME LOG LISTENER
+                db.collection('logs').orderBy('timestamp', 'desc').limit(200).onSnapshot(snap => {
+                    APP_DATA.audit_logs = [];
+                    snap.forEach(doc => APP_DATA.audit_logs.push({ id: doc.id, ...doc.data() }));
+                    if(document.getElementById('view-audit')) buildAuditLogs();
+                }, err => { console.warn("Log permission denied:", err); });
             });
         }
 
@@ -485,11 +481,10 @@
                 details: detailsStr
             };
             
-            // Send straight to Firebase for real-time network sync
+            // PUSH DIRECT TO DB - The Snapshot above will automatically pull it down in milliseconds!
             db.collection('logs').add(entry).catch(err => {
-                // Fallback if rules block it
-                APP_DATA.audit_logs.unshift(entry);
-                if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') buildAuditLogs();
+                console.warn("Could not save to DB. Showing locally.", err);
+                APP_DATA.audit_logs.unshift(entry); buildAuditLogs();
             });
         }
 
@@ -544,6 +539,26 @@
 
         function parseCurrency(val) { return parseFloat(String(val).replace(/[^0-9.-]+/g,"")) || 0; }
         function formatEGP(val) { return val.toLocaleString() + " EGP"; }
+    // --- BULLETPROOF DATE PARSER ---
+        function parseDBDate(dStr) {
+            if (!dStr) return 0;
+            let ds = String(dStr).trim();
+            let d = new Date(ds);
+            if (!isNaN(d.getTime())) return d.getTime();
+            d = new Date(ds.replace(' ', 'T')); // Fix SQL style
+            if (!isNaN(d.getTime())) return d.getTime();
+            let parts = ds.split(' '); let dateParts = parts[0].split('/'); // Fix DD/MM/YYYY
+            if (dateParts.length === 3) {
+                d = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}T${parts[1] || '00:00:00'}`);
+                if (!isNaN(d.getTime())) return d.getTime();
+            }
+            return 0; // Fallback
+        }
+        function formatDBDateStr(ms) {
+            if (!ms) return 'Invalid Date';
+            const d = new Date(ms); const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
         function getSafeVal(obj, searchKeys) { if(!obj) return ""; for (let sk of searchKeys) { const target = sk.toLowerCase().trim(); const foundKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target); if (foundKey && obj[foundKey] != null) return String(obj[foundKey]).trim(); } return ""; }
         
         function getCarColorHex(colorStr) {
@@ -879,7 +894,7 @@
         // --- 7. RADAR ---
         function buildRadar() {
             const body = document.getElementById('radar-body'); if(!body) return; body.innerHTML = ''; APP_DATA.tooltips = {};
-            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })); const nowMs = now.getTime();
+            const nowMs = new Date().getTime();
             const filter = document.getElementById('radar-status-filter').value; let counts = { ready: 0, rented: 0, going: 0, back: 0, pending: 0 };
             const T_START = nowMs - (30 * 24 * 60 * 60 * 1000); const T_END = nowMs + (60 * 24 * 60 * 60 * 1000); const T_TOTAL_MS = T_END - T_START;
 
@@ -903,31 +918,28 @@
 
                 let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id)); 
                 
-                // Identify the active booking
                 let activeBookings = carBookings.filter(b => {
                     let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
-                    // AUTO-CLOSE IF FULLY PAID AND EXPIRED
-                    let paid = parseCurrency(b['المدفوع EGP']); let total = parseCurrency(b['إجمالي المستحق (Total)']); let endMs = new Date(b['نهاية التعاقد']).getTime();
-                    if (paid >= total && total > 0 && nowMs > endMs) isClosed = true;
+                    let isAccidentOrder = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
+                    let paid = parseCurrency(b['المدفوع EGP']); let total = parseCurrency(b['إجمالي المستحق (Total)']); let endMs = parseDBDate(b['نهاية التعاقد']);
+                    if (!isAccidentOrder && paid >= total && total > 0 && nowMs > endMs) isClosed = true; // Auto-close safe orders
                     return !isClosed;
                 });
                 
-                activeBookings.sort((a,b) => new Date(b['بداية التعاقد']).getTime() - new Date(a['بداية التعاقد']).getTime());
+                activeBookings.sort((a,b) => parseDBDate(b['بداية التعاقد']) - parseDBDate(a['بداية التعاقد']));
                 let currentActiveBooking = null, nextFutureBooking = null;
                 if (activeBookings.length > 0) {
                     currentActiveBooking = activeBookings[0];
-                    if (new Date(currentActiveBooking['بداية التعاقد']).getTime() > nowMs) { nextFutureBooking = currentActiveBooking; currentActiveBooking = null; }
+                    if (parseDBDate(currentActiveBooking['بداية التعاقد']) > nowMs) { nextFutureBooking = currentActiveBooking; currentActiveBooking = null; }
                 }
 
                 let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)"; let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
 
-                // Check Car DB Level Status First
                 if (contractStr.includes('accident')) { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; assignmentText = '<span style="color:#c0392b; font-weight:bold;">Out of Service (Accident)</span>'; } 
                 else if (contractStr.includes('maintenance') || contractStr.includes('صيانة')) { masterStatusClass = "status-maint"; masterStatusText = "صيانة (MAINT)"; assignmentText = '<span style="color:#2d3436; font-weight:bold;">In Garage (Maintenance)</span>'; }
 
-                // Override with Booking Status
                 if (currentActiveBooking) {
-                    const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
+                    const end = parseDBDate(currentActiveBooking['نهاية التعاقد']);
                     let isAccidentOrder = String(currentActiveBooking['حالة الطلب'] || '').toLowerCase().includes('accident');
                     
                     if (isAccidentOrder || masterStatusClass === "status-accident") { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
@@ -936,35 +948,36 @@
                         else if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
                         else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
                     }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${formatDBDateStr(end)}</span>`;
                 } else if (nextFutureBooking) {
-                    const start = new Date(nextFutureBooking['بداية التعاقد']).getTime(); const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
+                    const start = parseDBDate(nextFutureBooking['بداية التعاقد']); const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
                     if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${nextFutureBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${nextFutureBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Starts: ${formatDBDateStr(start)}</span>`;
                 } else if (masterStatusClass === "status-ready") { counts.ready++; }
 
                 let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left: 33.33%;"></div>`;
                 let occupiedLevels = [];
 
                 for (let b of carBookings) {
-                    let bStart = new Date(b['بداية التعاقد']).getTime(); let bEnd = new Date(b['نهاية التعاقد']).getTime();
+                    let bStart = parseDBDate(b['بداية التعاقد']); let bEnd = parseDBDate(b['نهاية التعاقد']);
+                    if (bStart === 0 || bEnd === 0) continue; // Skip fatally broken dates
+                    
                     let paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']);
-                    
-                    let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
-                    if (paid >= staticTotal && staticTotal > 0 && nowMs > bEnd) isClosed = true; // Auto-close visually
-                    
                     let isAccident = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
+                    let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
+                    if (!isAccident && paid >= staticTotal && staticTotal > 0 && nowMs > bEnd) isClosed = true; 
                     
                     if (bEnd > T_START && bStart < T_END) {
                         let renderStart = Math.max(bStart, T_START); 
                         let actualEnd = bEnd;
 
+                        // FIX OVERLAP: Stop stretch if another booking exists
                         if (!isClosed && nowMs > bEnd) {
                             let nextStart = nowMs + 86400000; 
-                            for (let other of carBookings) { let oStart = new Date(other['بداية التعاقد']).getTime(); if (oStart > bStart && oStart < nextStart) { nextStart = oStart; } }
+                            for (let other of carBookings) { let oStart = parseDBDate(other['بداية التعاقد']); if (oStart > bStart && oStart < nextStart) { nextStart = oStart; } }
                             actualEnd = Math.min(nowMs + 86400000, nextStart);
                         }
 
@@ -972,19 +985,16 @@
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100; let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
                         let estDays = Math.max(1, Math.ceil((bEnd - bStart)/86400000));
-                        let dailyRent = parseCurrency(b['الايجار اليومى']);
-                        if (!dailyRent || dailyRent <= 0) dailyRent = staticTotal / estDays;
-                        
+                        let dailyRent = parseCurrency(b['الايجار اليومى']) || (staticTotal / estDays); // FIX 0 EGP PENALTY
                         let dynamicTotal = staticTotal; let latePenaltyStr = ""; let overdueHtml = "";
                         
+                        // ONGOING DEBT
                         if (!isClosed && actualEnd > bEnd) {
                             let lateDays = Math.floor((actualEnd - bEnd) / 86400000);
                             if (lateDays > 0) {
                                 let latePenalty = lateDays * dailyRent;
                                 dynamicTotal += latePenalty;
                                 latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Late Penalty (${lateDays} Days):</span> <b style="font-size:12px;">${Math.round(latePenalty).toLocaleString()} EGP</b></div>`;
-                                
-                                // VISUAL OVERDUE STRIPING
                                 if (renderEnd > bEnd) {
                                     let overdueWidthPct = ((renderEnd - Math.max(bEnd, renderStart)) / (renderEnd - renderStart)) * 100;
                                     overdueHtml = `<div style="position:absolute; right:0; top:0; bottom:0; width:${overdueWidthPct}%; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.6), rgba(0,0,0,0.6) 8px, transparent 8px, transparent 16px); border-left: 2px solid rgba(0,0,0,0.8); border-radius:0 4px 4px 0;"></div>`;
@@ -1011,10 +1021,9 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa; font-weight:bold;'>Order #${b.id}</span></div>
                                 <b style='color:var(--accent); font-size:15px;'>Client: ${b['اسم العميل']}</b><br><span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span><hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Branch:</span> <span style="color:white; font-weight:bold;">${getSafeVal(b, ['فرع الإصدار', 'Branch', 'branch']) || 'HRG'}</span></div>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Pickup:</span> <span style="color:white; font-weight:bold;">${b['مكان الاستلام'] || 'Office'}</span></div>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px;"><span style="color:#888;">Dropoff:</span> <span style="color:white; font-weight:bold;">${b['مكان التسليم'] || 'Office'}</span></div>
-                                <div style="margin-bottom:6px; font-size:12px;"><span style="color:#888;">Start:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
-                                <div style="margin-bottom:10px; font-size:12px;"><span style="color:#888;">Expected End:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
+                                <div style="margin-bottom:6px; font-size:12px;"><span style="color:#888;">Start:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${formatDBDateStr(bStart)}</span></div>
+                                <div style="margin-bottom:10px; font-size:12px;"><span style="color:#888;">Expected End:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${formatDBDateStr(bEnd)}</span></div>
                                 <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
                                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Base Value:</span> <b style="color:white; font-size:12px;">${staticTotal.toLocaleString()} EGP</b></div>
                                     ${latePenaltyStr}
@@ -1022,9 +1031,6 @@
                                     <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Current Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${Math.round(debt).toLocaleString()} EGP</b></div>
                                 </div>
                                 <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Deposit:</span> <b>${depBadge}</b></div>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Insurance:</span> <b style="color:white">${insPack}</b></div>
-                                <div style="display:flex; justify-content:space-between; font-size:11px;"><span style="color:#888;">Extras:</span> <b style="color:white">${b['إضافات أخري (ملاّك)'] || 'None'}</b></div>
                                 <div style="margin-top:8px; font-size:9px; color:#666; text-align:center;">Click bar to edit order</div>
                             </div>`;
 
@@ -1034,7 +1040,7 @@
                 timelineHTML += `</div></div>`;
                 const row = body.insertRow(); row.innerHTML = `<td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td><td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}" style="width:100%; display:block; box-sizing:border-box;">${masterStatusText}</span></td><td style="padding: 10px 15px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td><td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>`;
             });
-            if(document.getElementById('ct-ready')) document.getElementById('ct-ready').innerText = counts.ready; if(document.getElementById('ct-rented')) document.getElementById('ct-rented').innerText = counts.rented; if(document.getElementById('ct-going')) document.getElementById('ct-going').innerText = counts.going; if(document.getElementById('ct-back')) document.getElementById('ct-back').innerText = counts.back; if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
+            if(document.getElementById('ct-ready')) document.getElementById('ct-ready').innerText = counts.ready; if(document.getElementById('ct-rented')) document.getElementById('ct-rented').innerText = counts.rented; if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
             initDragScroll(); setTimeout(scrollToToday, 50); 
         }
 
