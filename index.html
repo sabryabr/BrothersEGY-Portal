@@ -237,6 +237,29 @@
                 </div>
             </div>
 
+            <div id="view-audit" class="view-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0;"><i class="fa-solid fa-clock-rotate-left"></i> System Logs & User Tracking</h2>
+                    <div style="background:rgba(46, 204, 113, 0.1); border:1px solid var(--success); padding:8px 15px; border-radius:8px; color:var(--success); font-weight:bold; font-size:12px;">
+                        <i class="fa-solid fa-circle-check"></i> Tracker Active
+                    </div>
+                </div>
+                <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="m-card"><label>Total Actions Logged</label><div class="val" id="audit_tot_actions" style="color:white">0</div></div>
+                    <div class="m-card"><label>Active Session Time</label><div class="val" id="audit_session_time" style="color:var(--primary)">0m</div></div>
+                    <div class="m-card"><label>Records Edited/Saved</label><div class="val" id="audit_tot_edits" style="color:var(--accent)">0</div></div>
+                    <div class="m-card"><label>Current User</label><div class="val" id="audit_current_user" style="color:var(--success); font-size:20px; margin-top:14px;">-</div></div>
+                </div>
+                <div class="table-responsive" style="max-height:600px; overflow-y:auto;">
+                    <table class="data-table">
+                        <thead style="position: sticky; top: 0; background: #111; z-index: 10;"><tr>
+                            <th style="width:15%">Timestamp</th><th style="width:15%">User</th><th style="width:10%">Action</th><th style="width:20%">Module</th><th style="width:40%">Details</th>
+                        </tr></thead>
+                        <tbody id="audit-body"></tbody>
+                    </table>
+                </div>
+            </div>
+                    
             <div id="view-orders" class="view-section">
                 <h2>📋 Master Order Book</h2>
                 <div class="filter-row" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); align-items: center;">
@@ -397,7 +420,8 @@
         const firebaseConfig = { apiKey: "AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc", projectId: "brothers-egy-portal", appId: "1:673531280760:web:f0d5484c0e8eabc1dd9c8d" };
         firebase.initializeApp(firebaseConfig); const db = firebase.firestore();
 
-        const APP_DATA = { cars: [], bookings: [], car_expenses: [], customers: [], user: null, liveRates: { usd: 50, eur: 54 }, tooltips: {} };
+        const APP_DATA = { cars: [], bookings: [], car_expenses: [], customers: [], user: null, liveRates: { usd: 50, eur: 54 }, audit_logs: [] };
+        const SESSION = { loginTime: null, intervalId: null };
         const T_WIDTH_PX = 2160; 
         const RATE_EXCESS_KM = 30; const RATE_FUEL_EIGHTH = 125; const MAX_DISCOUNT_PCT = 5;
 
@@ -675,6 +699,88 @@
             else { document.getElementById('quick-modal').classList.remove('show'); } 
         }
 
+        // --- REAL FIREBASE SAVING ---
+        async function updateRecordInDB(type, id) {
+            try {
+                if (type === 'order') {
+                    const statusVal = document.getElementById('modal_order_status').value;
+                    const notesVal = document.getElementById('modal_order_notes').value;
+                    
+                    await db.collection('bookings').doc(id).update({
+                        "حالة الطلب": statusVal,
+                        "ملاحظات": notesVal,
+                        "_sys_updated": new Date().toLocaleString('en-GB')
+                    });
+                    logAction('EDIT', 'Order Book', `Updated Status/Notes for Order #${id}`);
+                    showToast('Order Successfully Updated!');
+                } 
+                else if (type === 'car') {
+                    const statusVal = document.getElementById('modal_car_status').value;
+                    const kmVal = document.getElementById('modal_car_km').value;
+                    const notesVal = document.getElementById('modal_car_notes').value;
+
+                    await db.collection('fleet').doc(id).update({
+                        "حاله التعاقد": statusVal,
+                        "كيلومتر تعاقد": kmVal,
+                        "ملاحظات": notesVal,
+                        "_sys_updated": new Date().toLocaleString('en-GB')
+                    });
+                    logAction('EDIT', 'Fleet Radar', `Updated Status/KM for Car #${id}`);
+                    showToast('Vehicle Successfully Updated!');
+                }
+                closeQuickModal();
+            } catch (error) {
+                console.error(error);
+                showToast('Error saving to Database!');
+            }
+        }
+
+        // --- THE UNIVERSAL AUDIT TRACKER ---
+        function logAction(actionType, moduleName, detailsStr) {
+            const entry = {
+                timestamp: new Date().getTime(),
+                timeStr: new Date().toLocaleString('en-GB'),
+                user: APP_DATA.user ? (APP_DATA.user.name || 'Admin') : 'System',
+                action: actionType, // LOGIN, VIEW, EDIT, ADD
+                module: moduleName,
+                details: detailsStr
+            };
+            
+            APP_DATA.audit_logs.unshift(entry); // Add to local array for UI
+            
+            // Rebuild the Audit Table if open
+            if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') {
+                buildAuditLogs();
+            }
+        }
+
+        function buildAuditLogs() {
+            const body = document.getElementById('audit-body');
+            if(!body) return;
+            body.innerHTML = '';
+            let editCount = 0;
+
+            APP_DATA.audit_logs.forEach(log => {
+                if (log.action === 'EDIT' || log.action === 'ADD') editCount++;
+                let actionBadge = '';
+                if (log.action === 'LOGIN') actionBadge = '<span class="badge" style="background:#3498db; color:white;">LOGIN</span>';
+                else if (log.action === 'VIEW') actionBadge = '<span class="badge" style="background:#95a5a6; color:white;">VIEW</span>';
+                else if (log.action === 'EDIT') actionBadge = '<span class="badge bg-orange">EDIT</span>';
+                else if (log.action === 'ADD') actionBadge = '<span class="badge bg-green">ADD</span>';
+
+                const row = body.insertRow();
+                row.innerHTML = `<td style="color:#aaa; font-size:12px;">${log.timeStr}</td><td style="font-weight:bold; color:var(--primary);">${log.user}</td><td>${actionBadge}</td><td style="color:#ddd;">${log.module}</td><td style="color:#fff;">${log.details}</td>`;
+            });
+
+            document.getElementById('audit_tot_actions').innerText = APP_DATA.audit_logs.length;
+            document.getElementById('audit_tot_edits').innerText = editCount;
+            
+            if(!SESSION.loginTime) SESSION.loginTime = new Date();
+            const diffMins = Math.floor((new Date() - SESSION.loginTime) / 60000);
+            document.getElementById('audit_session_time').innerText = diffMins + "m";
+            document.getElementById('audit_current_user').innerText = APP_DATA.user ? APP_DATA.user.name : "Admin";
+        }
+        
         function calcSettlement(outKm, days, baseRent) {
             const usd = parseFloat(document.getElementById('global_usd').value) || 50; const inKm = parseFloat(document.getElementById('settle_in_km').value) || outKm; const inFuel = parseInt(document.getElementById('settle_in_fuel').value) || 0;
             let kmFee = 0; const allowedKm = days * 120; if (inKm > outKm + allowedKm) { kmFee = (inKm - (outKm + allowedKm)) * RATE_EXCESS_KM; }
@@ -723,14 +829,14 @@
                     if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
                     else if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else if (nextFutureBooking) {
                     const start = new Date(nextFutureBooking['بداية التعاقد']).getTime(); const paid = parseCurrency(nextFutureBooking['المدفوع EGP']); const total = parseCurrency(nextFutureBooking['إجمالي المستحق (Total)']);
                     if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING)"; counts.going++; }
                     else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
                     else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
                     else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `<span style="color:#888; font-size:10px;">Next:</span> <b class="clickable-obj" style="color:#fff" onclick="openQuickModal('client', '${nextFutureBooking['كود العميل']}')">${nextFutureBooking['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${new Date(nextFutureBooking['بداية التعاقد']).toLocaleDateString('en-GB')}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
                 } else { counts.ready++; }
 
                 let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left: 33.33%;"></div>`;
@@ -761,7 +867,7 @@
                             <div style="text-align:right; font-family:'Inter', 'Cairo', sans-serif; min-width:240px; direction:ltr; text-align:left;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa; font-weight:bold;'>Order #${b.id}</span></div>
                                 <b style='color:var(--accent); font-size:15px;'>Client: ${b['اسم العميل']}</b><br><span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span><hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Branch:</span> <span style="color:white; font-weight:bold;">${b['فرع الإصدار'] || b['Branch'] || 'HRG'}</span></div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Branch:</span> <span style="color:white; font-weight:bold;">${getSafeVal(b, ['فرع الإصدار', 'Branch', 'branch']) || 'HRG'}</span></div>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Pickup:</span> <span style="color:white; font-weight:bold;">${b['مكان الاستلام'] || 'Office'}</span></div>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px;"><span style="color:#888;">Dropoff:</span> <span style="color:white; font-weight:bold;">${b['مكان التسليم'] || 'Office'}</span></div>
                                 <div style="margin-bottom:6px; font-size:12px;"><span style="color:#888;">Start:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
