@@ -82,6 +82,7 @@
         .status-goingsoon { background: #9b59b6 !important; color: white !important; }
         .status-maint { background: #2d3436 !important; color: white !important; }
         .status-overdue { background: #c0392b !important; color: white !important; animation: pulse-alert 1.5s infinite; border: 2px solid #fff; }
+        .status-accident { background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #000 10px, #000 20px) !important; color: white !important; border: 2px solid #f1c40f; animation: pulse-alert 2s infinite; }
         @keyframes pulse-alert { 0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(192, 57, 43, 0); } 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); } }
 
         .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
@@ -439,14 +440,21 @@
 
         function loadCloudData() {
             return new Promise((resolve) => {
-                let loaded = { fleet: false, bookings: false, expenses: false, customers: false };
-                const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers) resolve(); };
+                let loaded = { fleet: false, bookings: false, expenses: false, customers: false, logs: false };
+                const checkDone = () => { if(loaded.fleet && loaded.bookings && loaded.expenses && loaded.customers && loaded.logs) resolve(); };
 
                 db.collection('fleet').onSnapshot(snap => { APP_DATA.cars = []; snap.forEach(doc => APP_DATA.cars.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.fleet = true; checkDone(); });
-                // Financials: Bookings (Income)
                 db.collection('bookings').onSnapshot(snap => { APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.bookings = true; checkDone(); });
-                // Financials: Expenses
                 db.collection('car_expenses').onSnapshot(snap => { APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() })); loaded.expenses = true; checkDone(); });
+                
+                // --- NEW: FETCH AUDIT LOGS FROM FIREBASE ---
+                db.collection('logs').orderBy('timestamp', 'desc').limit(100).onSnapshot(snap => {
+                    APP_DATA.audit_logs = [];
+                    snap.forEach(doc => APP_DATA.audit_logs.push({ id: doc.id, ...doc.data() }));
+                    if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') buildAuditLogs();
+                    loaded.logs = true; checkDone();
+                });
+
                 db.collection('customers').onSnapshot(snap => { 
                     APP_DATA.customers = []; snap.forEach(doc => APP_DATA.customers.push({ id: doc.id, ...doc.data() })); populateClientList(); loaded.customers = true; checkDone(); 
                     if(document.getElementById('view-proposal').style.display === 'block') prepProposal();
@@ -774,13 +782,10 @@
                 details: detailsStr
             };
             
-            // Push to local array to update the UI instantly
-            APP_DATA.audit_logs.unshift(entry); 
-            if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') {
-                buildAuditLogs();
-            }
-
-            // --- SAVE DIRECTLY TO FIREBASE ---
+            // --- 100% REAL-TIME CLOUD SYNC ---
+            // We no longer push locally. We send it straight to Firebase.
+            // The onSnapshot listener in loadCloudData() will instantly catch this
+            // and update the Audit Table for EVERYONE currently logged into the system.
             db.collection('logs').add(entry)
                 .catch(err => console.error("Failed to save audit log:", err));
         }
@@ -837,7 +842,10 @@
             document.getElementById('radar-head').innerHTML = `<tr><th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th><th style="width: 10%; text-align: center;">الحالة (Status)</th><th style="width: 48%; text-align: center; padding:5px 0;"><div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>${headerTimeline}</th><th style="width: 17%;">Assignment Info</th></tr>`;
 
             APP_DATA.cars.forEach(c => {
-                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase(); if(filter === 'active' && !contractStr.includes('valid') && !contractStr.includes('ساري')) return;
+                const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase(); 
+                // FIX: "Active" now means anything that is NOT explicitly "Finished"
+                if(filter === 'active' && (contractStr.includes('finished') || contractStr.includes('منتهي'))) return;
+                
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']); let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" "); let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
                 let carName = getCarName(c, 'ar'); let cYear = getSafeVal(c, ['سنة الصنع', 'Year']); let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
@@ -857,7 +865,10 @@
 
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
-                    if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
+                    let isAccident = String(currentActiveBooking['حالة الطلب'] || '').toLowerCase().includes('accident');
+                    
+                    if (isAccident) { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
+                    else if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
                     else if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
                     else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
                     assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${currentActiveBooking['كود العميل']}')">${currentActiveBooking['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${currentActiveBooking['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${new Date(currentActiveBooking['نهاية التعاقد']).toLocaleDateString('en-GB')}</span>`;
@@ -876,23 +887,40 @@
                 for (let b of carBookings) {
                     let bStart = new Date(b['بداية التعاقد']).getTime(); let bEnd = new Date(b['نهاية التعاقد']).getTime();
                     let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
+                    let isAccident = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
                     
                     if (bEnd > T_START && bStart < T_END) {
                         let renderStart = Math.max(bStart, T_START); let renderEnd = Math.min(bEnd, T_END);
+                        // If it's an ongoing accident or overdue, extend the visual bar to the live pointer
+                        if (!isClosed && nowMs > bEnd) { renderEnd = Math.min(nowMs + 86400000, T_END); }
+                        
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100; let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
-                        const paid = parseCurrency(b['المدفوع EGP']); const total = parseCurrency(b['إجمالي المستحق (Total)']); const debt = total - paid; const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit'])); const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
+                        const paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']); 
+                        const dailyRent = parseCurrency(b['الايجار اليومى']) || 0;
+                        let dynamicTotal = staticTotal; let latePenaltyStr = "";
+                        
+                        // ONGOING DEBT CALCULATION
+                        if (!isClosed && nowMs > bEnd) {
+                            let lateDays = Math.ceil((nowMs - bEnd) / 86400000);
+                            let latePenalty = lateDays * dailyRent;
+                            dynamicTotal += latePenalty;
+                            latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Late Penalty (${lateDays} Days):</span> <b style="font-size:12px;">${latePenalty.toLocaleString()} EGP</b></div>`;
+                        }
+                        
+                        const debt = dynamicTotal - paid; 
+                        const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit'])); const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
                         let depBadge = deposit > 0 ? `<span style="color:var(--danger);">${deposit.toLocaleString()} EGP (Held)</span>` : `<span style="color:var(--success);">Returned</span>`;
                         let barClass = "status-paid"; let statusTxt = "Paid";
                         
-                        if (isClosed) { barClass = "status-ready"; statusTxt = "Archived"; }
+                        if (isAccident) { barClass = "status-accident"; statusTxt = "ACCIDENT"; }
+                        else if (isClosed) { barClass = "status-ready"; statusTxt = "Archived"; }
                         else if (nowMs > bEnd) { barClass = "status-overdue"; statusTxt = "OVERDUE"; }
                         else if (bStart <= nowMs && bEnd >= nowMs) { if (((bEnd - nowMs) / 3600000) <= 24) { barClass = "status-backsoon"; statusTxt = "Back Soon"; } else { barClass = "status-rented"; statusTxt = "Rented"; } } 
-                        else if (bStart > nowMs) { if (((bStart - nowMs) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; } else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending"; } else if (paid < total) { barClass = "status-partial"; statusTxt = "Partial Pay"; } else { barClass = "status-paid"; statusTxt = "Paid"; } } 
+                        else if (bStart > nowMs) { if (((bStart - nowMs) / 3600000) <= 24) { barClass = "status-goingsoon"; statusTxt = "Going Soon"; } else if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending"; } else if (paid < staticTotal) { barClass = "status-partial"; statusTxt = "Partial Pay"; } else { barClass = "status-paid"; statusTxt = "Paid"; } } 
 
                         let topOffset = "14px"; if(occupiedLevels.some(lvlEnd => renderStart < lvlEnd)) { if(barClass === "status-paid" || barClass === "status-ready") topOffset = "4px"; else topOffset = "24px"; } occupiedLevels.push(renderEnd); 
 
-                        // BULLETPROOF TOOLTIP DICTIONARY
                         let ttId = 'tt_' + b.id;
                         APP_DATA.tooltips[ttId] = `
                             <div style="text-align:right; font-family:'Inter', 'Cairo', sans-serif; min-width:240px; direction:ltr; text-align:left;">
@@ -902,11 +930,12 @@
                                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Pickup:</span> <span style="color:white; font-weight:bold;">${b['مكان الاستلام'] || 'Office'}</span></div>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px;"><span style="color:#888;">Dropoff:</span> <span style="color:white; font-weight:bold;">${b['مكان التسليم'] || 'Office'}</span></div>
                                 <div style="margin-bottom:6px; font-size:12px;"><span style="color:#888;">Start:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bStart).toLocaleString('en-GB')}</span></div>
-                                <div style="margin-bottom:10px; font-size:12px;"><span style="color:#888;">End:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
+                                <div style="margin-bottom:10px; font-size:12px;"><span style="color:#888;">Expected End:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${new Date(bEnd).toLocaleString('en-GB')}</span></div>
                                 <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Total Value:</span> <b style="color:white; font-size:12px;">${total.toLocaleString()} EGP</b></div>
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Base Value:</span> <b style="color:white; font-size:12px;">${staticTotal.toLocaleString()} EGP</b></div>
+                                    ${latePenaltyStr}
                                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Paid:</span> <b style="color:var(--success); font-size:12px;">${paid.toLocaleString()} EGP</b></div>
-                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${debt.toLocaleString()} EGP</b></div>
+                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Current Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${debt.toLocaleString()} EGP</b></div>
                                 </div>
                                 <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Deposit:</span> <b>${depBadge}</b></div>
