@@ -475,13 +475,12 @@
             const entry = {
                 timestamp: new Date().getTime(),
                 timeStr: new Date().toLocaleString('en-GB'),
-                user: APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name || 'Admin') : 'System',
+                user: APP_DATA.user ? (APP_DATA.user.username || 'Admin') : 'System',
                 action: actionType, 
                 module: moduleName,
                 details: detailsStr
             };
             
-            // PUSH DIRECT TO DB - The Snapshot above will automatically pull it down in milliseconds!
             db.collection('logs').add(entry).catch(err => {
                 console.warn("Could not save to DB. Showing locally.", err);
                 APP_DATA.audit_logs.unshift(entry); buildAuditLogs();
@@ -498,7 +497,6 @@
             let userActivity = {};
 
             APP_DATA.audit_logs.forEach(log => {
-                // Tracker logic
                 let u = log.user || 'Unknown';
                 if(!userActivity[u]) userActivity[u] = { logins: 0, edits: 0 };
                 if(log.action === 'LOGIN') userActivity[u].logins++;
@@ -521,12 +519,14 @@
             document.getElementById('audit_tot_actions').innerText = APP_DATA.audit_logs.length;
             document.getElementById('audit_tot_edits').innerText = editCount;
             
-            // Insert the daily tracker into the Current User card for Admins
-            let trackerHtml = `<div style="font-size:10px; color:#aaa; text-transform:uppercase;">Daily Activity Feed:</div>`;
+            let currentUserDisplay = APP_DATA.user ? (APP_DATA.user.username || 'Admin') : 'Admin';
+            let trackerHtml = `<div style="color:var(--success); font-size:20px; font-weight:bold; margin-bottom:10px;">${currentUserDisplay}</div>`;
+            trackerHtml += `<div style="font-size:10px; color:#aaa; text-transform:uppercase; margin-bottom:5px;">Daily Feed Summary:</div>`;
             Object.keys(userActivity).forEach(k => {
-                trackerHtml += `<div style="font-size:12px; color:white; margin-top:4px; padding-bottom:4px; border-bottom:1px solid #333;"><b>${k}</b>: <span style="color:var(--accent)">${userActivity[k].edits} Edits</span> | <span style="color:#3498db">${userActivity[k].logins} Logins</span></div>`;
+                trackerHtml += `<div style="font-size:12px; color:white; margin-top:4px; padding-bottom:4px; border-bottom:1px solid #333;"><b>${k}</b>: <span style="color:var(--accent)">${userActivity[k].edits} Actions</span></div>`;
             });
             document.getElementById('audit_current_user').innerHTML = trackerHtml;
+            document.getElementById('audit_current_user').style.marginTop = "0"; // fix alignment
         }
 
         // --- 3. UTILITIES & HELPERS ---
@@ -921,8 +921,9 @@
                 let activeBookings = carBookings.filter(b => {
                     let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
                     let isAccidentOrder = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
-                    let paid = parseCurrency(b['المدفوع EGP']); let total = parseCurrency(b['إجمالي المستحق (Total)']); let endMs = parseDBDate(b['نهاية التعاقد']);
-                    if (!isAccidentOrder && paid >= total && total > 0 && nowMs > endMs) isClosed = true; // Auto-close safe orders
+                    let paid = parseCurrency(b['المدفوع EGP']); let total = parseCurrency(b['إجمالي المستحق (Total)']); 
+                    // FIX: Force treat order as closed if fully paid (unless it's an accident)
+                    if (!isAccidentOrder && paid >= total && total > 0) isClosed = true; 
                     return !isClosed;
                 });
                 
@@ -963,18 +964,19 @@
 
                 for (let b of carBookings) {
                     let bStart = parseDBDate(b['بداية التعاقد']); let bEnd = parseDBDate(b['نهاية التعاقد']);
-                    if (bStart === 0 || bEnd === 0) continue; // Skip fatally broken dates
+                    if (bStart === 0 || bEnd === 0) continue; 
                     
                     let paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']);
                     let isAccident = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
                     let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
-                    if (!isAccident && paid >= staticTotal && staticTotal > 0 && nowMs > bEnd) isClosed = true; 
+                    
+                    // FIX: Visual auto-close for paid orders
+                    if (!isAccident && paid >= staticTotal && staticTotal > 0) isClosed = true; 
                     
                     if (bEnd > T_START && bStart < T_END) {
                         let renderStart = Math.max(bStart, T_START); 
                         let actualEnd = bEnd;
 
-                        // FIX OVERLAP: Stop stretch if another booking exists
                         if (!isClosed && nowMs > bEnd) {
                             let nextStart = nowMs + 86400000; 
                             for (let other of carBookings) { let oStart = parseDBDate(other['بداية التعاقد']); if (oStart > bStart && oStart < nextStart) { nextStart = oStart; } }
@@ -984,13 +986,16 @@
                         let renderEnd = Math.min(actualEnd, T_END);
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100; let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
+                        // FIX: Ensure Daily Rent doesn't return NaN or 0
                         let estDays = Math.max(1, Math.ceil((bEnd - bStart)/86400000));
-                        let dailyRent = parseCurrency(b['الايجار اليومى']) || (staticTotal / estDays); // FIX 0 EGP PENALTY
+                        let dailyRent = parseCurrency(b['الايجار اليومى']);
+                        if (isNaN(dailyRent) || dailyRent <= 0) { dailyRent = staticTotal / estDays; }
+                        
                         let dynamicTotal = staticTotal; let latePenaltyStr = ""; let overdueHtml = "";
                         
-                        // ONGOING DEBT
+                        // ONGOING DEBT FIX
                         if (!isClosed && actualEnd > bEnd) {
-                            let lateDays = Math.floor((actualEnd - bEnd) / 86400000);
+                            let lateDays = Math.ceil((actualEnd - bEnd) / 86400000); // Changed to ceil to guarantee at least 1 day
                             if (lateDays > 0) {
                                 let latePenalty = lateDays * dailyRent;
                                 dynamicTotal += latePenalty;
