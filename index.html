@@ -82,7 +82,9 @@
         .status-goingsoon { background: #9b59b6 !important; color: white !important; }
         .status-maint { background: #2d3436 !important; color: white !important; }
         .status-overdue { background: #c0392b !important; color: white !important; animation: pulse-alert 1.5s infinite; border: 2px solid #fff; }
-        .status-accident { background: repeating-linear-gradient(45deg, #000, #000 10px, #f1c40f 10px, #f1c40f 20px) !important; color: white !important; border: 2px solid #fff; animation: pulse-alert 2s infinite; }
+        .status-accident-pill { background: #000 !important; color: #f1c40f !important; border: 2px solid #f1c40f; }
+        .accident-stripe { background: repeating-linear-gradient(45deg, #000, #000 8px, #f1c40f 8px, #f1c40f 16px) !important; border-left: 2px solid #f1c40f; }
+        .overdue-stripe { background: repeating-linear-gradient(45deg, rgba(0,0,0,0.6), rgba(0,0,0,0.6) 8px, transparent 8px, transparent 16px) !important; border-left: 2px solid rgba(0,0,0,0.8); }
         @keyframes pulse-alert { 0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(192, 57, 43, 0); } 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); } }
 
         .arabic-car-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; color: white; direction: rtl; }
@@ -477,39 +479,30 @@
             const entry = {
                 timestamp: new Date().getTime(),
                 timeStr: new Date().toLocaleString('en-GB'),
-                user: APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name || 'Admin') : 'System',
+                user: APP_DATA.user ? (APP_DATA.user.username || 'Admin') : 'System',
                 action: actionType, 
                 module: moduleName,
                 details: detailsStr
             };
             
-            // Instantly push to the UI so you always see it
+            // Instantly push to the UI so you always see it locally
             APP_DATA.audit_logs.unshift(entry);
             if (document.getElementById('view-audit')) buildAuditLogs();
             
-            // Sync to Cloud in background
-            db.collection('logs').add(entry).catch(err => console.log("DB Sync:", err));
+            // Try to save to Firebase in background
+            db.collection('logs').add(entry).catch(err => console.error("Firebase blocked log save. Check your Firestore Security Rules!", err));
         }
 
         function buildAuditLogs() {
             const body = document.getElementById('audit-body'); if(!body) return; body.innerHTML = '';
-            
             const filterVal = document.getElementById('audit-filter') ? document.getElementById('audit-filter').value : 'ALL';
-            const searchVal = document.getElementById('search-audit') ? document.getElementById('search-audit').value.toLowerCase() : '';
-
-            let editCount = 0;
-            let userActivity = {};
+            
+            // Sort locally in case Firebase didn't sort it
+            APP_DATA.audit_logs.sort((a, b) => b.timestamp - a.timestamp);
 
             APP_DATA.audit_logs.forEach(log => {
-                let u = log.user || 'Unknown';
-                if(!userActivity[u]) userActivity[u] = { logins: 0, edits: 0 };
-                if(log.action === 'LOGIN') userActivity[u].logins++;
-                if(log.action === 'EDIT' || log.action === 'ADD') userActivity[u].edits++;
+                if (filterVal !== 'ALL' && log.action !== filterVal) return;
 
-                if (filterVal !== 'ALL' && log.action !== filterVal && !(filterVal === 'EDIT' && log.action === 'ADD')) return;
-                if (searchVal && !log.user.toLowerCase().includes(searchVal) && !log.details.toLowerCase().includes(searchVal)) return;
-
-                if (log.action === 'EDIT' || log.action === 'ADD') editCount++;
                 let actionBadge = '';
                 if (log.action === 'LOGIN') actionBadge = '<span class="badge" style="background:#3498db; color:white;">LOGIN</span>';
                 else if (log.action === 'VIEW') actionBadge = '<span class="badge" style="background:#95a5a6; color:white;">VIEW</span>';
@@ -519,6 +512,8 @@
                 const row = body.insertRow();
                 row.innerHTML = `<td style="color:#aaa; font-size:12px;">${log.timeStr}</td><td style="font-weight:bold; color:var(--primary);">${log.user}</td><td>${actionBadge}</td><td style="color:#ddd;">${log.module}</td><td style="color:#fff;">${log.details}</td>`;
             });
+            document.getElementById('audit_tot_actions').innerText = APP_DATA.audit_logs.length;
+        }
 
             document.getElementById('audit_tot_actions').innerText = APP_DATA.audit_logs.length;
             document.getElementById('audit_tot_edits').innerText = editCount;
@@ -920,8 +915,7 @@
             axisHTML += `</div>`;
 
             let headerTimeline = `<div class="gantt-viewport drag-scroll" style="background:transparent; height:30px; border:none;"><div class="gantt-wrapper" style="border:none; background:transparent; width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left:33.33%;"><div class="live-time-label">LIVE</div></div></div></div>`;
-            const radarTable = document.querySelector('#view-radar .data-table'); if (radarTable) radarTable.classList.add('radar-fixed-table');
-            document.getElementById('radar-head').innerHTML = `<tr><th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th><th style="width: 10%; text-align: center;">الحالة (Status)</th><th style="width: 48%; text-align: center; padding:5px 0;"><div style="margin-bottom:5px;">📅 90-Day Operational Radar <span style="font-size:10px; color:var(--accent); font-weight:bold;">(Drag left/right to Pan)</span></div>${headerTimeline}</th><th style="width: 17%;">Assignment Info</th></tr>`;
+            document.getElementById('radar-head').innerHTML = `<tr><th style="width: 25%; text-align: right;">السيارة (Vehicle Identity)</th><th style="width: 10%; text-align: center;">الحالة (Status)</th><th style="width: 48%; text-align: center; padding:5px 0;"><div style="margin-bottom:5px;">📅 90-Day Operational Radar</div>${headerTimeline}</th><th style="width: 17%;">Assignment Info</th></tr>`;
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase(); 
@@ -929,26 +923,22 @@
                 if(filter === 'active' && !isActiveFleet) return;
                 
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']); let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
-                let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" "); let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
-                let carName = getCarName(c, 'ar'); let cYear = getSafeVal(c, ['سنة الصنع', 'Year']); let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
-                const carHTML = `<div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')"><span>${carName} (${cYear}) ${fullPlate} [${c.id}]</span><div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div></div>`;
+                let fullPlate = [l3, l2, l1].filter(Boolean).join(" ") + " | " + [n4, n3, n2, n1].filter(Boolean).join(" ");
+                let carName = getCarName(c, 'ar'); let colorHex = getCarColorHex(getSafeVal(c, ['اللون', 'Color']));
+                const carHTML = `<div class="arabic-car-title clickable-obj" onclick="openQuickModal('car', '${c.id}')"><span>${carName} ${fullPlate} [${c.id}]</span><div class="color-dot" style="background: ${colorHex}; margin-right:5px;"></div></div>`;
 
                 let carBookings = APP_DATA.bookings.filter(b => String(b['كود السيارة']) === String(c.id)); 
-                
-                // Sort ascending by Start Date
                 carBookings.sort((a,b) => parseDBDate(a['بداية التعاقد']) - parseDBDate(b['بداية التعاقد']));
                 
-                // Find LATEST relevant booking for Assignment Info
                 let activeB = null, futureB = null;
                 for (let b of carBookings) {
                     let start = parseDBDate(b['بداية التعاقد']); let end = parseDBDate(b['نهاية التعاقد']);
                     let isAcc = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
                     let isCl = String(b['حالة الطلب'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
-                    let p = parseCurrency(b['المدفوع EGP']); let t = parseCurrency(b['إجمالي المستحق (Total)']);
-                    if (!isAcc && p >= t && t > 0 && nowMs > end) isCl = true;
+                    if (!isAcc && parseCurrency(b['المدفوع EGP']) >= parseCurrency(b['إجمالي المستحق (Total)']) && end > 0 && nowMs > end) isCl = true;
 
                     if (!isCl) {
-                        if (start <= nowMs) activeB = b; // Overwrites to grab the absolutely latest ongoing one
+                        if (start <= nowMs) activeB = b; 
                         else if (!futureB && start > nowMs) futureB = b; 
                     }
                 }
@@ -956,26 +946,19 @@
                 let masterStatusClass = "status-ready"; let masterStatusText = "متاح (READY)"; let assignmentText = '<span style="color:#666">Idle / No Assignment</span>';
 
                 if (contractStr.includes('accident')) { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; assignmentText = '<span style="color:#c0392b; font-weight:bold;">Out of Service (Accident)</span>'; } 
-                else if (contractStr.includes('maintenance') || contractStr.includes('صيانة')) { masterStatusClass = "status-maint"; masterStatusText = "صيانة (MAINT)"; assignmentText = '<span style="color:#2d3436; font-weight:bold;">In Garage (Maintenance)</span>'; }
+                else if (contractStr.includes('maintenance')) { masterStatusClass = "status-maint"; masterStatusText = "صيانة (MAINT)"; assignmentText = '<span style="color:#2d3436; font-weight:bold;">In Garage (Maintenance)</span>'; }
 
                 if (activeB) {
                     const end = parseDBDate(activeB['نهاية التعاقد']);
-                    let isAccidentOrder = String(activeB['حالة الطلب'] || '').toLowerCase().includes('accident');
-                    
-                    if (isAccidentOrder || masterStatusClass === "status-accident") { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
+                    if (String(activeB['حالة الطلب'] || '').toLowerCase().includes('accident') || masterStatusClass === "status-accident") { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
                     else if (masterStatusClass !== "status-maint") {
-                        if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
-                        else if ((end - nowMs) / 3600000 <= 24) { masterStatusClass = "status-backsoon"; masterStatusText = "عودة قريبة (BACK)"; counts.back++; }
+                        if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE"; counts.rented++; }
                         else { masterStatusClass = "status-rented"; masterStatusText = "نشط (RENTED)"; counts.rented++; }
                     }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${activeB['كود العميل']}')">${activeB['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${activeB['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Ends: ${formatDBDateStr(end)}</span>`;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${activeB['كود العميل']}')">${activeB['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Ends: ${formatDBDateStr(end)}</span>`;
                 } else if (futureB && masterStatusClass === "status-ready") {
-                    const start = parseDBDate(futureB['بداية التعاقد']); const paid = parseCurrency(futureB['المدفوع EGP']); const total = parseCurrency(futureB['إجمالي المستحق (Total)']);
-                    if ((start - nowMs) / 3600000 <= 24) { masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب (GOING)"; counts.going++; }
-                    else if (paid === 0) { masterStatusClass = "status-pending"; masterStatusText = "مؤكد (PENDING)"; counts.pending++; }
-                    else if (paid < total) { masterStatusClass = "status-partial"; masterStatusText = "مؤكد (PARTIAL)"; counts.pending++; }
-                    else { masterStatusClass = "status-paid"; masterStatusText = "مؤكد (PAID)"; counts.pending++; }
-                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${futureB['كود العميل']}')">${futureB['اسم العميل']} <span style="font-size:9px; color:#ccc;">(ID: ${futureB['كود العميل']})</span></b><br><span style="font-size:10px; color:#aaa;">Starts: ${formatDBDateStr(start)}</span>`;
+                    masterStatusClass = "status-goingsoon"; masterStatusText = "خروج قريب"; counts.going++;
+                    assignmentText = `<b class="clickable-obj" style="color:var(--accent)" onclick="openQuickModal('client', '${futureB['كود العميل']}')">${futureB['اسم العميل']}</b><br><span style="font-size:10px; color:#aaa;">Starts: ${formatDBDateStr(parseDBDate(futureB['بداية التعاقد']))}</span>`;
                 } else if (masterStatusClass === "status-ready") { counts.ready++; }
 
                 let timelineHTML = `<div class="gantt-viewport drag-scroll"><div class="gantt-wrapper" style="width:${T_WIDTH_PX}px;">${axisHTML}<div class="live-time-pointer" style="left: 33.33%;"></div>`;
@@ -988,47 +971,38 @@
                     
                     let paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']);
                     let isAccident = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
-                    let isClosed = String(b['حالة الطلب'] || b['Status'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
-                    
-                    // Force visual close for paid orders to stop them stretching
+                    let isClosed = String(b['حالة الطلب'] || b['closed'] || '').toLowerCase().includes('closed') || b['closed'] === true;
                     if (!isAccident && paid >= staticTotal && staticTotal > 0 && nowMs > bEnd) isClosed = true; 
                     
                     if (bEnd > T_START && bStart < T_END) {
                         let actualEnd = bEnd;
-
-                        // FIX OVERLAP: Stop stretching if there's a newer booking!
+                        // Prevent overlap by capping the overdue extension at the next order's start time
                         if (!isClosed && nowMs > bEnd) {
                             let nextStart = nowMs + 86400000; 
                             if (i + 1 < carBookings.length) {
                                 let potentialNext = parseDBDate(carBookings[i+1]['بداية التعاقد']);
-                                if (potentialNext > bStart) nextStart = potentialNext;
+                                if (potentialNext >= bEnd) nextStart = potentialNext;
                             }
                             actualEnd = Math.min(nowMs + 86400000, nextStart);
                         }
 
-                        let renderStart = Math.max(bStart, T_START); 
-                        let renderEnd = Math.min(actualEnd, T_END);
-                        if (renderEnd <= renderStart) continue; // Skip zero-width
+                        let renderStart = Math.max(bStart, T_START); let renderEnd = Math.min(actualEnd, T_END);
+                        if (renderEnd <= renderStart) continue; 
 
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100; 
                         let widthPercent = ((renderEnd - renderStart) / T_TOTAL_MS) * 100; 
                         
                         let estDays = Math.max(1, Math.ceil((bEnd - bStart)/86400000));
-                        let dailyRent = parseCurrency(b['الايجار اليومى']) || (staticTotal / estDays);
+                        let dailyRent = parseCurrency(b['الايجار اليومى']); if (!dailyRent || dailyRent <= 0) dailyRent = staticTotal / estDays;
                         
                         let dynamicTotal = staticTotal; let latePenaltyStr = ""; let overdueHtml = "";
-                        
-                        // ONGOING DEBT & STRIPES FOR OVERDUE/ACCIDENT
                         if (!isClosed && actualEnd > bEnd) {
                             let lateDays = Math.ceil((actualEnd - bEnd) / 86400000);
                             if (lateDays > 0) {
-                                let latePenalty = lateDays * dailyRent;
-                                dynamicTotal += latePenalty;
-                                latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Delay/Accident (${lateDays} Days):</span> <b style="font-size:12px;">${Math.round(latePenalty).toLocaleString()} EGP</b></div>`;
-                                
-                                let overdueRenderStart = Math.max(bEnd, renderStart);
-                                if (renderEnd > overdueRenderStart) {
-                                    let overdueWidthPct = ((renderEnd - overdueRenderStart) / (renderEnd - renderStart)) * 100;
+                                dynamicTotal += (lateDays * dailyRent);
+                                latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Penalty (${lateDays} Days):</span> <b style="font-size:12px;">${Math.round(lateDays * dailyRent).toLocaleString()} EGP</b></div>`;
+                                if (renderEnd > bEnd) {
+                                    let overdueWidthPct = ((renderEnd - Math.max(bEnd, renderStart)) / (renderEnd - renderStart)) * 100;
                                     let stripeBg = isAccident ? 'repeating-linear-gradient(45deg, #000, #000 8px, #f1c40f 8px, #f1c40f 16px)' : 'repeating-linear-gradient(45deg, rgba(0,0,0,0.6), rgba(0,0,0,0.6) 8px, transparent 8px, transparent 16px)';
                                     let borderL = isAccident ? '2px solid #f1c40f' : '2px solid rgba(0,0,0,0.8)';
                                     overdueHtml = `<div style="position:absolute; right:0; top:0; bottom:0; width:${overdueWidthPct}%; background: ${stripeBg}; border-left: ${borderL}; border-radius:0 4px 4px 0; z-index:2;"></div>`;
@@ -1037,10 +1011,6 @@
                         }
                         
                         const debt = dynamicTotal - paid; 
-                        const deposit = parseCurrency(getSafeVal(b, ['الوديعة المعلقة لدينا', 'الوديعة', 'Deposit'])); const insPack = getSafeVal(b, ['نوع التأمين', 'التأمين', 'Insurance Package']) || 'Basic';
-                        let depBadge = deposit > 0 ? `<span style="color:var(--danger);">${deposit.toLocaleString()} EGP (Held)</span>` : `<span style="color:var(--success);">Returned</span>`;
-                        
-                        // BASE COLOR LOGIC (Regular color for the contracted period)
                         let barClass = "status-paid"; let statusTxt = "Paid";
                         if (paid === 0) { barClass = "status-pending"; statusTxt = "Pending"; }
                         else if (paid < staticTotal) { barClass = "status-partial"; statusTxt = "Partial Pay"; }
@@ -1049,38 +1019,15 @@
                         else if (isClosed) { barClass = "status-ready"; statusTxt = "Archived"; }
                         else if (nowMs > bEnd) { statusTxt = "OVERDUE"; } 
 
-                        let topOffset = "4px";
-                        let placed = false;
-                        for(let i=0; i<occupiedLevels.length; i++) {
-                            if (renderStart >= occupiedLevels[i]) {
-                                occupiedLevels[i] = renderEnd;
-                                topOffset = (i * 20 + 4) + "px";
-                                placed = true; break;
-                            }
+                        // Clean Row Placement Logic (End-to-Start alignment allowed on same row)
+                        let topOffset = "4px"; let placed = false;
+                        for(let k=0; k<occupiedLevels.length; k++) {
+                            if (renderStart >= occupiedLevels[k]) { occupiedLevels[k] = renderEnd; topOffset = (k * 20 + 4) + "px"; placed = true; break; }
                         }
-                        if (!placed) {
-                            occupiedLevels.push(renderEnd);
-                            topOffset = ((occupiedLevels.length - 1) * 20 + 4) + "px";
-                        }
+                        if (!placed) { occupiedLevels.push(renderEnd); topOffset = ((occupiedLevels.length - 1) * 20 + 4) + "px"; }
 
                         let ttId = 'tt_' + b.id;
-                        APP_DATA.tooltips[ttId] = `
-                            <div style="text-align:right; font-family:'Inter', 'Cairo', sans-serif; min-width:240px; direction:ltr; text-align:left;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa; font-weight:bold;'>Order #${b.id}</span></div>
-                                <b style='color:var(--accent); font-size:15px;'>Client: ${b['اسم العميل']}</b><br><span style='font-size:11px; color:#888;'>(ID: ${b['كود العميل'] || 'N/A'})</span><hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Branch:</span> <span style="color:white; font-weight:bold;">${getSafeVal(b, ['فرع الإصدار', 'Branch', 'branch']) || 'HRG'}</span></div>
-                                <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px;"><span style="color:#888;">Dropoff:</span> <span style="color:white; font-weight:bold;">${b['مكان التسليم'] || 'Office'}</span></div>
-                                <div style="margin-bottom:6px; font-size:12px;"><span style="color:#888;">Start:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${formatDBDateStr(bStart)}</span></div>
-                                <div style="margin-bottom:10px; font-size:12px;"><span style="color:#888;">Expected End:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${formatDBDateStr(bEnd)}</span></div>
-                                <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Base Value:</span> <b style="color:white; font-size:12px;">${staticTotal.toLocaleString()} EGP</b></div>
-                                    ${latePenaltyStr}
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Paid:</span> <b style="color:var(--success); font-size:12px;">${paid.toLocaleString()} EGP</b></div>
-                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Current Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${Math.round(debt).toLocaleString()} EGP</b></div>
-                                </div>
-                                <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
-                                <div style="margin-top:8px; font-size:9px; color:#666; text-align:center;">Click bar to edit order</div>
-                            </div>`;
+                        APP_DATA.tooltips[ttId] = `<div style="text-align:right; font-family:'Inter', 'Cairo', sans-serif; min-width:240px; direction:ltr; text-align:left;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span class="badge ${barClass}" style="font-size:10px;">${statusTxt}</span><span style='font-size:11px; color:#aaa; font-weight:bold;'>Order #${b.id}</span></div><b style='color:var(--accent); font-size:15px;'>Client: ${b['اسم العميل']}</b><hr style='border:none; border-top:1px solid #444; margin:10px 0;'><div style="margin-bottom:6px; font-size:12px;"><span style="color:#888;">Start:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${formatDBDateStr(bStart)}</span></div><div style="margin-bottom:10px; font-size:12px;"><span style="color:#888;">End:</span> <span dir="ltr" style="font-weight:bold; color:#fff;">${formatDBDateStr(bEnd)}</span></div><div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border:1px solid #333;"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Base Value:</span> <b style="color:white; font-size:12px;">${staticTotal.toLocaleString()} EGP</b></div>${latePenaltyStr}<div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Paid:</span> <b style="color:var(--success); font-size:12px;">${paid.toLocaleString()} EGP</b></div><div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${Math.round(debt).toLocaleString()} EGP</b></div></div><div style="margin-top:8px; font-size:9px; color:#666; text-align:center;">Click bar to edit order</div></div>`;
 
                         timelineHTML += `<div class="gantt-bar ${barClass}" style="left: ${leftPercent}%; width: ${widthPercent}%; top: ${topOffset};" data-tooltip-id="${ttId}" onclick="openQuickModal('order', '${b.id}')">${overdueHtml}</div>`;
                     }
@@ -1088,7 +1035,6 @@
                 timelineHTML += `</div></div>`;
                 const row = body.insertRow(); row.innerHTML = `<td style="border-right: 1px solid rgba(255,255,255,0.05); padding-right: 15px;">${carHTML}</td><td style="text-align: center; border-right: 1px solid rgba(255,255,255,0.05);"><span class="badge ${masterStatusClass}" style="width:100%; display:block; box-sizing:border-box;">${masterStatusText}</span></td><td style="padding: 10px 15px; border-right: 1px solid rgba(255,255,255,0.05);">${timelineHTML}</td><td style="font-size:11px; padding-left:15px; line-height:1.4;">${assignmentText}</td>`;
             });
-            if(document.getElementById('ct-ready')) document.getElementById('ct-ready').innerText = counts.ready; if(document.getElementById('ct-rented')) document.getElementById('ct-rented').innerText = counts.rented; if(document.getElementById('ct-pending')) document.getElementById('ct-pending').innerText = counts.pending;
             initDragScroll(); setTimeout(scrollToToday, 50); 
         }
 
