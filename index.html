@@ -447,11 +447,14 @@
                 db.collection('bookings').onSnapshot(snap => { APP_DATA.bookings = []; snap.forEach(doc => APP_DATA.bookings.push({ id: doc.id, ...doc.data() })); if(document.getElementById('view-radar').style.display === 'block') buildRadar(); loaded.bookings = true; checkDone(); });
                 db.collection('car_expenses').onSnapshot(snap => { APP_DATA.car_expenses = []; snap.forEach(doc => APP_DATA.car_expenses.push({ id: doc.id, ...doc.data() })); loaded.expenses = true; checkDone(); });
                 
-                // --- NEW: FETCH AUDIT LOGS FROM FIREBASE ---
-                db.collection('logs').orderBy('timestamp', 'desc').limit(100).onSnapshot(snap => {
+                // --- FETCH LIVE LOGS ---
+                db.collection('logs').orderBy('timestamp', 'desc').limit(200).onSnapshot(snap => {
                     APP_DATA.audit_logs = [];
                     snap.forEach(doc => APP_DATA.audit_logs.push({ id: doc.id, ...doc.data() }));
                     if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') buildAuditLogs();
+                    loaded.logs = true; checkDone();
+                }, err => {
+                    console.warn("Log read permission denied. Using local session logs only.");
                     loaded.logs = true; checkDone();
                 });
 
@@ -463,6 +466,66 @@
                     if(document.getElementById('view-receipt').style.display === 'block') prepReceipt();
                 });
             });
+        }
+
+        // --- THE UNIVERSAL AUDIT TRACKER ---
+        function logAction(actionType, moduleName, detailsStr) {
+            const entry = {
+                timestamp: new Date().getTime(),
+                timeStr: new Date().toLocaleString('en-GB'),
+                user: APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name || 'Admin') : 'System',
+                action: actionType, 
+                module: moduleName,
+                details: detailsStr
+            };
+            
+            // Send straight to Firebase for real-time network sync
+            db.collection('logs').add(entry).catch(err => {
+                // Fallback if rules block it
+                APP_DATA.audit_logs.unshift(entry);
+                if(document.getElementById('view-audit') && document.getElementById('view-audit').style.display === 'block') buildAuditLogs();
+            });
+        }
+
+        function buildAuditLogs() {
+            const body = document.getElementById('audit-body'); if(!body) return; body.innerHTML = '';
+            
+            const filterVal = document.getElementById('audit-filter') ? document.getElementById('audit-filter').value : 'ALL';
+            const searchVal = document.getElementById('search-audit') ? document.getElementById('search-audit').value.toLowerCase() : '';
+
+            let editCount = 0;
+            let userActivity = {};
+
+            APP_DATA.audit_logs.forEach(log => {
+                // Tracker logic
+                let u = log.user || 'Unknown';
+                if(!userActivity[u]) userActivity[u] = { logins: 0, edits: 0 };
+                if(log.action === 'LOGIN') userActivity[u].logins++;
+                if(log.action === 'EDIT' || log.action === 'ADD') userActivity[u].edits++;
+
+                if (filterVal !== 'ALL' && log.action !== filterVal && !(filterVal === 'EDIT' && log.action === 'ADD')) return;
+                if (searchVal && !log.user.toLowerCase().includes(searchVal) && !log.details.toLowerCase().includes(searchVal)) return;
+
+                if (log.action === 'EDIT' || log.action === 'ADD') editCount++;
+                let actionBadge = '';
+                if (log.action === 'LOGIN') actionBadge = '<span class="badge" style="background:#3498db; color:white;">LOGIN</span>';
+                else if (log.action === 'VIEW') actionBadge = '<span class="badge" style="background:#95a5a6; color:white;">VIEW</span>';
+                else if (log.action === 'EDIT') actionBadge = '<span class="badge bg-orange">EDIT</span>';
+                else if (log.action === 'ADD') actionBadge = '<span class="badge bg-green">ADD</span>';
+
+                const row = body.insertRow();
+                row.innerHTML = `<td style="color:#aaa; font-size:12px;">${log.timeStr}</td><td style="font-weight:bold; color:var(--primary);">${log.user}</td><td>${actionBadge}</td><td style="color:#ddd;">${log.module}</td><td style="color:#fff;">${log.details}</td>`;
+            });
+
+            document.getElementById('audit_tot_actions').innerText = APP_DATA.audit_logs.length;
+            document.getElementById('audit_tot_edits').innerText = editCount;
+            
+            // Insert the daily tracker into the Current User card for Admins
+            let trackerHtml = `<div style="font-size:10px; color:#aaa; text-transform:uppercase;">Daily Activity Feed:</div>`;
+            Object.keys(userActivity).forEach(k => {
+                trackerHtml += `<div style="font-size:12px; color:white; margin-top:4px; padding-bottom:4px; border-bottom:1px solid #333;"><b>${k}</b>: <span style="color:var(--accent)">${userActivity[k].edits} Edits</span> | <span style="color:#3498db">${userActivity[k].logins} Logins</span></div>`;
+            });
+            document.getElementById('audit_current_user').innerHTML = trackerHtml;
         }
 
         // --- 3. UTILITIES & HELPERS ---
@@ -771,25 +834,6 @@
             }
         }
 
-        // --- THE UNIVERSAL AUDIT TRACKER ---
-        function logAction(actionType, moduleName, detailsStr) {
-            const entry = {
-                timestamp: new Date().getTime(),
-                timeStr: new Date().toLocaleString('en-GB'),
-                user: APP_DATA.user ? (APP_DATA.user.username || APP_DATA.user.name || 'Admin') : 'System',
-                action: actionType, 
-                module: moduleName,
-                details: detailsStr
-            };
-            
-            // --- 100% REAL-TIME CLOUD SYNC ---
-            // We no longer push locally. We send it straight to Firebase.
-            // The onSnapshot listener in loadCloudData() will instantly catch this
-            // and update the Audit Table for EVERYONE currently logged into the system.
-            db.collection('logs').add(entry)
-                .catch(err => console.error("Failed to save audit log:", err));
-        }
-
         function buildAuditLogs() {
             const body = document.getElementById('audit-body');
             if(!body) return;
@@ -843,8 +887,9 @@
 
             APP_DATA.cars.forEach(c => {
                 const contractStr = getSafeVal(c, ['Contract', 'حاله التعاقد']).toLowerCase(); 
-                // FIX: "Active" now means anything that is NOT explicitly "Finished"
-                if(filter === 'active' && (contractStr.includes('finished') || contractStr.includes('منتهي'))) return;
+                // FIX: "Active Fleet" now includes Valid, Maintenance, and Accident. Only ignores "Finished".
+                const isActiveFleet = ['valid', 'active', 'ساري', 'maintenance', 'accident'].some(s => contractStr.includes(s));
+                if(filter === 'active' && !isActiveFleet) return;
                 
                 let n4 = getSafeVal(c, ['رقم اللوحة']), n3 = getSafeVal(c, ['Field_26']), n2 = getSafeVal(c, ['Field_27']), n1 = getSafeVal(c, ['Field_28']); let l3 = getSafeVal(c, ['احرف اللوحة']), l2 = getSafeVal(c, ['Field_23']), l1 = getSafeVal(c, ['Field_24']);
                 let nums = [n4, n3, n2, n1].filter(Boolean).join(" "); let lets = [l3, l2, l1].filter(Boolean).join(" "); let fullPlate = (nums || lets) ? `${lets} | ${nums}`.trim() : "No Plate";
@@ -865,7 +910,7 @@
 
                 if (currentActiveBooking) {
                     const end = new Date(currentActiveBooking['نهاية التعاقد']).getTime();
-                    let isAccident = String(currentActiveBooking['حالة الطلب'] || '').toLowerCase().includes('accident');
+                    let isAccident = String(currentActiveBooking['حالة الطلب'] || '').toLowerCase().includes('accident') || contractStr.includes('accident');
                     
                     if (isAccident) { masterStatusClass = "status-accident"; masterStatusText = "ACCIDENT (حـادث)"; counts.rented++; }
                     else if (nowMs > end) { masterStatusClass = "status-overdue"; masterStatusText = "OVERDUE (DELAYED)"; counts.rented++; }
@@ -890,22 +935,38 @@
                     let isAccident = String(b['حالة الطلب'] || '').toLowerCase().includes('accident');
                     
                     if (bEnd > T_START && bStart < T_END) {
-                        let renderStart = Math.max(bStart, T_START); let renderEnd = Math.min(bEnd, T_END);
-                        // If it's an ongoing accident or overdue, extend the visual bar to the live pointer
-                        if (!isClosed && nowMs > bEnd) { renderEnd = Math.min(nowMs + 86400000, T_END); }
-                        
+                        let renderStart = Math.max(bStart, T_START); 
+                        let actualEnd = bEnd;
+
+                        // FIX OVERLAP: If it's overdue, only stretch it until the NEXT booking starts!
+                        if (!isClosed && nowMs > bEnd) {
+                            let nextStart = nowMs + 86400000; // default to stretching to today
+                            for (let other of carBookings) {
+                                let oStart = new Date(other['بداية التعاقد']).getTime();
+                                if (oStart > bStart && oStart < nextStart) { nextStart = oStart; }
+                            }
+                            actualEnd = Math.min(nowMs + 86400000, nextStart);
+                        }
+
+                        let renderEnd = Math.min(actualEnd, T_END);
                         let leftPercent = ((renderStart - T_START) / T_TOTAL_MS) * 100; let widthPercent = Math.max(((renderEnd - renderStart) / T_TOTAL_MS) * 100, 0.5); 
                         
                         const paid = parseCurrency(b['المدفوع EGP']); let staticTotal = parseCurrency(b['إجمالي المستحق (Total)']); 
-                        const dailyRent = parseCurrency(b['الايجار اليومى']) || 0;
+                        
+                        // FIX 0 EGP PENALTY: Calculate daily rent if missing
+                        let estDays = Math.max(1, Math.ceil((bEnd - bStart)/86400000));
+                        const dailyRent = parseCurrency(b['الايجار اليومى']) || (staticTotal / estDays);
+                        
                         let dynamicTotal = staticTotal; let latePenaltyStr = "";
                         
                         // ONGOING DEBT CALCULATION
-                        if (!isClosed && nowMs > bEnd) {
-                            let lateDays = Math.ceil((nowMs - bEnd) / 86400000);
-                            let latePenalty = lateDays * dailyRent;
-                            dynamicTotal += latePenalty;
-                            latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Late Penalty (${lateDays} Days):</span> <b style="font-size:12px;">${latePenalty.toLocaleString()} EGP</b></div>`;
+                        if (!isClosed && actualEnd > bEnd) {
+                            let lateDays = Math.floor((actualEnd - bEnd) / 86400000);
+                            if (lateDays > 0) {
+                                let latePenalty = lateDays * dailyRent;
+                                dynamicTotal += latePenalty;
+                                latePenaltyStr = `<div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#f39c12;"><span style="font-size:11px;">+ Late Penalty (${lateDays} Days):</span> <b style="font-size:12px;">${Math.round(latePenalty).toLocaleString()} EGP</b></div>`;
+                            }
                         }
                         
                         const debt = dynamicTotal - paid; 
@@ -935,7 +996,7 @@
                                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Base Value:</span> <b style="color:white; font-size:12px;">${staticTotal.toLocaleString()} EGP</b></div>
                                     ${latePenaltyStr}
                                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span style="color:#888; font-size:11px;">Paid:</span> <b style="color:var(--success); font-size:12px;">${paid.toLocaleString()} EGP</b></div>
-                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Current Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${debt.toLocaleString()} EGP</b></div>
+                                    <div style="display:flex; justify-content:space-between; border-top:1px dashed #555; padding-top:4px;"><span style="color:#888; font-size:11px;">Current Debt:</span> <b style="color:${debt > 0 ? 'var(--danger)' : 'var(--success)'}; font-size:12px;">${Math.round(debt).toLocaleString()} EGP</b></div>
                                 </div>
                                 <hr style='border:none; border-top:1px solid #444; margin:10px 0;'>
                                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;"><span style="color:#888;">Deposit:</span> <b>${depBadge}</b></div>
