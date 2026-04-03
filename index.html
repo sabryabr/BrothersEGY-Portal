@@ -2294,6 +2294,1672 @@ document.addEventListener('DOMContentLoaded', () => {
       weekday:'long',year:'numeric',month:'long',day:'numeric'
     });
 });
+
+/* ============================================================
+   PART 2: DASHBOARD + ORDER BOOK
+   ============================================================ */
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+let dashCharts = {};
+
+async function loadDashboard() {
+  const el = document.getElementById('page-dashboard');
+  if (!el) return;
+
+  el.innerHTML = `
+    <div class="section-header">
+      <div>
+        <h2>📊 Dashboard</h2>
+        <p id="dash-welcome">Welcome back, ${G.user?.username} — ${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">🔄 Refresh</button>
+        <span class="pill pill-${G.user?.role?.toLowerCase()}">${G.user?.role}</span>
+        <span class="pill pill-active">${BRANCH_MAP[G.user?.branch]||G.user?.branch||'All Branches'}</span>
+      </div>
+    </div>
+
+    <!-- KPI ROW -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="kpi-card" onclick="showPage('order-book')" style="cursor:pointer;">
+        <div class="kpi-label">Active Orders</div>
+        <div class="kpi-value text-accent" id="kpi-active">--</div>
+        <div class="kpi-sub">Currently running</div>
+        <div class="kpi-icon">📋</div>
+      </div>
+      <div class="kpi-card" onclick="showPage('order-book')" style="cursor:pointer;">
+        <div class="kpi-label">Overdue Orders</div>
+        <div class="kpi-value text-danger" id="kpi-overdue">--</div>
+        <div class="kpi-sub">Past end date</div>
+        <div class="kpi-icon">⚠️</div>
+      </div>
+      <div class="kpi-card" onclick="showPage('fleet-radar')" style="cursor:pointer;">
+        <div class="kpi-label">Available Cars</div>
+        <div class="kpi-value text-success" id="kpi-avail">--</div>
+        <div class="kpi-sub">Ready to rent</div>
+        <div class="kpi-icon">🚗</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Monthly Revenue</div>
+        <div class="kpi-value text-success" id="kpi-revenue">--</div>
+        <div class="kpi-sub" id="kpi-revenue-sub">This month</div>
+        <div class="kpi-icon">💰</div>
+      </div>
+      <div class="kpi-card" onclick="showPage('tasks')" style="cursor:pointer;">
+        <div class="kpi-label">My Pending Tasks</div>
+        <div class="kpi-value text-warning" id="kpi-tasks">--</div>
+        <div class="kpi-sub">Assigned to me</div>
+        <div class="kpi-icon">✅</div>
+      </div>
+      <div class="kpi-card" onclick="showPage('proposals')" style="cursor:pointer;">
+        <div class="kpi-label">Open Proposals</div>
+        <div class="kpi-value text-purple" id="kpi-proposals">--</div>
+        <div class="kpi-sub">Draft status</div>
+        <div class="kpi-icon">📋</div>
+      </div>
+    </div>
+
+    <!-- ROW 2: Activity Feed + Fleet Chart -->
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:16px;margin-bottom:20px;">
+
+      <!-- Activity Feed -->
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <h3 style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--success);
+                         display:inline-block;animation:pulse 2s infinite;"></span>
+            Live Activity Feed
+          </h3>
+          <div style="display:flex;gap:6px;">
+            <select id="dash-log-filter" onchange="renderActivityFeed()"
+                    style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);
+                           border-radius:6px;color:var(--text);font-size:11px;">
+              <option value="all">All Actions</option>
+              <option value="LOGIN">Login</option>
+              <option value="GENERATE">Generate</option>
+              <option value="EDIT">Edit</option>
+              <option value="ADD">Add</option>
+              <option value="PRINT">Print</option>
+            </select>
+          </div>
+        </div>
+        <div id="activity-feed" style="max-height:320px;overflow-y:auto;">
+          <div class="empty-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Fleet Status Chart -->
+      <div class="panel">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:14px;">
+          🚗 Fleet Status
+        </h3>
+        <div style="position:relative;height:180px;margin-bottom:12px;">
+          <canvas id="fleet-chart"></canvas>
+        </div>
+        <div id="fleet-chart-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);
+                      text-transform:uppercase;margin-bottom:8px;">
+            This Month Finance
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
+                        border-radius:8px;padding:8px;">
+              <div style="font-size:9px;color:var(--text3);">Income</div>
+              <div id="dash-income" style="font-size:14px;font-weight:800;color:var(--success);">--</div>
+            </div>
+            <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);
+                        border-radius:8px;padding:8px;">
+              <div style="font-size:9px;color:var(--text3);">Expenses</div>
+              <div id="dash-expenses" style="font-size:14px;font-weight:800;color:var(--danger);">--</div>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);
+                      border-radius:8px;padding:8px;margin-top:8px;
+                      display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:10px;color:var(--text3);">Net Balance</span>
+            <span id="dash-net" style="font-size:15px;font-weight:900;">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 3: Tasks + Approvals + Recent Orders -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
+
+      <!-- My Tasks -->
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:800;">✅ My Tasks</h3>
+          <button class="btn btn-ghost btn-xs" onclick="showPage('tasks')">View All</button>
+        </div>
+        <div id="dash-tasks" style="max-height:240px;overflow-y:auto;"></div>
+      </div>
+
+      <!-- Pending Approvals -->
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:800;">🔔 Approvals</h3>
+          <button class="btn btn-ghost btn-xs" onclick="showPage('approvals')">View All</button>
+        </div>
+        <div id="dash-approvals" style="max-height:240px;overflow-y:auto;"></div>
+      </div>
+
+      <!-- Recent Orders -->
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:800;">📋 Recent Orders</h3>
+          <button class="btn btn-ghost btn-xs" onclick="showPage('order-book')">View All</button>
+        </div>
+        <div id="dash-orders" style="max-height:240px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- ROW 4: Upcoming Expiries -->
+    <div class="panel" style="margin-bottom:20px;">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:12px;">
+        📅 Upcoming Expiries (Next 30 Days)
+      </h3>
+      <div id="dash-expiries" class="table-wrap">
+        <div class="empty-state"><div class="spinner"></div></div>
+      </div>
+    </div>`;
+
+  // Add pulse animation
+  const style = document.getElementById('dash-pulse-style') ||
+    (() => {
+      const s = document.createElement('style');
+      s.id = 'dash-pulse-style';
+      s.textContent = `@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}`;
+      document.head.appendChild(s);
+      return s;
+    })();
+
+  // Load all dashboard data
+  await Promise.all([
+    loadDashKPIs(),
+    loadActivityFeed(),
+    loadDashFleetChart(),
+    loadDashFinance(),
+    loadDashTasks(),
+    loadDashApprovals(),
+    loadDashRecentOrders(),
+    loadDashExpiries()
+  ]);
+}
+
+/* ---- Dashboard KPIs ---- */
+async function loadDashKPIs() {
+  try {
+    const isPriv = ['Admin','Executive'].includes(G.user?.role);
+    const now    = new Date();
+    const month  = String(now.getMonth()+1);
+    const year   = String(now.getFullYear());
+
+    // Active orders
+    let activeSnap = await db.collection('bookings')
+      .where('حالة الطلب','==','Active').get();
+    let active = activeSnap.docs.map(d=>({id:d.id,...d.data()}));
+    if (!isPriv) {
+      active = active.filter(o =>
+        o['فرع الإصدار']===G.user.branch ||
+        o.assigned_user===G.user.username
+      );
+    }
+    document.getElementById('kpi-active').textContent = active.length;
+
+    // Overdue
+    const today   = new Date();
+    const overdue = active.filter(o => {
+      const {end} = getOrderDates(o);
+      return end && today > end && !o.closed;
+    });
+    document.getElementById('kpi-overdue').textContent = overdue.length;
+
+    // Available cars
+    const avail = G.fleet.filter(c =>
+      (c.status||'available').toLowerCase() === 'available'
+    );
+    document.getElementById('kpi-avail').textContent = avail.length;
+
+    // My pending tasks
+    const taskSnap = await db.collection('tasks')
+      .where('assigned_to','==',G.user.username)
+      .where('status','in',['pending','inprogress']).get();
+    document.getElementById('kpi-tasks').textContent = taskSnap.size;
+
+    // Open proposals
+    const drafts = G.proposals.filter(p=>p.status==='Draft');
+    document.getElementById('kpi-proposals').textContent = drafts.length;
+
+    // Monthly revenue from collections
+    const colSnap = await db.collection('collections').get();
+    let monthRevenue = 0;
+    colSnap.docs.forEach(d => {
+      const data = d.data();
+      if (!isPriv) {
+        const b = data['موقع الفرع']||data.Branch||'';
+        if (!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()) &&
+            !b.includes(BRANCH_AR[G.user.branch]||'')) return;
+      }
+      const m = String(data['شهر']||data.Month||'');
+      const y = String(data['سنة']||data.Year||'');
+      if (m===month && y===year) {
+        monthRevenue += parseAmount(data['قيمة التحصيل']);
+      }
+    });
+    document.getElementById('kpi-revenue').textContent = fmtMoney(monthRevenue);
+    document.getElementById('kpi-revenue-sub').textContent =
+      `${now.toLocaleString('en-GB',{month:'long'})} ${year}`;
+
+  } catch(e) { console.warn('KPI load failed:', e.message); }
+}
+
+/* ---- Activity Feed ---- */
+let allLogs = [];
+async function loadActivityFeed() {
+  try {
+    const unsub = db.collection('logs')
+      .orderBy('timestamp','desc').limit(60)
+      .onSnapshot(snap => {
+        allLogs = snap.docs.map(d=>d.data());
+        renderActivityFeed();
+      });
+    G.unsubscribers.push(unsub);
+  } catch(e) {
+    document.getElementById('activity-feed').innerHTML =
+      '<div class="empty-state"><p>Could not load logs</p></div>';
+  }
+}
+
+function renderActivityFeed() {
+  const filter = document.getElementById('dash-log-filter')?.value || 'all';
+  const feed   = document.getElementById('activity-feed');
+  if (!feed) return;
+  let logs = allLogs;
+  if (filter !== 'all') logs = logs.filter(l => l.action === filter);
+  if (!logs.length) {
+    feed.innerHTML = '<div class="empty-state" style="padding:24px;"><p>No activity found</p></div>';
+    return;
+  }
+  const actionColors = {
+    LOGIN:    {bg:'rgba(34,197,94,0.1)',  color:'var(--success)', icon:'🔐'},
+    LOGOUT:   {bg:'rgba(100,116,139,0.1)',color:'var(--text3)',   icon:'🚪'},
+    GENERATE: {bg:'rgba(59,130,246,0.1)', color:'var(--accent)',  icon:'📄'},
+    EDIT:     {bg:'rgba(245,158,11,0.1)', color:'var(--warning)', icon:'✏️'},
+    ADD:      {bg:'rgba(168,85,247,0.1)', color:'var(--purple)',  icon:'➕'},
+    PRINT:    {bg:'rgba(14,165,233,0.1)', color:'var(--accent3)', icon:'🖨️'},
+    VIEW:     {bg:'rgba(100,116,139,0.05)',color:'var(--text3)',  icon:'👁'},
+    DELETE:   {bg:'rgba(239,68,68,0.1)',  color:'var(--danger)',  icon:'🗑️'}
+  };
+  feed.innerHTML = logs.slice(0,30).map(l => {
+    const ac = actionColors[l.action] || actionColors.VIEW;
+    const av = initials(l.user||'?').toUpperCase();
+    const timeAgo = getTimeAgo(l.timestamp);
+    return `
+      <div style="display:flex;align-items:flex-start;gap:10px;
+                  padding:8px;border-radius:8px;margin-bottom:4px;
+                  background:${ac.bg};border:1px solid transparent;
+                  transition:all 0.2s;"
+           onmouseover="this.style.borderColor='var(--border2)'"
+           onmouseout="this.style.borderColor='transparent'">
+        <div style="width:28px;height:28px;border-radius:8px;
+                    background:linear-gradient(135deg,var(--accent),var(--accent2));
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:10px;font-weight:800;color:#fff;flex-shrink:0;">
+          ${av}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:11px;font-weight:700;">${l.user||'-'}</span>
+            <span style="padding:1px 7px;border-radius:99px;font-size:9px;
+                         font-weight:800;background:${ac.bg};color:${ac.color};
+                         border:1px solid ${ac.color}20;">
+              ${ac.icon} ${l.action}
+            </span>
+            <span style="font-size:10px;color:var(--text3);">${l.module||''}</span>
+          </div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${l.details||''}
+          </div>
+        </div>
+        <div style="font-size:9px;color:var(--text3);white-space:nowrap;flex-shrink:0;">
+          ${timeAgo}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function getTimeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const mins  = Math.floor(diff/60000);
+  const hrs   = Math.floor(diff/3600000);
+  const days  = Math.floor(diff/86400000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return `${mins}m ago`;
+  if (hrs  < 24)  return `${hrs}h ago`;
+  return `${days}d ago`;
+}
+
+/* ---- Fleet Pie Chart ---- */
+async function loadDashFleetChart() {
+  try {
+    const total     = G.fleet.length;
+    const available = G.fleet.filter(c=>(c.status||'available').toLowerCase()==='available').length;
+    const rented    = G.fleet.filter(c=>(c.status||'').toLowerCase()==='rented').length;
+    const accident  = G.fleet.filter(c=>(c.status||'').toLowerCase()==='accident').length;
+    const maintenance=G.fleet.filter(c=>(c.status||'').toLowerCase()==='maintenance').length;
+    const other     = total - available - rented - accident - maintenance;
+    const canvas    = document.getElementById('fleet-chart');
+    if (!canvas) return;
+    if (dashCharts.fleet) dashCharts.fleet.destroy();
+    dashCharts.fleet = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Available','Rented','Accident','Maintenance','Other'],
+        datasets:[{
+          data:[available,rented,accident,maintenance,Math.max(0,other)],
+          backgroundColor:[
+            'rgba(34,197,94,0.85)',
+            'rgba(59,130,246,0.85)',
+            'rgba(239,68,68,0.85)',
+            'rgba(245,158,11,0.85)',
+            'rgba(100,116,139,0.85)'
+          ],
+          borderColor:'rgba(13,19,33,0.8)',
+          borderWidth:2,
+          hoverOffset:6
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        cutout:'68%',
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            callbacks:{
+              label: ctx =>
+                ` ${ctx.label}: ${ctx.parsed} cars (${total?Math.round(ctx.parsed/total*100):0}%)`
+            }
+          }
+        }
+      }
+    });
+    // Legend
+    const colors=['#22c55e','#3b82f6','#ef4444','#f59e0b','#64748b'];
+    const labels=['Available','Rented','Accident','Maintenance','Other'];
+    const vals  =[available,rented,accident,maintenance,Math.max(0,other)];
+    document.getElementById('fleet-chart-legend').innerHTML =
+      labels.map((l,i)=>`
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;">
+          <div style="width:10px;height:10px;border-radius:3px;
+                      background:${colors[i]};flex-shrink:0;"></div>
+          <span style="color:var(--text2);">${l}</span>
+          <span style="font-weight:700;margin-left:auto;">${vals[i]}</span>
+        </div>`).join('');
+  } catch(e) { console.warn('Fleet chart failed:', e.message); }
+}
+
+/* ---- Dashboard Finance ---- */
+async function loadDashFinance() {
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  try {
+    const now   = new Date();
+    const month = String(now.getMonth()+1);
+    const year  = String(now.getFullYear());
+    let income=0, expenses=0;
+    // Income
+    const cSnap = await db.collection('collections').get();
+    cSnap.docs.forEach(d=>{
+      const data=d.data();
+      if (!isPriv) {
+        const b=data['موقع الفرع']||data.Branch||'';
+        if (!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase())) return;
+      }
+      const m=String(data['شهر']||''), y=String(data['سنة']||'');
+      if (m===month && y===year) income += parseAmount(data['قيمة التحصيل']);
+    });
+    // Car expenses
+    const ceSnap = await db.collection('car_expenses').get();
+    ceSnap.docs.forEach(d=>{
+      const data=d.data();
+      if (!isPriv) {
+        const b=data['موقع الفرع']||'';
+        if (!b.includes(BRANCH_AR[G.user.branch]||G.user.branch)) return;
+      }
+      const m=String(data['شهر']||'').replace(/^0/,'');
+      const y=String(data['paid_year']||data['سنة']||'');
+      if (m===month && y===year) expenses += parseAmount(data['قيمة المصروف']);
+    });
+    // Gen expenses
+    const geSnap = await db.collection('gen_expenses').get();
+    geSnap.docs.forEach(d=>{
+      const data=d.data();
+      if (!isPriv) {
+        const b=data.Branch||data['موقع الفرع']||'';
+        if (!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase())) return;
+      }
+      const m=String(data['شهر']||'');
+      const y=String(data['سنة']||'');
+      if (m===month && y===year) expenses += parseAmount(data['قيمة المصروف']);
+    });
+    const net = income - expenses;
+    document.getElementById('dash-income').textContent   = fmtMoney(income);
+    document.getElementById('dash-expenses').textContent = fmtMoney(expenses);
+    const netEl = document.getElementById('dash-net');
+    netEl.textContent = fmtMoney(net);
+    netEl.style.color = net >= 0 ? 'var(--success)' : 'var(--danger)';
+  } catch(e) { console.warn('Finance load failed:', e.message); }
+}
+
+/* ---- Dashboard Tasks ---- */
+async function loadDashTasks() {
+  const el = document.getElementById('dash-tasks');
+  if (!el) return;
+  try {
+    const snap = await db.collection('tasks')
+      .where('assigned_to','==',G.user.username)
+      .where('status','in',['pending','inprogress'])
+      .orderBy('due_date','asc').limit(5).get();
+    if (snap.empty) {
+      el.innerHTML = `<div class="empty-state" style="padding:20px;">
+        <div style="font-size:24px;">✅</div><p>No pending tasks</p></div>`;
+      return;
+    }
+    const priorityColors = {
+      urgent:'var(--danger)',high:'var(--orange)',
+      medium:'var(--warning)',low:'var(--success)'
+    };
+    el.innerHTML = snap.docs.map(d=>{
+      const t = d.data();
+      const due = t.due_date ? new Date(t.due_date) : null;
+      const isOverdue = due && new Date() > due;
+      return `
+        <div style="padding:8px;border-radius:8px;margin-bottom:6px;
+                    background:var(--surface2);border:1px solid var(--border);
+                    cursor:pointer;transition:all 0.2s;"
+             onclick="showPage('tasks')"
+             onmouseover="this.style.borderColor='var(--accent)'"
+             onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+                         background:${priorityColors[t.priority]||'var(--text3)'};"></span>
+            <span style="font-size:11px;font-weight:700;flex:1;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${t.title||'Task'}
+            </span>
+            <span class="pill pill-${t.status}">${t.status}</span>
+          </div>
+          <div style="font-size:10px;color:${isOverdue?'var(--danger)':'var(--text3)'};">
+            ${due ? (isOverdue?'⚠️ Overdue: ':'Due: ')+fmtDate(due) : 'No due date'}
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Could not load tasks</p></div>';
+  }
+}
+
+/* ---- Dashboard Approvals ---- */
+async function loadDashApprovals() {
+  const el = document.getElementById('dash-approvals');
+  if (!el) return;
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  try {
+    let snap;
+    if (isPriv) {
+      snap = await db.collection('approvals')
+        .where('status','==','pending')
+        .orderBy('created_at','desc').limit(5).get();
+    } else {
+      snap = await db.collection('approvals')
+        .where('requested_by','==',G.user.username)
+        .orderBy('created_at','desc').limit(5).get();
+    }
+    if (snap.empty) {
+      el.innerHTML = `<div class="empty-state" style="padding:20px;">
+        <div style="font-size:24px;">🔔</div>
+        <p>${isPriv?'No pending approvals':'No approval requests'}</p></div>`;
+      return;
+    }
+    const typeIcons = {
+      rate_change:'💲',cancellation:'❌',task_appeal:'📝',
+      expense:'💰',blacklist:'🚫',deposit_waiver:'🔓'
+    };
+    el.innerHTML = snap.docs.map(d=>{
+      const a = d.data();
+      return `
+        <div style="padding:8px;border-radius:8px;margin-bottom:6px;
+                    background:var(--surface2);border:1px solid var(--border);
+                    cursor:pointer;transition:all 0.2s;"
+             onclick="showPage('approvals')"
+             onmouseover="this.style.borderColor='var(--warning)'"
+             onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span style="font-size:14px;">${typeIcons[a.type]||'🔔'}</span>
+            <span style="font-size:11px;font-weight:700;flex:1;">
+              ${(a.type||'').replace(/_/g,' ').toUpperCase()}
+            </span>
+            <span class="pill pill-${a.status}">${a.status}</span>
+          </div>
+          <div style="font-size:10px;color:var(--text2);">
+            ${a.requested_by||'-'} • ${a.subject||a.details||''}
+          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:2px;">
+            ${a.created_at ? getTimeAgo(a.created_at) : ''}
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Could not load</p></div>';
+  }
+}
+
+/* ---- Dashboard Recent Orders ---- */
+async function loadDashRecentOrders() {
+  const el = document.getElementById('dash-orders');
+  if (!el) return;
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  try {
+    const snap = await db.collection('bookings')
+      .orderBy('_sys_updated','desc').limit(20).get();
+    let orders = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if (!isPriv) {
+      orders = orders.filter(o =>
+        o['فرع الإصدار']===G.user.branch ||
+        o.assigned_user===G.user.username
+      );
+    }
+    orders = orders.slice(0,5);
+    if (!orders.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:20px;">
+        <div style="font-size:24px;">📋</div><p>No recent orders</p></div>`;
+      return;
+    }
+    el.innerHTML = orders.map(o=>{
+      const {end} = getOrderDates(o);
+      const now   = new Date();
+      const isOverdue = end && now > end && !o.closed &&
+                        o['حالة الطلب']==='Active';
+      const status = isOverdue ? 'overdue' : (o['حالة الطلب']||'active').toLowerCase();
+      const total  = parseAmount(o['إجمالي المستحق (Total)']);
+      const paid   = parseAmount(o['المدفوع EGP']);
+      const pct    = total > 0 ? Math.min(100, Math.round(paid/total*100)) : 0;
+      return `
+        <div style="padding:8px;border-radius:8px;margin-bottom:6px;
+                    background:var(--surface2);border:1px solid var(--border);
+                    cursor:pointer;transition:all 0.2s;"
+             onclick="openOrderDetail('${o.id}')"
+             onmouseover="this.style.borderColor='var(--accent)'"
+             onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--accent);font-weight:700;">
+              #${o['No.']||o.id}
+            </span>
+            <span style="font-size:11px;font-weight:600;flex:1;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${o['اسم العميل']||'-'}
+            </span>
+            <span class="pill pill-${status}">${isOverdue?'OVERDUE':o['حالة الطلب']||'Active'}</span>
+          </div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">
+            ${o['اسم السيارة']||'-'}
+          </div>
+          <div style="background:var(--surface3);border-radius:99px;height:4px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;
+                        background:${pct>=100?'var(--success)':pct>50?'var(--accent)':'var(--warning)'};
+                        border-radius:99px;transition:width 0.5s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;
+                      font-size:9px;color:var(--text3);margin-top:3px;">
+            <span>Paid: ${fmtMoney(paid)}</span>
+            <span>Total: ${fmtMoney(total)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Could not load</p></div>';
+  }
+}
+
+/* ---- Dashboard Expiries ---- */
+async function loadDashExpiries() {
+  const el = document.getElementById('dash-expiries');
+  if (!el) return;
+  try {
+    const today = new Date();
+    const in30  = new Date(today.getTime() + 30*86400000);
+    const risks = [];
+    G.fleet.forEach(car => {
+      const checkFields = [
+        {field:'نهاية الترخيص',  label:'License',  icon:'📋'},
+        {field:'نهاية التأمين',  label:'Insurance', icon:'🛡'},
+        {field:'نهاية التعاقد',  label:'Contract',  icon:'📄'}
+      ];
+      checkFields.forEach(({field,label,icon}) => {
+        const dateStr = car[field];
+        if (!dateStr) return;
+        const d = parseDBDate(dateStr);
+        if (!d) return;
+        const daysLeft = Math.ceil((d-today)/86400000);
+        if (daysLeft <= 30) {
+          risks.push({
+            car,
+            label,
+            icon,
+            date: d,
+            daysLeft,
+            carLabel: getCarLabel(car)
+          });
+        }
+      });
+    });
+    risks.sort((a,b)=>a.daysLeft-b.daysLeft);
+    if (!risks.length) {
+      el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--success);">
+        ✅ No expiries in the next 30 days</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <table class="data-table">
+        <thead><tr>
+          <th>Car</th><th>Type</th><th>Expires</th>
+          <th>Days Left</th><th>Risk Level</th>
+        </tr></thead>
+        <tbody>
+          ${risks.map(r=>{
+            const risk = r.daysLeft<=7?'high':r.daysLeft<=14?'medium':'low';
+            return `<tr>
+              <td style="font-size:11px;">${r.carLabel}</td>
+              <td>${r.icon} ${r.label}</td>
+              <td>${fmtDateShort(r.date)}</td>
+              <td><strong style="color:${risk==='high'?'var(--danger)':risk==='medium'?'var(--warning)':'var(--success)'};">
+                ${r.daysLeft<=0?'EXPIRED':r.daysLeft+' days'}
+              </strong></td>
+              <td><span class="pill pill-${risk}">${risk.toUpperCase()}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) { console.warn('Expiries failed:', e.message); }
+}
+
+/* ============================================================
+   ORDER BOOK
+   ============================================================ */
+let allOrders  = [];
+let orderFilters = {
+  status: 'all', branch: 'all', search: '', dateFrom: '', dateTo: ''
+};
+
+async function loadOrderBook() {
+  const el = document.getElementById('page-order-book');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="section-header">
+      <div>
+        <h2>📋 Order Book</h2>
+        <p>All rental orders with live status and debt tracking</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="showPage('en-contract')">
+          ➕ New Order
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="refreshOrderBook()">
+          🔄 Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700;">
+            🔍 SEARCH
+          </div>
+          <input type="text" id="ob-search"
+                 placeholder="Client name, order #, car, passport..."
+                 style="width:100%;padding:8px 12px;background:var(--surface2);
+                        border:1px solid var(--border);border-radius:8px;color:var(--text);"
+                 oninput="filterOrders()"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700;">STATUS</div>
+          <select id="ob-status" onchange="filterOrders()"
+                  style="padding:8px 10px;background:var(--surface2);
+                         border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            <option value="all">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="overdue">Overdue</option>
+            <option value="Accident">Accident</option>
+            <option value="Closed">Closed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div id="branch-filter-wrap">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700;">BRANCH</div>
+          <select id="ob-branch" onchange="filterOrders()"
+                  style="padding:8px 10px;background:var(--surface2);
+                         border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            <option value="all">All Branches</option>
+            <option value="HRG">Hurghada</option>
+            <option value="ALX">Alexandria</option>
+            <option value="CAI">Cairo</option>
+            <option value="RSH">Rashid</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700;">FROM</div>
+          <input type="date" id="ob-from" onchange="filterOrders()"
+                 style="padding:8px 10px;background:var(--surface2);
+                        border:1px solid var(--border);border-radius:8px;color:var(--text);"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700;">TO</div>
+          <input type="date" id="ob-to" onchange="filterOrders()"
+                 style="padding:8px 10px;background:var(--surface2);
+                        border:1px solid var(--border);border-radius:8px;color:var(--text);"/>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="clearOrderFilters()">✕ Clear</button>
+      </div>
+      <!-- Active filter pills -->
+      <div id="ob-filter-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;"></div>
+    </div>
+
+    <!-- Orders Summary Bar -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+                gap:8px;margin-bottom:16px;" id="ob-summary-bar"></div>
+
+    <!-- Orders Table -->
+    <div class="panel">
+      <div id="ob-table-wrap" class="table-wrap">
+        <div class="empty-state"><div class="spinner lg"></div></div>
+      </div>
+    </div>
+
+    <!-- Order Detail Modal Content placeholder -->
+    <div id="order-detail-anchor"></div>`;
+
+  // Hide branch filter for non-admin
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  if (!isPriv) {
+    document.getElementById('branch-filter-wrap').style.display = 'none';
+  }
+
+  // Load orders with realtime listener
+  subscribeOrders();
+}
+
+function subscribeOrders() {
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  const query  = db.collection('bookings').orderBy('_sys_updated','desc').limit(300);
+  const unsub  = query.onSnapshot(snap => {
+    let orders = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if (!isPriv) {
+      orders = orders.filter(o =>
+        o['فرع الإصدار']===G.user.branch ||
+        o.assigned_user===G.user.username
+      );
+    }
+    allOrders = orders;
+    filterOrders();
+    updateOrderSummaryBar();
+  }, e => console.warn('Orders subscribe failed:', e.message));
+  G.unsubscribers.push(unsub);
+}
+
+function filterOrders() {
+  const search  = (document.getElementById('ob-search')?.value||'').toLowerCase();
+  const status  = document.getElementById('ob-status')?.value||'all';
+  const branch  = document.getElementById('ob-branch')?.value||'all';
+  const from    = document.getElementById('ob-from')?.value||'';
+  const to      = document.getElementById('ob-to')?.value||'';
+  const today   = new Date();
+
+  let filtered = allOrders.filter(o => {
+    // Search
+    if (search) {
+      const hay = [
+        o['اسم العميل'],o['No.'],o['اسم السيارة'],
+        o['كود العميل'],o['فرع الإصدار'],o.assigned_user
+      ].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    // Status
+    if (status !== 'all') {
+      if (status === 'overdue') {
+        const {end} = getOrderDates(o);
+        const isOD = end && today > end && !o.closed && o['حالة الطلب']==='Active';
+        if (!isOD) return false;
+      } else {
+        if (o['حالة الطلب'] !== status) return false;
+      }
+    }
+    // Branch
+    if (branch !== 'all') {
+      if (o['فرع الإصدار'] !== branch) return false;
+    }
+    // Date range
+    if (from || to) {
+      const {start} = getOrderDates(o);
+      if (from && start && start < new Date(from)) return false;
+      if (to   && start && start > new Date(to))   return false;
+    }
+    return true;
+  });
+
+  renderOrdersTable(filtered);
+  updateFilterPills(search, status, branch, from, to);
+}
+
+function updateFilterPills(search, status, branch, from, to) {
+  const pills = document.getElementById('ob-filter-pills');
+  if (!pills) return;
+  const active = [];
+  if (search)             active.push({label:`Search: "${search}"`, key:'search'});
+  if (status !== 'all')   active.push({label:`Status: ${status}`,   key:'status'});
+  if (branch !== 'all')   active.push({label:`Branch: ${BRANCH_MAP[branch]||branch}`, key:'branch'});
+  if (from)               active.push({label:`From: ${from}`,       key:'from'});
+  if (to)                 active.push({label:`To: ${to}`,           key:'to'});
+  pills.innerHTML = active.map(p=>`
+    <span style="padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;
+                 background:rgba(59,130,246,0.15);color:var(--accent);
+                 border:1px solid rgba(59,130,246,0.3);cursor:pointer;"
+          onclick="clearFilter('${p.key}')">
+      ${p.label} ✕
+    </span>`).join('');
+}
+
+function clearFilter(key) {
+  const map = {
+    search: 'ob-search', status: 'ob-status',
+    branch: 'ob-branch', from: 'ob-from', to: 'ob-to'
+  };
+  const el = document.getElementById(map[key]);
+  if (el) {
+    el.value = key==='status'||key==='branch' ? 'all' : '';
+  }
+  filterOrders();
+}
+
+function clearOrderFilters() {
+  ['ob-search','ob-from','ob-to'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  ['ob-status','ob-branch'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='all';
+  });
+  filterOrders();
+}
+
+function updateOrderSummaryBar() {
+  const bar = document.getElementById('ob-summary-bar');
+  if (!bar || !allOrders.length) return;
+  const today = new Date();
+  const active   = allOrders.filter(o=>o['حالة الطلب']==='Active').length;
+  const overdue  = allOrders.filter(o=>{
+    const {end}=getOrderDates(o);
+    return end && today>end && !o.closed && o['حالة الطلب']==='Active';
+  }).length;
+  const accident = allOrders.filter(o=>o['حالة الطلب']==='Accident').length;
+  const closed   = allOrders.filter(o=>o['حالة الطلب']==='Closed'||o.closed).length;
+  const totalDebt= allOrders.reduce((sum,o)=>{
+    const total = parseAmount(o['إجمالي المستحق (Total)']);
+    const paid  = parseAmount(o['المدفوع EGP']);
+    const {end} = getOrderDates(o);
+    const daily = parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||
+                  (total/(Math.max(1,parseFloat(o.rental_days||1))));
+    let debt = total - paid;
+    if (end && today>end && !o.closed && o['حالة الطلب']==='Active') {
+      const lateDays = Math.ceil((today-end)/86400000);
+      debt += lateDays * daily;
+    }
+    return sum + Math.max(0,debt);
+  },0);
+  bar.innerHTML = `
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Active</div>
+      <div class="kpi-value text-accent" style="font-size:20px;">${active}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Overdue</div>
+      <div class="kpi-value text-danger" style="font-size:20px;">${overdue}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Accident</div>
+      <div class="kpi-value text-warning" style="font-size:20px;">${accident}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Closed</div>
+      <div class="kpi-value" style="font-size:20px;color:var(--text3);">${closed}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Total Debt</div>
+      <div class="kpi-value text-danger" style="font-size:16px;">${fmtMoney(totalDebt)}</div>
+    </div>`;
+}
+
+function renderOrdersTable(orders) {
+  const wrap = document.getElementById('ob-table-wrap');
+  if (!wrap) return;
+  if (!orders.length) {
+    wrap.innerHTML = `<div class="empty-state">
+      <div class="es-icon">📋</div>
+      <p>No orders match your filters</p></div>`;
+    return;
+  }
+  const today = new Date();
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Order #</th>
+        <th>Client</th>
+        <th>Car</th>
+        <th>Start</th>
+        <th>End</th>
+        <th>Total</th>
+        <th>Paid</th>
+        <th>Debt</th>
+        <th>Status</th>
+        <th>Branch</th>
+        <th>Actions</th>
+      </tr></thead>
+      <tbody>
+        ${orders.map(o => {
+          const {start, end} = getOrderDates(o);
+          const total  = parseAmount(o['إجمالي المستحق (Total)']);
+          const paid   = parseAmount(o['المدفوع EGP']);
+          const daily  = parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||
+                         (total/Math.max(1,parseFloat(o.rental_days||o['rental_days']||1)));
+          const isOverdue = end && today>end && !o.closed && o['حالة الطلب']==='Active';
+          const isAccident= o['حالة الطلب']==='Accident';
+          let lateDays = 0, latePenalty = 0;
+          if ((isOverdue||isAccident) && end && !o.closed) {
+            lateDays    = Math.max(0,Math.ceil((today-end)/86400000));
+            latePenalty = lateDays * daily;
+          }
+          const debt = Math.max(0, total + latePenalty - paid);
+          const statusKey = isOverdue ? 'overdue' :
+                            (o['حالة الطلب']||'active').toLowerCase();
+          const pct   = total>0 ? Math.min(100,Math.round(paid/(total+latePenalty)*100)) : 0;
+          const clientId = o['كود العميل']||'';
+          return `
+            <tr style="cursor:pointer;" onclick="openOrderDetail('${o.id}')">
+              <td>
+                <span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span>
+              </td>
+              <td>
+                <div style="font-weight:600;">${o['اسم العميل']||'-'}</div>
+                ${clientId?`<div style="font-size:10px;color:var(--text3);">ID: ${clientId}</div>`:''}
+              </td>
+              <td style="font-size:11px;max-width:150px;white-space:nowrap;
+                         overflow:hidden;text-overflow:ellipsis;">
+                ${o['اسم السيارة']||'-'}
+              </td>
+              <td style="font-size:11px;white-space:nowrap;">
+                ${start ? fmtDateShort(start) : '<span style="color:var(--danger);">Invalid</span>'}
+              </td>
+              <td style="font-size:11px;white-space:nowrap;">
+                ${end ? fmtDateShort(end) :
+                  '<span style="color:var(--danger);">Invalid Date</span>'}
+                ${isOverdue?`<div style="font-size:9px;color:var(--danger);">
+                  ${lateDays}d overdue</div>`:''}
+              </td>
+              <td style="white-space:nowrap;">${fmtMoney(total)}</td>
+              <td>
+                <div style="white-space:nowrap;">${fmtMoney(paid)}</div>
+                <div style="background:var(--surface3);border-radius:99px;
+                            height:3px;width:60px;margin-top:3px;overflow:hidden;">
+                  <div style="height:100%;width:${pct}%;
+                              background:${pct>=100?'var(--success)':pct>50?'var(--accent)':'var(--warning)'};
+                              border-radius:99px;"></div>
+                </div>
+              </td>
+              <td style="white-space:nowrap;">
+                <span style="font-weight:700;color:${debt>0?'var(--danger)':'var(--success)'};">
+                  ${debt>0 ? fmtMoney(debt) : '✅ Clear'}
+                </span>
+                ${latePenalty>0?`<div style="font-size:9px;color:var(--danger);">
+                  +${fmtMoney(latePenalty)} penalty</div>`:''}
+              </td>
+              <td>
+                <span class="pill pill-${statusKey}">
+                  ${isOverdue?'OVERDUE':o['حالة الطلب']||'Active'}
+                </span>
+              </td>
+              <td style="font-size:11px;">
+                ${BRANCH_MAP[o['فرع الإصدار']]||o['فرع الإصدار']||'-'}
+              </td>
+              <td onclick="event.stopPropagation()">
+                <div style="display:flex;gap:4px;">
+                  <button class="btn btn-ghost btn-xs"
+                          onclick="openOrderDetail('${o.id}')">👁</button>
+                  <button class="btn btn-warning btn-xs"
+                          onclick="openOrderEdit('${o.id}')">✏️</button>
+                  <button class="btn btn-primary btn-xs"
+                          onclick="quickAddPayment('${o.id}')">💰</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="padding:10px 12px;font-size:11px;color:var(--text3);
+                border-top:1px solid var(--border);">
+      Showing ${orders.length} order${orders.length!==1?'s':''}
+    </div>`;
+}
+
+function refreshOrderBook() {
+  const wrap = document.getElementById('ob-table-wrap');
+  if (wrap) wrap.innerHTML = '<div class="empty-state"><div class="spinner lg"></div></div>';
+  subscribeOrders();
+}
+
+/* ---- Order Detail Modal ---- */
+async function openOrderDetail(orderId) {
+  const order = allOrders.find(o=>o.id===orderId);
+  if (!order) {
+    try {
+      const snap = await db.collection('bookings').doc(orderId).get();
+      if (!snap.exists) { toast('Order not found','error'); return; }
+    } catch(e) { toast('Failed to load order','error'); return; }
+  }
+  const o       = order || {};
+  const today   = new Date();
+  const {start,end} = getOrderDates(o);
+  const total   = parseAmount(o['إجمالي المستحق (Total)']);
+  const paid    = parseAmount(o['المدفوع EGP']);
+  const daily   = parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||
+                  (total/Math.max(1,parseFloat(o.rental_days||1)));
+  const isOverdue  = end && today>end && !o.closed && o['حالة الطلب']==='Active';
+  const isAccident = o['حالة الطلب']==='Accident';
+  let lateDays=0, latePenalty=0;
+  if ((isOverdue||isAccident) && end && !o.closed) {
+    lateDays    = Math.max(0,Math.ceil((today-end)/86400000));
+    latePenalty = lateDays * daily;
+  }
+  const debt = Math.max(0, total+latePenalty-paid);
+  // Get customer details
+  const customer = G.customers.find(c=>String(c['No.'])===String(o['كود العميل']));
+  // Get pickup media
+  const pickupMedia  = o.pickup_media  || [];
+  const dropoffMedia = o.dropoff_media || [];
+
+  const html = `
+    <!-- Status Banner -->
+    <div style="padding:10px 14px;border-radius:10px;margin-bottom:16px;
+                background:${isAccident?'rgba(249,115,22,0.1)':
+                             isOverdue ?'rgba(239,68,68,0.1)':
+                             o.closed  ?'rgba(100,116,139,0.1)':'rgba(34,197,94,0.1)'};
+                border:1px solid ${isAccident?'rgba(249,115,22,0.3)':
+                                   isOverdue ?'rgba(239,68,68,0.3)':
+                                   o.closed  ?'rgba(100,116,139,0.3)':'rgba(34,197,94,0.3)'};
+                display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">
+        ${isAccident?'🚨':isOverdue?'⚠️':o.closed?'✅':'🚗'}
+      </span>
+      <div>
+        <div style="font-weight:800;font-size:14px;">
+          Order #${o['No.']||o.id}
+          ${isOverdue?'— OVERDUE':isAccident?'— ACCIDENT':o.closed?'— CLOSED':'— ACTIVE'}
+        </div>
+        ${lateDays>0?`<div style="font-size:11px;color:var(--danger);">
+          ${lateDays} days overdue • Penalty: ${fmtMoney(latePenalty)}</div>`:''}
+      </div>
+    </div>
+
+    <!-- Details Grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:10px;">👤 Client</div>
+        <div style="font-size:13px;font-weight:700;">${o['اسم العميل']||'-'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">
+          CRM ID: ${o['كود العميل']||'-'}
+        </div>
+        ${customer?`
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">
+            📞 ${customer['رقم التليفون']||'-'}
+          </div>
+          <div style="font-size:11px;color:var(--text2);">
+            🪪 ${customer['رقم جواز السفر']||customer['الرقم القومي']||'-'}
+          </div>`:''}
+      </div>
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:10px;">🚗 Vehicle</div>
+        <div style="font-size:12px;font-weight:700;">${o['اسم السيارة']||'-'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">
+          Car Code: ${o['كود السيارة']||'-'}
+        </div>
+        <div style="font-size:11px;color:var(--text2);">
+          📍 Pickup: ${o['مكان الاستلام']||'-'}
+        </div>
+        <div style="font-size:11px;color:var(--text2);">
+          📍 Dropoff: ${o['مكان التسليم']||'-'}
+        </div>
+      </div>
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:10px;">📅 Period</div>
+        <div style="font-size:11px;">
+          <strong>Start:</strong> ${start?fmtDate(start):'Invalid Date'}
+        </div>
+        <div style="font-size:11px;margin-top:4px;">
+          <strong>End:</strong> ${end?fmtDate(end):'Invalid Date'}
+        </div>
+        <div style="font-size:11px;margin-top:4px;color:var(--text3);">
+          Duration: ${o.rental_days||o['rental_days']||'-'} days
+        </div>
+        <div style="font-size:11px;margin-top:4px;color:var(--text3);">
+          Branch: ${BRANCH_MAP[o['فرع الإصدار']]||o['فرع الإصدار']||'-'}
+        </div>
+      </div>
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:10px;">💰 Financials</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+          <span style="color:var(--text3);">Daily Rate:</span>
+          <span style="font-weight:700;">${fmtMoney(daily)}</span>
+          <span style="color:var(--text3);">Base Total:</span>
+          <span style="font-weight:700;">${fmtMoney(total)}</span>
+          ${latePenalty>0?`
+          <span style="color:var(--danger);">+ Penalty:</span>
+          <span style="font-weight:700;color:var(--danger);">${fmtMoney(latePenalty)}</span>`:''}
+          <span style="color:var(--text3);">Total Due:</span>
+          <span style="font-weight:800;">${fmtMoney(total+latePenalty)}</span>
+          <span style="color:var(--text3);">Paid:</span>
+          <span style="font-weight:700;color:var(--success);">${fmtMoney(paid)}</span>
+          <span style="color:var(--text3);">Deposit:</span>
+          <span>${o['الوديعة المعلقة لدينا']||'£0.00'}</span>
+        </div>
+        <div style="margin-top:10px;padding:8px 12px;border-radius:8px;
+                    background:${debt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)'};
+                    display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;">CURRENT DEBT</span>
+          <span style="font-size:16px;font-weight:900;
+                       color:${debt>0?'var(--danger)':'var(--success)'};">
+            ${debt>0?fmtMoney(debt):'✅ CLEAR'}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Photo Gallery -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  margin-bottom:12px;">
+        <h4 style="font-size:12px;font-weight:800;">
+          📸 Order Media
+          ${pickupMedia.length+dropoffMedia.length>0?
+            `<span class="nav-badge" style="display:inline-flex;margin-left:6px;">
+              ${pickupMedia.length+dropoffMedia.length}
+            </span>`:''}
+        </h4>
+        <div style="display:flex;gap:6px;">
+          <label class="btn btn-ghost btn-xs" style="cursor:pointer;">
+            📷 Pickup Photo
+            <input type="file" accept="image/*" capture="environment" style="display:none;"
+                   onchange="uploadOrderPhoto(event,'${o.id}','pickup')"/>
+          </label>
+          <label class="btn btn-ghost btn-xs" style="cursor:pointer;">
+            📷 Dropoff Photo
+            <input type="file" accept="image/*" capture="environment" style="display:none;"
+                   onchange="uploadOrderPhoto(event,'${o.id}','dropoff')"/>
+          </label>
+        </div>
+      </div>
+      ${pickupMedia.length||dropoffMedia.length ? `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+                    gap:8px;">
+          ${[...pickupMedia.map(m=>({...m,type:'pickup'})),
+             ...dropoffMedia.map(m=>({...m,type:'dropoff'}))].map(m=>`
+            <div style="position:relative;border-radius:8px;overflow:hidden;
+                        aspect-ratio:4/3;background:var(--surface3);">
+              <img src="${m.url||m}" style="width:100%;height:100%;object-fit:cover;"
+                   onclick="openPhotoLightbox('${m.url||m}')"/>
+              <div style="position:absolute;bottom:0;left:0;right:0;
+                          background:rgba(0,0,0,0.6);padding:3px 6px;
+                          font-size:9px;font-weight:700;">
+                ${m.type==='pickup'?'📤 Pickup':'📥 Dropoff'}
+              </div>
+            </div>`).join('')}
+        </div>` : `
+        <div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;">
+          No photos attached yet. Use the buttons above to add pickup/dropoff photos.
+        </div>`}
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-warning" onclick="closeModal();openOrderEdit('${o.id}')">
+        ✏️ Edit Order
+      </button>
+      <button class="btn btn-primary" onclick="closeModal();quickAddPayment('${o.id}')">
+        💰 Add Payment
+      </button>
+      ${!o.closed && o['حالة الطلب']!=='Closed' ? `
+        <button class="btn btn-success"
+                onclick="closeModal();requestCloseOrder('${o.id}')">
+          ✅ Request Close
+        </button>` : ''}
+      <button class="btn btn-ghost" onclick="closeModal();showPage('receipts')">
+        🧾 Generate Receipt
+      </button>
+    </div>`;
+
+  openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`, html, true);
+  logAction('VIEW','Order Book',`Viewed order #${o['No.']||o.id}`);
+}
+
+/* ---- Order Edit Modal ---- */
+async function openOrderEdit(orderId) {
+  const order = allOrders.find(o=>o.id===orderId);
+  if (!order) return;
+  const o = order;
+  const isAdminOrExec = ['Admin','Executive'].includes(G.user?.role);
+  const html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="field">
+        <label>Order Status</label>
+        <select id="edit-status">
+          <option value="Active"    ${o['حالة الطلب']==='Active'   ?'selected':''}>Active</option>
+          <option value="Closed"    ${o['حالة الطلب']==='Closed'   ?'selected':''}>Closed</option>
+          <option value="Accident"  ${o['حالة الطلب']==='Accident' ?'selected':''}>Accident</option>
+          <option value="Cancelled" ${o['حالة الطلب']==='Cancelled'?'selected':''}>Cancelled</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Daily Rate (EGP)</label>
+        <input type="number" id="edit-daily"
+               value="${parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||''}"
+               ${!isAdminOrExec?'readonly title="Rate changes require admin approval"':''}/>
+      </div>
+      <div class="field">
+        <label>Total Due (EGP)</label>
+        <input type="number" id="edit-total"
+               value="${parseAmount(o['إجمالي المستحق (Total)'])||''}"/>
+      </div>
+      <div class="field">
+        <label>Paid EGP</label>
+        <input type="number" id="edit-paid"
+               value="${parseAmount(o['المدفوع EGP'])||''}"/>
+      </div>
+      <div class="field">
+        <label>KM at Start</label>
+        <input type="number" id="edit-km-start"
+               value="${parseAmount(o['كيلومتر بداية'])||''}"/>
+      </div>
+      <div class="field">
+        <label>KM at End</label>
+        <input type="number" id="edit-km-end"
+               value="${parseAmount(o['كيلومتر نهاية'])||''}"/>
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <input type="text" id="edit-notes"
+               value="${o['ملاحظات']||o.Notes||''}"/>
+      </div>
+      <div class="field">
+        <label>Mark as Closed</label>
+        <select id="edit-closed">
+          <option value="false" ${!o.closed?'selected':''}>Open (debt clock running)</option>
+          <option value="true"  ${o.closed ?'selected':''}>Closed (debt clock stopped)</option>
+        </select>
+      </div>
+    </div>
+    ${!isAdminOrExec?`
+      <div style="margin-top:12px;padding:10px;border-radius:8px;
+                  background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);
+                  font-size:11px;color:var(--warning);">
+        ⚠️ Rate changes exceeding 5% discount require Admin approval.
+        The system will auto-submit an approval request if needed.
+      </div>`:''}
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-success" onclick="saveOrderEdit('${orderId}')">
+        💾 Save Changes
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(`Edit Order #${o['No.']||o.id}`, html);
+}
+
+async function saveOrderEdit(orderId) {
+  const order     = allOrders.find(o=>o.id===orderId);
+  const isPriv    = ['Admin','Executive'].includes(G.user?.role);
+  const newStatus = document.getElementById('edit-status').value;
+  const newDaily  = parseFloat(document.getElementById('edit-daily').value)||0;
+  const newTotal  = parseFloat(document.getElementById('edit-total').value)||0;
+  const newPaid   = parseFloat(document.getElementById('edit-paid').value)||0;
+  const newClosed = document.getElementById('edit-closed').value === 'true';
+  const newNotes  = document.getElementById('edit-notes').value.trim();
+  const kmStart   = document.getElementById('edit-km-start').value;
+  const kmEnd     = document.getElementById('edit-km-end').value;
+  // Check rate discount threshold
+  if (!isPriv && order) {
+    const origRate  = parseAmount(order['سعر السيارة اليومي بالجنيه المصري']);
+    const threshold = G.settings.discountThreshold || 5;
+    const discountPct = origRate > 0 ?
+      ((origRate - newDaily) / origRate * 100) : 0;
+    if (discountPct > threshold) {
+      // Submit approval request
+      await db.collection('approvals').add({
+        type:            'rate_change',
+        requested_by:    G.user.username,
+        branch:          G.user.branch,
+        subject:         `Rate change for Order #${order['No.']}`,
+        details:         `Original: ${fmtMoney(origRate)} → Requested: ${fmtMoney(newDaily)} (${discountPct.toFixed(1)}% discount)`,
+        linked_ref:      orderId,
+        current_value:   String(origRate),
+        requested_value: String(newDaily),
+        reason:          newNotes || 'Rate change requested',
+        status:          'pending',
+        created_at:      Date.now()
+      });
+      toast(`Rate change of ${discountPct.toFixed(1)}% exceeds ${threshold}% threshold. Approval request submitted.`,'warning',6000);
+      // Notify admins
+      const adminSnap = await db.collection('users').get();
+      adminSnap.docs.forEach(d => {
+        if (['Admin','Executive'].includes(d.data().role)) {
+          createNotification(d.id,'approval',
+            `Rate change request from ${G.user.username} for Order #${order['No.']}`,
+            'approvals',orderId);
+        }
+      });
+      closeModal();
+      return;
+    }
+  }
+  try {
+    const updateData = {
+      'حالة الطلب':  newStatus,
+      'سعر السيارة اليومي بالجنيه المصري': fmtMoney(newDaily),
+      'إجمالي المستحق (Total)': fmtMoney(newTotal),
+      'المدفوع EGP': String(newPaid),
+      'closed':       newClosed,
+      'ملاحظات':      newNotes,
+      '_sys_updated': Date.now()
+    };
+    if (kmStart) updateData['كيلومتر بداية'] = kmStart;
+    if (kmEnd)   updateData['كيلومتر نهاية'] = kmEnd;
+    // Accident cascade: update fleet status
+    if (newStatus === 'Accident' && order?.['كود السيارة']) {
+      await db.collection('fleet')
+        .doc(String(order['كود السيارة']))
+        .update({status:'accident', Contract:'Accident', _sys_updated:Date.now()})
+        .catch(()=>{});
+    }
+    // Closed: update fleet to available
+    if (newClosed && order?.['كود السيارة']) {
+      await db.collection('fleet')
+        .doc(String(order['كود السيارة']))
+        .update({status:'available', _sys_updated:Date.now()})
+        .catch(()=>{});
+    }
+    await db.collection('bookings').doc(orderId).update(updateData);
+    await logAction('EDIT','Order Book',
+      `Updated Order #${order?.['No.']||orderId} → Status: ${newStatus}`);
+    toast('Order updated successfully!','success');
+    closeModal();
+  } catch(e) {
+    toast('Update failed: '+e.message,'error');
+  }
+}
+
+/* ---- Quick Payment ---- */
+function quickAddPayment(orderId) {
+  const order = allOrders.find(o=>o.id===orderId);
+  if (!order) return;
+  const total = parseAmount(order['إجمالي المستحق (Total)']);
+  const paid  = parseAmount(order['المدفوع EGP']);
+  const debt  = Math.max(0, total - paid);
+  const html  = `
+    <div style="margin-bottom:16px;padding:12px;border-radius:8px;
+                background:var(--surface2);border:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;font-size:12px;">
+        <span style="color:var(--text3);">Order:</span>
+        <strong>#${order['No.']||orderId}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;">
+        <span style="color:var(--text3);">Client:</span>
+        <strong>${order['اسم العميل']||'-'}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;">
+        <span style="color:var(--text3);">Outstanding:</span>
+        <strong style="color:var(--danger);">${fmtMoney(debt)}</strong>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Amount EGP</label>
+        <input type="number" id="qp-egp" value="0"
+               oninput="updateQPTotal()"/>
+      </div>
+      <div class="field">
+        <label>Amount USD</label>
+        <input type="number" id="qp-usd" value="0"
+               oninput="updateQPTotal()"/>
+      </div>
+      <div class="field">
+        <label>Amount EUR</label>
+        <input type="number" id="qp-eur" value="0"
+               oninput="updateQPTotal()"/>
+      </div>
+      <div class="field">
+        <label>Card (EGP)</label>
+        <input type="number" id="qp-card" value="0"
+               oninput="updateQPTotal()"/>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:10px 14px;border-radius:8px;
+                background:var(--surface2);border:1px solid var(--border);
+                display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:700;">Total This Payment</span>
+      <span id="qp-total" style="font-size:16px;font-weight:900;
+                                  color:var(--success);">£0.00</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-success btn-full"
+              onclick="saveQuickPayment('${orderId}',${total},${paid})">
+        💾 Save Payment
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(`Add Payment — Order #${order['No.']||orderId}`, html);
+}
+
+function updateQPTotal() {
+  const egp  = parseFloat(document.getElementById('qp-egp')?.value)||0;
+  const usd  = parseFloat(document.getElementById('qp-usd')?.value)||0;
+  const eur  = parseFloat(document.getElementById('qp-eur')?.value)||0;
+  const card = parseFloat(document.getElementById('qp-card')?.value)||0;
+  const total= egp + (usd*G.ratesUSD) + (eur*G.ratesEUR) + card;
+  const el   = document.getElementById('qp-total');
+  if (el) el.textContent = fmtMoney(total);
+}
+
+async function saveQuickPayment(orderId, totalDue, prevPaid) {
+  const egp  = parseFloat(document.getElementById('qp-egp')?.value)||0;
+  const usd  = parseFloat(document.getElementById('qp-usd')?.value)||0;
+  const eur  = parseFloat(document.getElementById('qp-eur')?.value)||0;
+  const card = parseFloat(document.getElementById('qp-card')?.value)||0;
+  const thisPayment = egp + (usd*G.ratesUSD) + (eur*G.ratesEUR) + card;
+  if (thisPayment <= 0) {
+    toast('Payment amount must be greater than 0','error');
+    return;
+  }
+  const order  = allOrders.find(o=>o.id===orderId);
+  const newEGP = prevPaid + egp;
+  const newTotalPaid = prevPaid + thisPayment;
+  try {
+    const updateData = {
+      'المدفوع EGP': String(newEGP),
+      '_sys_updated': Date.now()
+    };
+    if (usd > 0) {
+      const prevUSD = parseAmount(order?.['المدفوع USD']||'0');
+      updateData['المدفوع USD'] = String(prevUSD + usd);
+    }
+    if (eur > 0) {
+      const prevEUR = parseAmount(order?.['المدفوع EUR']||'0');
+      updateData['المدفوع EUR'] = String(prevEUR + eur);
+    }
+    // Auto-close if fully paid and past end date
+    const {end} = getOrderDates(order||{});
+    if (newTotalPaid >= totalDue && end && new Date()>end &&
+        order?.['حالة الطلب']!=='Accident') {
+      updateData['closed']       = true;
+      updateData['حالة الطلب']  = 'Closed';
+      if (order?.['كود السيارة']) {
+        await db.collection('fleet')
+          .doc(String(order['كود السيارة']))
+          .update({status:'available',_sys_updated:Date.now()})
+          .catch(()=>{});
+      }
+      toast('Order fully paid and automatically closed!','success');
+    }
+    await db.collection('bookings').doc(orderId).update(updateData);
+    await logAction('EDIT','Order Book',
+      `Payment added to Order #${order?.['No.']||orderId}: ${fmtMoney(thisPayment)}`);
+    toast(`Payment of ${fmtMoney(thisPayment)} saved!`,'success');
+    closeModal();
+    // Redirect to receipt generation
+    setTimeout(()=>{
+      document.getElementById('rc-contract-no').value = order?.['No.']||orderId;
+      showPage('receipts');
+      doRCLookup();
+    }, 500);
+  } catch(e) {
+    toast('Payment save failed: '+e.message,'error');
+  }
+}
+
+/* ---- Request Order Close ---- */
+async function requestCloseOrder(orderId) {
+  const order   = allOrders.find(o=>o.id===orderId);
+  const isPriv  = ['Admin','Executive'].includes(G.user?.role);
+  if (isPriv) {
+    // Admins can close directly
+    try {
+      await db.collection('bookings').doc(orderId).update({
+        'حالة الطلب': 'Closed',
+        'closed':      true,
+        '_sys_updated': Date.now()
+      });
+      if (order?.['كود السيارة']) {
+        await db.collection('fleet')
+          .doc(String(order['كود السيارة']))
+          .update({status:'available',_sys_updated:Date.now()}).catch(()=>{});
+      }
+      await logAction('EDIT','Order Book',
+        `Closed Order #${order?.['No.']||orderId}`);
+      toast('Order closed successfully!','success');
+    } catch(e) { toast('Close failed: '+e.message,'error'); }
+  } else {
+    // Non-admins submit approval request
+    try {
+      await db.collection('approvals').add({
+        type:         'cancellation',
+        requested_by: G.user.username,
+        branch:       G.user.branch,
+        subject:      `Close Order #${order?.['No.']||orderId}`,
+        details:      `Request to close order for ${order?.['اسم العميل']||'client'}`,
+        linked_ref:   orderId,
+        status:       'pending',
+        created_at:   Date.now()
+      });
+      toast('Close request submitted for Admin approval','info');
+      // Notify admins
+      const adminSnap = await db.collection('users').get();
+      adminSnap.docs.forEach(d => {
+        if (['Admin','Executive'].includes(d.data().role)) {
+          createNotification(d.id,'approval',
+            `Order close request from ${G.user.username}: #${order?.['No.']}`,
+            'approvals', orderId);
+        }
+      });
+    } catch(e) { toast('Request failed: '+e.message,'error'); }
+  }
+}
+
+/* ---- Photo Upload ---- */
+async function uploadOrderPhoto(event, orderId, type) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (file.size > 10*1024*1024) {
+    toast('File too large. Max 10MB per photo.','error');
+    return;
+  }
+  toast('Uploading photo...','info',2000);
+  try {
+    // Compress image client-side
+    const compressed = await compressImage(file, 800, 0.75);
+    const filename   = `img_${Date.now()}.jpg`;
+    const path       = `orders/${orderId}/${type}/${filename}`;
+    const ref        = storage.ref(path);
+    await ref.put(compressed);
+    const url = await ref.getDownloadURL();
+    // Save URL to booking doc
+    const order = allOrders.find(o=>o.id===orderId) ||
+                  (await db.collection('bookings').doc(orderId).get()).data();
+    const mediaField = type==='pickup' ? 'pickup_media' : 'dropoff_media';
+    const existing   = order?.[mediaField] || [];
+    const newEntry   = {url, timestamp:Date.now(), uploaded_by:G.user.username, type};
+    await db.collection('bookings').doc(orderId).update({
+      [mediaField]: [...existing, newEntry],
+      '_sys_updated': Date.now()
+    });
+    await logAction('ADD','Order Book',
+      `Photo uploaded for Order #${order?.['No.']||orderId} — ${type}`);
+    toast('Photo uploaded successfully!','success');
+    openOrderDetail(orderId);
+  } catch(e) {
+    toast('Upload failed: '+e.message,'error');
+  }
+}
+
+function compressImage(file, maxW, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale  = Math.min(1, maxW/img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(b=>resolve(b),'image/jpeg',quality);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+}
+
+function openPhotoLightbox(url) {
+  const html = `
+    <div style="text-align:center;">
+      <img src="${url}" style="max-width:100%;max-height:70vh;
+                                border-radius:8px;object-fit:contain;"/>
+      <div style="margin-top:12px;">
+        <a href="${url}" target="_blank" class="btn btn-ghost btn-sm">
+          🔗 Open Full Size
+        </a>
+        <a href="${url}" download class="btn btn-primary btn-sm" style="margin-left:8px;">
+          ⬇️ Download
+        </a>
+      </div>
+    </div>`;
+  openModal('Photo', html);
+}
+
+   
 </script>
 </body>
 </html>
