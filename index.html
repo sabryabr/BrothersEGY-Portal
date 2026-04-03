@@ -4251,7 +4251,1901 @@ async function loadVehicle360Details(){
       </div>`;
   }catch(e){content.innerHTML=`<div class="empty-state"><p>Failed to load vehicle data: ${e.message}</p></div>`;}
 }
- 
+
+/* ============================================================
+   PART 4: PROPOSALS MODULE
+   ============================================================ */
+async function loadProposalsPage(){
+  const el=document.getElementById('page-proposals');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>📋 Proposals</h2><p>Create, manage and convert price proposals</p></div>
+      <button class="btn btn-ghost btn-sm" onclick="loadProposalsList().then(()=>renderProposalsList())">🔄 Refresh</button>
+    </div>
+    <div style="display:grid;grid-template-columns:380px 1fr;gap:14px;align-items:start;">
+      <!-- Control Panel -->
+      <div class="panel sticky-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
+          <h3 style="font-size:13px;font-weight:800;">📋 New Proposal</h3>
+          <span id="pr-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+        </div>
+        <!-- Client Search -->
+        <div class="crm-search-wrap">
+          <div class="crm-search-header">
+            🔍 SEARCH & AUTO-FILL CLIENT
+            <span id="pr-crm-id" class="crm-id-badge" style="display:none;"></span>
+          </div>
+          <div class="crm-input-row">
+            <input type="text" id="pr-client-search" placeholder="Name, passport, phone..."
+                   oninput="crmSearch('pr')"/>
+          </div>
+          <div class="crm-actions">
+            <button class="crm-action-btn new" onclick="openAddCustomerModal()">+ New</button>
+            <button class="crm-action-btn edit" id="pr-edit-btn" style="display:none;" onclick="crmEditMode('pr')">✏️ Edit</button>
+            <button class="crm-action-btn save" id="pr-save-btn" style="display:none;" onclick="crmSaveEdit('pr')">💾 Save</button>
+            <button class="crm-action-btn cancel" id="pr-cancel-btn" style="display:none;" onclick="crmCancelEdit('pr')">✕ Cancel</button>
+          </div>
+          <div class="crm-suggestions" id="pr-suggestions"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;" id="pr-client-fields">
+            <div class="field"><label>First Name *</label><input type="text" id="pr-fname" placeholder="First Name" readonly/></div>
+            <div class="field"><label>Last Name *</label><input type="text" id="pr-lname" placeholder="Last Name" readonly/></div>
+            <div class="field"><label>Phone</label><input type="text" id="pr-phone" placeholder="Phone" readonly/></div>
+            <div class="field"><label>Email</label><input type="text" id="pr-email" placeholder="Email" readonly/></div>
+          </div>
+        </div>
+        <!-- Dates & Locations -->
+        <div class="form-section" style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">① Dates & Locations</div>
+          <div class="form-grid">
+            <div class="field"><label>Pickup Date/Time</label><input type="datetime-local" id="pr-pickup" onchange="prCalc()"/></div>
+            <div class="field"><label>Dropoff Date/Time</label><input type="datetime-local" id="pr-dropoff" onchange="prCalc()"/></div>
+            <div class="field"><label>Pickup Location</label><input type="text" id="pr-ploc" placeholder="Office/Airport/Hotel"/></div>
+            <div class="field"><label>Dropoff Location</label><input type="text" id="pr-dloc" placeholder="Office/Airport/Hotel"/></div>
+          </div>
+        </div>
+        <!-- Vehicle -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">② Vehicle Selection</div>
+          <div class="field" style="margin-bottom:7px;"><label>Select from Fleet</label>
+            <select id="pr-car" onchange="prSelectCar()"><option value="">-- Select Car --</option></select>
+          </div>
+          <div id="pr-car-badge" class="car-info-badge"></div>
+          <div id="pr-overlap-warn" style="display:none;background:rgba(239,68,68,0.1);border:1px solid var(--danger);border-radius:8px;padding:9px;font-size:11px;color:var(--danger);margin-top:7px;"></div>
+          <div class="form-grid" style="margin-top:7px;">
+            <div class="field"><label>Daily Rent (EGP)</label><input type="number" id="pr-daily" placeholder="0" oninput="prCalc()"/></div>
+            <div class="field"><label>Duration</label><input type="text" id="pr-days" readonly/></div>
+          </div>
+        </div>
+        <!-- Mileage & Insurance -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">③ Mileage & Insurance</div>
+          <div class="form-grid">
+            <div class="field"><label>KM Package</label>
+              <select id="pr-km" onchange="prCalc()">
+                <option value="standard">Standard (120 KM/Day)</option>
+                <option value="500">500 KM Package</option>
+                <option value="1000">1000 KM Package</option>
+                <option value="unlimited">Unlimited KM</option>
+              </select></div>
+            <div class="field"><label>KM Package Cost (EGP)</label><input type="number" id="pr-km-cost" value="0" oninput="prCalc()"/></div>
+            <div class="field"><label>Insurance Plan</label>
+              <select id="pr-ins" onchange="prCalc()">
+                <option value="basic">Basic (100% Liability)</option>
+                <option value="intermediate">Intermediate (70/30)</option>
+                <option value="full">Full Protection (Zero Liability)</option>
+              </select></div>
+            <div class="field"><label>Insurance Fee (Daily EGP)</label><input type="number" id="pr-ins-fee" value="0" oninput="prCalc()"/></div>
+          </div>
+        </div>
+        <!-- Extras -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">④ Extras & Delivery</div>
+          <div class="form-grid">
+            <div class="field"><label>Pickup Fee (EGP)</label><input type="number" id="pr-pfee" value="0" oninput="prCalc()"/></div>
+            <div class="field"><label>Dropoff Fee (EGP)</label><input type="number" id="pr-dfee" value="0" oninput="prCalc()"/></div>
+            <div class="field"><label>Security Deposit (EGP)</label><input type="number" id="pr-deposit" value="0" oninput="prCalc()"/></div>
+            <div class="field"><label>Child Seat (days)</label><input type="number" id="pr-seat-days" value="0" min="0" oninput="prCalc()"/></div>
+            <div class="field"><label>Add. Driver (days)</label><input type="number" id="pr-driver-days" value="0" min="0" oninput="prCalc()"/></div>
+          </div>
+        </div>
+        <!-- Live Estimate -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:13px;">
+          <div style="font-size:10px;color:var(--text3);font-weight:700;margin-bottom:8px;text-transform:uppercase;">Live Estimate</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;">
+            <span style="color:var(--text3);">Base Rent:</span><span id="pr-est-base" style="font-weight:700;">£0.00</span>
+            <span style="color:var(--text3);">KM Package:</span><span id="pr-est-km">£0.00</span>
+            <span style="color:var(--text3);">Insurance:</span><span id="pr-est-ins">£0.00</span>
+            <span style="color:var(--text3);">Extras/Fees:</span><span id="pr-est-extras">£0.00</span>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:9px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:700;">TOTAL ESTIMATE</span>
+            <span id="pr-est-total" style="font-size:17px;font-weight:900;color:var(--accent);">£0.00</span>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="generateProposal()">📋 Generate Proposal</button>
+        <button class="btn btn-ghost btn-full mt-8" onclick="clearProposalForm()">✕ Clear Form</button>
+      </div>
+      <!-- Right Panel: List + Output -->
+      <div>
+        <!-- Proposals List -->
+        <div class="panel" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px;">
+            <h3 style="font-size:13px;font-weight:800;">📁 Proposals List</h3>
+            <select id="pr-filter" onchange="renderProposalsList()" style="padding:5px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:11px;">
+              <option value="all">All Statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Converted">Converted</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Ref</th><th>Client</th><th>Car</th><th>Period</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="proposals-tbody">
+                <tr><td colspan="7"><div class="empty-state" style="padding:20px;"><p>No proposals yet</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Proposal A4 Output -->
+        <div id="pr-output" style="display:none;">
+          <div style="display:flex;gap:7px;margin-bottom:11px;">
+            <button class="btn btn-primary" onclick="printModule('pr-a4')">🖨️ Print / Save PDF</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('pr-output').style.display='none'">✕ Close Preview</button>
+          </div>
+          <div class="a4-page" id="pr-a4"></div>
+        </div>
+      </div>
+    </div>`;
+
+  populateFleetDropdowns();
+  renderProposalsList();
+}
+
+/* ---- CRM Search (shared for pr / en / ar) ---- */
+let crmSearchTimeout=null;
+function crmSearch(prefix){
+  clearTimeout(crmSearchTimeout);
+  crmSearchTimeout=setTimeout(()=>doCrmSearch(prefix),350);
+}
+function doCrmSearch(prefix){
+  const q=(document.getElementById(`${prefix}-client-search`)?.value||'').toLowerCase().trim();
+  const sugBox=document.getElementById(`${prefix}-suggestions`);if(!sugBox)return;
+  if(!q||q.length<2){sugBox.style.display='none';return;}
+  const matches=G.customers.filter(c=>{
+    const name=((c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')).toLowerCase();
+    const passport=(c['رقم جواز السفر']||'').toLowerCase();
+    const natid=(c['الرقم القومي']||'').toLowerCase();
+    const phone=(c['رقم التليفون']||'').toLowerCase();
+    return name.includes(q)||passport.includes(q)||natid.includes(q)||phone.includes(q);
+  });
+  if(!matches.length){sugBox.style.display='none';return;}
+  sugBox.style.display='block';
+  sugBox.innerHTML=matches.slice(0,8).map(c=>{
+    const name=((c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')).trim();
+    const id=c['رقم جواز السفر']||c['الرقم القومي']||'';
+    return`<div class="crm-suggestion-item" onclick="fillCrmFields('${prefix}','${c.id}')">
+      <div class="sug-avatar">${initials(name).toUpperCase()}</div>
+      <div class="sug-info">
+        <div class="sug-name">${name}</div>
+        <div class="sug-id">${id} | #${c['No.']||c.id}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function fillCrmFields(prefix,customerId){
+  const c=G.customers.find(x=>x.id===customerId);if(!c)return;
+  const set=(id,val)=>{const el=document.getElementById(id);if(el){el.value=val||'';el.readOnly=true;}};
+  set(`${prefix}-fname`,c['الاسم الأول']||'');
+  set(`${prefix}-lname`,c['الاسم الأخير']||'');
+  set(`${prefix}-phone`,c['رقم التليفون']||'');
+  set(`${prefix}-email`,c['عنوان البريد الإلكتروني']||'');
+  set(`${prefix}-passport`,c['رقم جواز السفر']||c['الرقم القومي']||'');
+  set(`${prefix}-license`,c['رقم رخصة القيادة']||'');
+  set(`${prefix}-address`,c['العنوان']||'');
+  set(`${prefix}-nationality`,c['رمز الدولة']||'');
+  const searchEl=document.getElementById(`${prefix}-client-search`);
+  if(searchEl)searchEl.value=((c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')).trim();
+  const sugBox=document.getElementById(`${prefix}-suggestions`);
+  if(sugBox)sugBox.style.display='none';
+  const crmId=document.getElementById(`${prefix}-crm-id`);
+  if(crmId){crmId.textContent=`CRM ID: ${c['No.']||c.id} (LINKED)`;crmId.style.display='inline';}
+  const editBtn=document.getElementById(`${prefix}-edit-btn`);
+  if(editBtn)editBtn.style.display='inline-flex';
+  window[`_crm_${prefix}_id`]=c.id;
+}
+function crmEditMode(prefix){
+  ['fname','lname','phone','email','passport','license','address','nationality'].forEach(f=>{
+    const el=document.getElementById(`${prefix}-${f}`);if(el)el.readOnly=false;
+  });
+  document.getElementById(`${prefix}-edit-btn`).style.display='none';
+  document.getElementById(`${prefix}-save-btn`).style.display='inline-flex';
+  document.getElementById(`${prefix}-cancel-btn`).style.display='inline-flex';
+}
+async function crmSaveEdit(prefix){
+  const customerId=window[`_crm_${prefix}_id`];if(!customerId){toast('No customer linked','error');return;}
+  try{
+    const upd={'الاسم الأول':document.getElementById(`${prefix}-fname`)?.value.trim(),'الاسم الأخير':document.getElementById(`${prefix}-lname`)?.value.trim(),'رقم التليفون':document.getElementById(`${prefix}-phone`)?.value.trim(),'عنوان البريد الإلكتروني':document.getElementById(`${prefix}-email`)?.value.trim(),'رقم جواز السفر':document.getElementById(`${prefix}-passport`)?.value.trim(),'رقم رخصة القيادة':document.getElementById(`${prefix}-license`)?.value.trim(),'العنوان':document.getElementById(`${prefix}-address`)?.value.trim(),'رمز الدولة':document.getElementById(`${prefix}-nationality`)?.value.trim(),'_sys_updated':Date.now()};
+    await db.collection('customers').doc(customerId).update(upd);
+    const idx=G.customers.findIndex(c=>c.id===customerId);
+    if(idx>-1)G.customers[idx]={...G.customers[idx],...upd};
+    crmCancelEdit(prefix);toast('Customer updated!','success');
+    await logAction('EDIT','CRM','Updated customer from proposal/contract form');
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+function crmCancelEdit(prefix){
+  ['fname','lname','phone','email','passport','license','address','nationality'].forEach(f=>{
+    const el=document.getElementById(`${prefix}-${f}`);if(el)el.readOnly=true;
+  });
+  const saveBtn=document.getElementById(`${prefix}-save-btn`);if(saveBtn)saveBtn.style.display='none';
+  const cancelBtn=document.getElementById(`${prefix}-cancel-btn`);if(cancelBtn)cancelBtn.style.display='none';
+  const editBtn=document.getElementById(`${prefix}-edit-btn`);if(editBtn)editBtn.style.display='inline-flex';
+}
+
+/* ---- Proposal Calc ---- */
+function prSelectCar(){
+  const carId=document.getElementById('pr-car')?.value;
+  showCarInfoBadge(carId,'pr-car-badge');
+  if(carId)prCheckOverlap(carId);
+  prCalc();
+}
+async function prCheckOverlap(carId){
+  const pickup=document.getElementById('pr-pickup')?.value;
+  const dropoff=document.getElementById('pr-dropoff')?.value;
+  const warnEl=document.getElementById('pr-overlap-warn');
+  if(!pickup||!dropoff||!carId){if(warnEl)warnEl.style.display='none';return;}
+  const start=new Date(pickup),end=new Date(dropoff);
+  try{
+    const snap=await db.collection('proposals').where('car_id','==',String(carId)).where('status','in',['Draft','Accepted']).get();
+    let conflict=null;
+    snap.docs.forEach(d=>{
+      const pd=d.data();const ps=new Date(pd.pickup_date),pe=new Date(pd.dropoff_date);
+      if(start<pe&&end>ps)conflict=pd;
+    });
+    if(warnEl){
+      if(conflict){warnEl.style.display='block';warnEl.textContent=`⚠️ Conflict: Car already has open proposal (${conflict.proposal_ref}) from ${fmtDateShort(new Date(conflict.pickup_date))} to ${fmtDateShort(new Date(conflict.dropoff_date))}. Cancel it first.`;}
+      else warnEl.style.display='none';
+    }
+  }catch(e){if(warnEl)warnEl.style.display='none';}
+}
+function prCalc(){
+  const pickup=document.getElementById('pr-pickup')?.value;
+  const dropoff=document.getElementById('pr-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('pr-km-cost')?.value)||0;
+  const insFee=parseFloat(document.getElementById('pr-ins-fee')?.value)||0;
+  const pfee=parseFloat(document.getElementById('pr-pfee')?.value)||0;
+  const dfee=parseFloat(document.getElementById('pr-dfee')?.value)||0;
+  const seatD=parseInt(document.getElementById('pr-seat-days')?.value)||0;
+  const drvD=parseInt(document.getElementById('pr-driver-days')?.value)||0;
+  let days=0;
+  if(pickup&&dropoff){const diff=new Date(dropoff)-new Date(pickup);days=Math.max(0,Math.ceil(diff/86400000));}
+  const daysEl=document.getElementById('pr-days');if(daysEl)daysEl.value=days>0?days+' days':'0';
+  const base=daily*days;const insTotal=insFee*days;
+  const extras=pfee+dfee+(seatD*250)+(drvD*500);
+  const total=base+insTotal+kmCost+extras;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=fmtMoney(v);};
+  s('pr-est-base',base);s('pr-est-km',kmCost);s('pr-est-ins',insTotal);s('pr-est-extras',extras);s('pr-est-total',total);
+}
+
+/* ---- Generate Proposal ---- */
+async function generateProposal(){
+  const clientName=((document.getElementById('pr-fname')?.value||'')+' '+(document.getElementById('pr-lname')?.value||'')).trim();
+  const carId=document.getElementById('pr-car')?.value;
+  const pickup=document.getElementById('pr-pickup')?.value;
+  const dropoff=document.getElementById('pr-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
+  if(!clientName){toast('Client name is required. Search and select a client first.','error');return;}
+  if(!carId){toast('Please select a car from the fleet.','error');return;}
+  if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
+  if(daily<=0){toast('Daily rent must be greater than 0.','error');return;}
+  const warnEl=document.getElementById('pr-overlap-warn');
+  if(warnEl&&warnEl.style.display!=='none'){toast('Resolve car conflict before generating proposal.','error');return;}
+  const car=getCarById(carId);
+  const carLabel=car?getCarLabel(car,'en'):carId;
+  const branchCode=G.user?.branch||'GEN';
+  const ref=await generateDocRef('PR',branchCode);
+  const pickupD=new Date(pickup),dropoffD=new Date(dropoff);
+  const days=Math.max(0,Math.ceil((dropoffD-pickupD)/86400000));
+  const kmCost=parseFloat(document.getElementById('pr-km-cost')?.value)||0;
+  const insFee=parseFloat(document.getElementById('pr-ins-fee')?.value)||0;
+  const pfee=parseFloat(document.getElementById('pr-pfee')?.value)||0;
+  const dfee=parseFloat(document.getElementById('pr-dfee')?.value)||0;
+  const deposit=parseFloat(document.getElementById('pr-deposit')?.value)||0;
+  const seatD=parseInt(document.getElementById('pr-seat-days')?.value)||0;
+  const drvD=parseInt(document.getElementById('pr-driver-days')?.value)||0;
+  const base=daily*days;const insTotal=insFee*days;
+  const extras=pfee+dfee+(seatD*250)+(drvD*500);
+  const total=base+insTotal+kmCost+extras;
+  const kmPkg=document.getElementById('pr-km')?.value||'standard';
+  const insPkg=document.getElementById('pr-ins')?.value||'basic';
+  const proposalData={proposal_ref:ref,client_name:clientName,client_crm_id:window['_crm_pr_id']||'',client_phone:document.getElementById('pr-phone')?.value.trim()||'',client_email:document.getElementById('pr-email')?.value.trim()||'',car_id:String(carId),car_label:carLabel,pickup_date:pickup,dropoff_date:dropoff,pickup_location:document.getElementById('pr-ploc')?.value.trim()||'',dropoff_location:document.getElementById('pr-dloc')?.value.trim()||'',duration_days:days,daily_rate:daily,km_package:kmPkg,km_cost:kmCost,insurance_plan:insPkg,insurance_fee:insFee,pickup_fee:pfee,delivery_fee:dfee,deposit_amount:deposit,child_seat_days:seatD,extra_driver_days:drvD,total_estimate:total,status:'Draft',converted_to:'',issued_by:G.user?.username||'',branch:branchCode,timestamp:Date.now()};
+  try{
+    await db.collection('proposals').doc(ref).set(proposalData);
+    G.proposals.unshift({id:ref,...proposalData});
+    renderProposalsList();
+    document.getElementById('pr-ref-preview').textContent=ref;
+    await logAction('GENERATE','Proposals',`Proposal ${ref} for ${clientName} | ${carLabel} | ${fmtMoney(total)}`);
+    toast(`Proposal ${ref} saved!`,'success');
+    buildProposalA4(ref,proposalData);
+  }catch(e){toast('Failed to save proposal: '+e.message,'error');}
+}
+
+function buildProposalA4(ref,d){
+  const kmMap={standard:'Standard (120 KM/Day)',500:'500 KM Package',1000:'1000 KM Package',unlimited:'Unlimited KM'};
+  const insMap={basic:'Basic (100% Client Liability)',intermediate:'Intermediate (70/30)',full:'Full Protection (Zero Liability)'};
+  const rows=[
+    {desc:'Base Rental',detail:`${d.duration_days} days × ${fmtMoney(d.daily_rate)}/day`,amount:fmtMoney(d.daily_rate*d.duration_days)},
+    d.km_cost>0?{desc:'KM Package',detail:kmMap[d.km_package]||d.km_package,amount:fmtMoney(d.km_cost)}:null,
+    d.insurance_fee>0?{desc:'Insurance Fee',detail:`${d.duration_days} days × ${fmtMoney(d.insurance_fee)}`,amount:fmtMoney(d.insurance_fee*d.duration_days)}:null,
+    d.pickup_fee>0?{desc:'Pickup Fee',detail:'',amount:fmtMoney(d.pickup_fee)}:null,
+    d.delivery_fee>0?{desc:'Delivery Fee',detail:'',amount:fmtMoney(d.delivery_fee)}:null,
+    d.child_seat_days>0?{desc:'Child Seat',detail:`${d.child_seat_days} days × £250`,amount:fmtMoney(d.child_seat_days*250)}:null,
+    d.extra_driver_days>0?{desc:'Additional Driver',detail:`${d.extra_driver_days} days × £500`,amount:fmtMoney(d.extra_driver_days*500)}:null,
+    d.deposit_amount>0?{desc:'Security Deposit',detail:'Refundable upon safe return',amount:fmtMoney(d.deposit_amount)}:null,
+  ].filter(Boolean);
+  const html=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:18px;">
+      <div>
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:40px;margin-bottom:6px;" alt="Brothers EGY"/>
+        <div style="font-size:18px;font-weight:900;color:#1e40af;">BROTHERS EGY</div>
+        <div style="font-size:10px;color:#64748b;">Car Rental Services • www.brothersegy.com</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:16px;font-weight:800;color:#1e40af;text-transform:uppercase;">Price Proposal</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">Ref: <strong>${ref}</strong></div>
+        <div style="font-size:10px;color:#64748b;">Date: ${new Date().toLocaleDateString('en-GB')}</div>
+        <div style="font-size:10px;color:#64748b;">Branch: ${BRANCH_MAP[d.branch]||d.branch}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Client & Period</div>
+        <div style="font-size:11px;font-weight:700;">${d.client_name}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">📞 ${d.client_phone||'-'}</div>
+        <div style="font-size:10px;color:#64748b;">✉️ ${d.client_email||'-'}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:5px;">📅 From: ${new Date(d.pickup_date).toLocaleString('en-GB')}</div>
+        <div style="font-size:10px;color:#64748b;">📅 To: ${new Date(d.dropoff_date).toLocaleString('en-GB')}</div>
+        <div style="font-size:10px;color:#64748b;">⏱ Duration: <strong>${d.duration_days} days</strong></div>
+        <div style="font-size:10px;color:#64748b;">📍 Pickup: ${d.pickup_location||'-'}</div>
+        <div style="font-size:10px;color:#64748b;">📍 Dropoff: ${d.dropoff_location||'-'}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Vehicle Details</div>
+        <div style="font-size:11px;font-weight:700;">${d.car_label}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">Daily Rate: <strong>${fmtMoney(d.daily_rate)}</strong></div>
+        <div style="font-size:10px;color:#64748b;">KM Package: ${kmMap[d.km_package]||d.km_package}</div>
+        <div style="font-size:10px;color:#64748b;">Insurance: ${insMap[d.insurance_plan]||d.insurance_plan}</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Financial Breakdown</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:13px;">
+      <thead><tr style="background:#1e40af;color:#fff;">
+        <th style="padding:7px 10px;text-align:left;">Description</th>
+        <th style="padding:7px 10px;text-align:left;">Details</th>
+        <th style="padding:7px 10px;text-align:right;">Amount (EGP)</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f8fafc'};">
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${r.desc}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;">${r.detail}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${r.amount}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="background:#1e40af;color:#fff;padding:10px 13px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-weight:800;font-size:13px;">TOTAL ESTIMATE</span>
+      <span style="font-size:18px;font-weight:900;">${fmtMoney(d.total_estimate)}</span>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:11px 13px;font-size:9px;color:#475569;line-height:1.6;margin-bottom:13px;">
+      <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:5px;">RENTAL TERMS & CONDITIONS SUMMARY</div>
+      <strong>1. ELIGIBILITY:</strong> Min age 21. Valid License and ID/Passport mandatory.<br>
+      <strong>2. RENTAL CYCLE:</strong> 24-hour units. Exceeding by 5+ hours = full extra day charged.<br>
+      <strong>3. MILEAGE:</strong> 120 KM/day included in standard package. Excess charged at return.<br>
+      <strong>4. FUEL:</strong> Same-to-Same policy. Return at same level as pickup or charges apply.<br>
+      <strong>5. INSURANCE:</strong> Void if no Police Report filed immediately after accident.<br>
+      <strong>6. DEPOSIT:</strong> Refunded upon safe return. Card refunds processed as EGP cash.<br>
+      <strong>7. LIABILITY:</strong> Lessee bears full legal and criminal liability during rental period.<br>
+      <a href="https://brothersegy.com/terms-conditions/" style="color:#1e40af;">View Full Terms Online →</a>
+    </div>
+    <div style="text-align:center;font-size:11px;color:#475569;margin-bottom:13px;">
+      We look forward to serving you. Best Regards, <strong>Brothers EGY Team</strong>
+    </div>
+    ${a4FooterHTML(ref,'PRICE PROPOSAL',false)}`;
+  const a4=document.getElementById('pr-a4');if(a4)a4.innerHTML=html;
+  document.getElementById('pr-output').style.display='block';
+  attachQRAndBarcode(ref);
+}
+
+function renderProposalsList(){
+  const filter=document.getElementById('pr-filter')?.value||'all';
+  const tbody=document.getElementById('proposals-tbody');if(!tbody)return;
+  const list=filter==='all'?G.proposals:G.proposals.filter(p=>p.status===filter);
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  if(!list.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state" style="padding:18px;"><p>No proposals found</p></div></td></tr>`;return;}
+  tbody.innerHTML=list.map(p=>`<tr>
+    <td><span style="color:var(--accent);font-weight:700;">${p.proposal_ref||p.id}</span></td>
+    <td>${p.client_name||'-'}</td>
+    <td style="font-size:11px;">${p.car_label||'-'}</td>
+    <td style="font-size:10px;">${p.pickup_date?new Date(p.pickup_date).toLocaleDateString('en-GB'):'-'} → ${p.dropoff_date?new Date(p.dropoff_date).toLocaleDateString('en-GB'):'-'}</td>
+    <td><strong>${fmtMoney(p.total_estimate)}</strong></td>
+    <td><span class="pill pill-${(p.status||'draft').toLowerCase()}">${p.status||'Draft'}</span></td>
+    <td>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;">
+        ${p.status==='Draft'?`
+          <button class="btn btn-success btn-xs" onclick="convertProposalToContract('${p.id}')">→ Contract</button>
+          ${isPriv?`<button class="btn btn-warning btn-xs" onclick="updateProposalStatus('${p.id}','Accepted')">✓</button>
+          <button class="btn btn-danger btn-xs" onclick="updateProposalStatus('${p.id}','Cancelled')">✕</button>`:''}
+        `:''}
+        ${p.status==='Accepted'?`<button class="btn btn-primary btn-xs" onclick="convertProposalToContract('${p.id}')">→ Contract</button>`:''}
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+async function updateProposalStatus(id,status){
+  try{
+    await db.collection('proposals').doc(id).update({status});
+    const idx=G.proposals.findIndex(p=>p.id===id);
+    if(idx>-1)G.proposals[idx].status=status;
+    renderProposalsList();
+    await logAction('EDIT','Proposals',`Proposal ${id} → ${status}`);
+    toast(`Proposal marked as ${status}`,status==='Cancelled'?'warning':'success');
+  }catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+function convertProposalToContract(proposalId){
+  const p=G.proposals.find(x=>x.id===proposalId);if(!p)return;
+  const choice=confirm('Convert to English Contract?\n\nClick OK for English Contract.\nClick Cancel for Arabic Contract.');
+  const prefix=choice?'en':'ar';
+  const targetPage=choice?'en-contract':'ar-contract';
+  showPage(targetPage);
+  setTimeout(()=>{fillContractFromProposal(prefix,p);updateProposalStatus(proposalId,'Accepted');},300);
+}
+
+function fillContractFromProposal(prefix,p){
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+  set(`${prefix}-client-search`,p.client_name||'');
+  set(`${prefix}-pickup`,p.pickup_date||'');
+  set(`${prefix}-dropoff`,p.dropoff_date||'');
+  set(`${prefix}-daily`,p.daily_rate||'');
+  set(`${prefix}-ins-fee`,p.insurance_fee||'');
+  set(`${prefix}-km-cost`,p.km_cost||'');
+  set(`${prefix}-pick-fee`,p.pickup_fee||'');
+  set(`${prefix}-del-fee`,p.delivery_fee||'');
+  set(`${prefix}-req-dep`,p.deposit_amount||'');
+  const carSel=document.getElementById(`${prefix}-car`);
+  if(carSel&&p.car_id){carSel.value=p.car_id;showCarInfoBadge(p.car_id,`${prefix}-car-badge`);}
+  const propRefEl=document.getElementById(`${prefix}-proposal-ref`);
+  if(propRefEl)propRefEl.value=p.proposal_ref||p.id;
+  // Fill client CRM fields if available
+  if(p.client_crm_id){
+    const c=G.customers.find(x=>x.id===p.client_crm_id);
+    if(c)fillCrmFields(prefix,c.id);
+  }
+  if(prefix==='en')enCalc();else arCalc();
+  toast('Proposal data loaded into contract form!','success');
+}
+
+function clearProposalForm(){
+  ['pr-client-search','pr-fname','pr-lname','pr-phone','pr-email','pr-pickup','pr-dropoff','pr-ploc','pr-dloc','pr-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pr-daily','pr-km-cost','pr-ins-fee','pr-pfee','pr-dfee','pr-deposit','pr-seat-days','pr-driver-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+  document.getElementById('pr-car').value='';
+  document.getElementById('pr-overlap-warn').style.display='none';
+  document.getElementById('pr-output').style.display='none';
+  document.getElementById('pr-ref-preview').textContent='';
+  document.getElementById('pr-crm-id').style.display='none';
+  window['_crm_pr_id']=null;
+  const badge=document.getElementById('pr-car-badge');if(badge)badge.className='car-info-badge';
+  prCalc();
+}
+
+/* ============================================================
+   PART 4: ENGLISH CONTRACT
+   ============================================================ */
+async function loadENContract(){
+  const el=document.getElementById('page-en-contract');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>📄 English Contract</h2><p>Generate official English rental agreements</p></div>
+      <div style="display:flex;gap:7px;">
+        <div style="padding:4px 9px;background:var(--glass);border:1px solid var(--border);border-radius:7px;font-size:11px;text-align:center;">
+          <div style="font-size:9px;color:var(--text3);">USD</div>
+          <div id="en-usd-rate" style="font-weight:800;color:var(--success);">${G.ratesUSD.toFixed(2)}</div>
+        </div>
+        <div style="padding:4px 9px;background:var(--glass);border:1px solid var(--border);border-radius:7px;font-size:11px;text-align:center;">
+          <div style="font-size:9px;color:var(--text3);">EUR</div>
+          <div id="en-eur-rate" style="font-weight:800;color:var(--success);">${G.ratesEUR.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:400px 1fr;gap:14px;align-items:start;">
+      <!-- Control Panel -->
+      <div class="panel sticky-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
+          <h3 style="font-size:13px;font-weight:800;">📄 New Contract</h3>
+          <span id="en-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+        </div>
+        <!-- Load from Proposal -->
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:9px;padding:11px;margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:7px;">📋 Load from Proposal (Optional)</div>
+          <div style="display:flex;gap:7px;">
+            <input type="text" id="en-proposal-ref" placeholder="Proposal Ref e.g. PR-HRG-..."
+                   style="flex:1;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+                   oninput="searchProposalRef('en')"/>
+            <button class="btn btn-ghost btn-xs" onclick="document.getElementById('en-proposal-ref').value='';document.getElementById('en-proposal-status').textContent=''">✕</button>
+          </div>
+          <div id="en-proposal-status" style="font-size:10px;color:var(--text2);margin-top:5px;"></div>
+        </div>
+        <!-- Contract Info -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">① Contract Info</div>
+          <div class="form-grid">
+            <div class="field"><label>Issuing Branch</label>
+              <select id="en-branch">
+                <option value="HRG">Hurghada Branch</option><option value="ALX">Alexandria (HQ)</option>
+                <option value="CAI">Cairo Branch</option><option value="RSH">Rashid Branch</option>
+              </select></div>
+            <div class="field"><label>Rental Mode</label>
+              <select id="en-mode" onchange="enCalc()">
+                <option value="daily">Daily (Short Term)</option>
+                <option value="monthly">Monthly (Long Term)</option>
+              </select></div>
+            <div class="field"><label>Agreement Type</label>
+              <select id="en-agr" onchange="enTogglePrev()">
+                <option value="new">New Agreement</option>
+                <option value="extension">Extension</option>
+              </select></div>
+            <div class="field" id="en-prev-wrap" style="display:none;"><label>Prev. Contract No.</label><input type="text" id="en-prev-con" placeholder="Previous No."/></div>
+          </div>
+        </div>
+        <!-- Vehicle -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">② Vehicle Details</div>
+          <div class="field" style="margin-bottom:7px;"><label>Select from Fleet</label>
+            <select id="en-car" onchange="enSelectCar()"><option value="">-- Select Car --</option></select>
+          </div>
+          <div id="en-car-badge" class="car-info-badge"></div>
+          <div class="form-grid" style="margin-top:7px;">
+            <div class="field"><label>KM Out</label><input type="number" id="en-km-out" placeholder="e.g. 52747"/></div>
+            <div class="field"><label>Fuel Level</label>
+              <select id="en-fuel">
+                <option value="Full (8/8)">Full (8/8)</option><option value="3/4">3/4</option>
+                <option value="1/2">1/2</option><option value="1/4">1/4</option><option value="Reserve">Reserve</option>
+              </select></div>
+            <div class="field"><label>Daily Rent (EGP)</label><input type="number" id="en-daily" placeholder="0" oninput="enCalc()"/></div>
+            <div class="field"><label>Insurance Fee (Daily)</label><input type="number" id="en-ins-fee" value="0" oninput="enCalc()"/></div>
+          </div>
+        </div>
+        <!-- Client -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">③ Client Details</div>
+          <div class="crm-search-wrap">
+            <div class="crm-search-header">
+              🔍 SEARCH & AUTO-FILL CLIENT
+              <span id="en-crm-id" class="crm-id-badge" style="display:none;"></span>
+            </div>
+            <div class="crm-input-row">
+              <input type="text" id="en-client-search" placeholder="Name, passport, phone..." oninput="crmSearch('en')"/>
+            </div>
+            <div class="crm-actions">
+              <button class="crm-action-btn new" onclick="openAddCustomerModal()">+ New</button>
+              <button class="crm-action-btn edit" id="en-edit-btn" style="display:none;" onclick="crmEditMode('en')">✏️ Edit</button>
+              <button class="crm-action-btn save" id="en-save-btn" style="display:none;" onclick="crmSaveEdit('en')">💾 Save</button>
+              <button class="crm-action-btn cancel" id="en-cancel-btn" style="display:none;" onclick="crmCancelEdit('en')">✕ Cancel</button>
+            </div>
+            <div class="crm-suggestions" id="en-suggestions"></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>First Name *</label><input type="text" id="en-fname" placeholder="First Name" readonly/></div>
+            <div class="field"><label>Surname *</label><input type="text" id="en-lname" placeholder="Last Name" readonly/></div>
+            <div class="field"><label>Passport / National ID *</label><input type="text" id="en-passport" placeholder="ID Number" readonly/></div>
+            <div class="field"><label>Nationality</label><input type="text" id="en-nationality" placeholder="Nationality" readonly/></div>
+            <div class="field"><label>Phone</label><input type="text" id="en-phone" placeholder="Phone" readonly/></div>
+            <div class="field"><label>Email</label><input type="text" id="en-email" placeholder="Email" readonly/></div>
+            <div class="field"><label>Driver License *</label><input type="text" id="en-license" placeholder="License No." readonly/></div>
+            <div class="field"><label>Address</label><input type="text" id="en-address" placeholder="Address" readonly/></div>
+            <div class="field"><label>Add. Driver Name</label><input type="text" id="en-add-dr-name" placeholder="Optional"/></div>
+            <div class="field"><label>Add. Driver License</label><input type="text" id="en-add-dr-lic" placeholder="Optional"/></div>
+          </div>
+        </div>
+        <!-- Dates -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">④ Dates & Locations</div>
+          <div class="form-grid">
+            <div class="field"><label>Pickup Date/Time</label><input type="datetime-local" id="en-pickup" onchange="enCalc()"/></div>
+            <div class="field"><label>Dropoff Date/Time</label><input type="datetime-local" id="en-dropoff" onchange="enCalc()"/></div>
+            <div class="field"><label>Pickup Location</label>
+              <select id="en-ploc-type"><option>Office</option><option>Airport</option><option>Hotel</option></select></div>
+            <div class="field"><label>Pickup Address</label><input type="text" id="en-ploc-addr" placeholder="Specific address"/></div>
+            <div class="field"><label>Dropoff Location</label>
+              <select id="en-dloc-type"><option>Office</option><option>Airport</option><option>Hotel</option></select></div>
+            <div class="field"><label>Dropoff Address</label><input type="text" id="en-dloc-addr" placeholder="Specific address"/></div>
+          </div>
+        </div>
+        <!-- Payments -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">⑤ Payments</div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:700;">Rent Paid Now</div>
+          <div class="form-grid g3" style="margin-bottom:7px;">
+            <div class="field"><label>EGP</label><input type="number" id="en-paid-egp" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>USD</label><input type="number" id="en-paid-usd" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>EUR</label><input type="number" id="en-paid-eur" value="0" oninput="enCalc()"/></div>
+          </div>
+          <div class="form-grid" style="margin-bottom:10px;">
+            <div class="field"><label>Card (EGP)</label><input type="number" id="en-paid-card" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>Delivery Fee</label><input type="number" id="en-del-fee" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>Pickup Fee</label><input type="number" id="en-pick-fee" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>Required Deposit</label><input type="number" id="en-req-dep" value="0" oninput="enCalc()"/></div>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:700;">Deposit Held</div>
+          <div class="form-grid g3" style="margin-bottom:7px;">
+            <div class="field"><label>EGP</label><input type="number" id="en-dep-egp" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>USD</label><input type="number" id="en-dep-usd" value="0" oninput="enCalc()"/></div>
+            <div class="field"><label>EUR</label><input type="number" id="en-dep-eur" value="0" oninput="enCalc()"/></div>
+          </div>
+          <div class="form-grid" style="margin-bottom:10px;">
+            <div class="field"><label>Deposit Card (EGP)</label><input type="number" id="en-dep-card" value="0" oninput="enCalc()"/></div>
+          </div>
+        </div>
+        <!-- Package & Add-ons -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">⑥ Package & Add-ons</div>
+          <div class="form-grid">
+            <div class="field"><label>Insurance Package</label>
+              <select id="en-ins-pkg">
+                <option value="basic">Basic (100% Client Liability)</option>
+                <option value="intermediate">Intermediate (70% / 30%)</option>
+                <option value="full">Full Protection (Zero Liability)</option>
+              </select></div>
+            <div class="field"><label>KM Package</label>
+              <select id="en-km-pkg" onchange="enCalc()">
+                <option value="standard">Standard (120 KM/Day)</option>
+                <option value="500">500 KM Extra</option>
+                <option value="750">750 KM Extra</option>
+                <option value="1000">1000 KM Extra</option>
+                <option value="1500">1500 KM Package</option>
+                <option value="2000">2000 KM Package</option>
+                <option value="3000">3000 KM Package</option>
+                <option value="unlimited">Unlimited KM</option>
+              </select></div>
+            <div class="field"><label>KM Package Cost (EGP)</label><input type="number" id="en-km-cost" value="0" oninput="enCalc()"/></div>
+          </div>
+          <div style="display:flex;gap:13px;margin-top:7px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+              <input type="checkbox" id="en-add-driver" onchange="enCalc()" style="width:14px;height:14px;"/>
+              Additional Driver
+              <input type="number" id="en-dr-rate" value="500" oninput="enCalc()" style="width:65px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);" title="Rate per day"/>
+              <span style="font-size:10px;color:var(--text3);">EGP/day</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+              <input type="checkbox" id="en-add-seat" onchange="enCalc()" style="width:14px;height:14px;"/>
+              Child Seat
+              <input type="number" id="en-seat-rate" value="250" oninput="enCalc()" style="width:65px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);" title="Rate per day"/>
+              <span style="font-size:10px;color:var(--text3);">EGP/day</span>
+            </label>
+          </div>
+        </div>
+        <!-- Live Estimate -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;margin-bottom:13px;">
+          <div style="font-size:10px;color:var(--text3);font-weight:700;margin-bottom:7px;text-transform:uppercase;">Rent Estimate</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
+            <span style="color:var(--text3);">Base:</span><span id="en-est-base" style="font-weight:700;">£0.00</span>
+            <span style="color:var(--text3);">Days:</span><span id="en-est-days">0</span>
+            <span style="color:var(--text3);">Fees/Add-ons:</span><span id="en-est-fees">£0.00</span>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;display:flex;justify-content:space-between;">
+            <span style="font-weight:700;">TOTAL</span>
+            <span id="en-est-total" style="font-size:15px;font-weight:900;color:var(--accent);">£0.00</span>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:7px;padding-top:7px;font-size:11px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+              <span style="color:var(--text3);">Deposit Target:</span><span id="en-dep-target">£0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+              <span style="color:var(--text3);">Paid Now:</span><span id="en-paid-now" style="color:var(--success);">£0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:var(--text3);">Rent Pending:</span><span id="en-pending" style="color:var(--warning);">£0.00</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="generateENContract()">📄 Generate Contract Preview</button>
+        <button class="btn btn-ghost btn-full mt-8" onclick="clearContractForm('en')">✕ Clear Form</button>
+      </div>
+      <!-- Output -->
+      <div>
+        <div id="en-output" style="display:none;">
+          <div style="display:flex;gap:7px;margin-bottom:11px;">
+            <button class="btn btn-primary" onclick="printModule('en-a4')">🖨️ Print / Save PDF</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('en-output').style.display='none'">✕ Close</button>
+          </div>
+          <div class="a4-page" id="en-a4"></div>
+        </div>
+        <div id="en-placeholder" class="empty-state" style="padding:80px 20px;">
+          <div style="font-size:40px;margin-bottom:11px;">📄</div>
+          <p>Fill the form and click Generate Contract Preview</p>
+        </div>
+      </div>
+    </div>`;
+  populateFleetDropdowns();
+}
+
+function searchProposalRef(prefix){
+  const val=(document.getElementById(`${prefix}-proposal-ref`)?.value||'').trim();
+  const stEl=document.getElementById(`${prefix}-proposal-status`);
+  if(!val||val.length<4){if(stEl)stEl.textContent='';return;}
+  const p=G.proposals.find(x=>(x.proposal_ref||x.id).toLowerCase().includes(val.toLowerCase()));
+  if(stEl){
+    if(p){
+      stEl.textContent=`✅ Found: ${p.proposal_ref||p.id} | ${p.client_name} | ${fmtMoney(p.total_estimate)} | ${p.status}`;
+      stEl.style.color='var(--success)';
+      if(p.status==='Accepted'||p.status==='Draft')fillContractFromProposal(prefix,p);
+    }else{stEl.textContent='No proposal found with this reference.';stEl.style.color='var(--danger)';}
+  }
+}
+
+function enTogglePrev(){
+  const agr=document.getElementById('en-agr')?.value;
+  const wrap=document.getElementById('en-prev-wrap');
+  if(wrap)wrap.style.display=agr==='extension'?'flex':'none';
+}
+
+function enSelectCar(){
+  const carId=document.getElementById('en-car')?.value;
+  const car=getCarById(carId);
+  if(car){const mn=document.getElementById('en-car-manual');if(mn)mn.value=car.model||'';}
+  showCarInfoBadge(carId,'en-car-badge');
+  enCalc();
+}
+
+function enCalc(){
+  const pickup=document.getElementById('en-pickup')?.value;
+  const dropoff=document.getElementById('en-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('en-daily')?.value)||0;
+  const insFee=parseFloat(document.getElementById('en-ins-fee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('en-km-cost')?.value)||0;
+  const delFee=parseFloat(document.getElementById('en-del-fee')?.value)||0;
+  const pickFee=parseFloat(document.getElementById('en-pick-fee')?.value)||0;
+  const addDr=document.getElementById('en-add-driver')?.checked;
+  const drRate=parseFloat(document.getElementById('en-dr-rate')?.value)||500;
+  const addSt=document.getElementById('en-add-seat')?.checked;
+  const stRate=parseFloat(document.getElementById('en-seat-rate')?.value)||250;
+  const pEGP=parseFloat(document.getElementById('en-paid-egp')?.value)||0;
+  const pUSD=parseFloat(document.getElementById('en-paid-usd')?.value)||0;
+  const pEUR=parseFloat(document.getElementById('en-paid-eur')?.value)||0;
+  const pCard=parseFloat(document.getElementById('en-paid-card')?.value)||0;
+  const reqDep=parseFloat(document.getElementById('en-req-dep')?.value)||0;
+  let days=0;
+  if(pickup&&dropoff){days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));}
+  const base=daily*days;const insT=insFee*days;
+  const drT=addDr?drRate*days:0;const stT=addSt?stRate*days:0;
+  const fees=delFee+pickFee+kmCost+drT+stT+insT;
+  const total=base+fees;
+  const paidNow=pEGP+(pUSD*G.ratesUSD)+(pEUR*G.ratesEUR)+pCard;
+  const pending=total-paidNow;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  s('en-est-base',fmtMoney(base));s('en-est-days',String(days));s('en-est-fees',fmtMoney(fees));s('en-est-total',fmtMoney(total));
+  s('en-dep-target',fmtMoney(reqDep));s('en-paid-now',fmtMoney(paidNow));s('en-pending',fmtMoney(Math.max(0,pending)));
+}
+
+async function generateENContract(){
+  const fname=document.getElementById('en-fname')?.value.trim();
+  const lname=document.getElementById('en-lname')?.value.trim();
+  const carId=document.getElementById('en-car')?.value;
+  const pickup=document.getElementById('en-pickup')?.value;
+  const dropoff=document.getElementById('en-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('en-daily')?.value)||0;
+  const passport=document.getElementById('en-passport')?.value.trim();
+  const license=document.getElementById('en-license')?.value.trim();
+  if(!fname||!lname){toast('Client full name is required. Search and select a client first.','error');return;}
+  if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
+  if(daily<=0){toast('Daily rent must be greater than 0.','error');return;}
+  if(!passport)toast('Warning: Passport/ID not filled. Required for valid contract.','warning');
+  if(!license)toast('Warning: Driver license not filled. Required for valid contract.','warning');
+  const branchCode=document.getElementById('en-branch')?.value||G.user?.branch||'GEN';
+  const ref=await generateDocRef('CN',branchCode);
+  document.getElementById('en-ref-preview').textContent=ref;
+  const car=getCarById(carId);
+  const carLabel=car?getCarLabel(car,'en'):(document.getElementById('en-car-manual')?.value||carId||'-');
+  const pickupD=new Date(pickup),dropoffD=new Date(dropoff);
+  const days=Math.max(0,Math.ceil((dropoffD-pickupD)/86400000));
+  const insFee=parseFloat(document.getElementById('en-ins-fee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('en-km-cost')?.value)||0;
+  const delFee=parseFloat(document.getElementById('en-del-fee')?.value)||0;
+  const pickFee=parseFloat(document.getElementById('en-pick-fee')?.value)||0;
+  const addDr=document.getElementById('en-add-driver')?.checked;
+  const drRate=parseFloat(document.getElementById('en-dr-rate')?.value)||500;
+  const addSt=document.getElementById('en-add-seat')?.checked;
+  const stRate=parseFloat(document.getElementById('en-seat-rate')?.value)||250;
+  const insPkg=document.getElementById('en-ins-pkg')?.value||'basic';
+  const kmPkg=document.getElementById('en-km-pkg')?.value||'standard';
+  const pEGP=parseFloat(document.getElementById('en-paid-egp')?.value)||0;
+  const pUSD=parseFloat(document.getElementById('en-paid-usd')?.value)||0;
+  const pEUR=parseFloat(document.getElementById('en-paid-eur')?.value)||0;
+  const pCard=parseFloat(document.getElementById('en-paid-card')?.value)||0;
+  const dEGP=parseFloat(document.getElementById('en-dep-egp')?.value)||0;
+  const dUSD=parseFloat(document.getElementById('en-dep-usd')?.value)||0;
+  const dEUR=parseFloat(document.getElementById('en-dep-eur')?.value)||0;
+  const dCard=parseFloat(document.getElementById('en-dep-card')?.value)||0;
+  const reqDep=parseFloat(document.getElementById('en-req-dep')?.value)||0;
+  const drT=addDr?drRate*days:0;const stT=addSt?stRate*days:0;
+  const base=daily*days;const insT=insFee*days;
+  const fees=delFee+pickFee+kmCost+drT+stT+insT;
+  const total=base+fees;
+  const paidNow=pEGP+(pUSD*G.ratesUSD)+(pEUR*G.ratesEUR)+pCard;
+  const depHeld=dEGP+(dUSD*G.ratesUSD)+(dEUR*G.ratesEUR)+dCard;
+  const pending=Math.max(0,total-paidNow);
+  const propRef=document.getElementById('en-proposal-ref')?.value.trim()||'';
+  const kmPkgMap={standard:'Standard 120 KM/Day',500:'500 KM Extra',750:'750 KM Extra',1000:'1000 KM Extra',1500:'1500 KM Package',2000:'2000 KM Package',3000:'3000 KM Package',unlimited:'Unlimited KM'};
+  const insPkgMap={basic:'Basic – 100% Client Liability',intermediate:'Intermediate – 70% Client / 30% Company',full:'Full Protection – Zero Liability'};
+  // Save to bookings
+  try{
+    const bookingData={'No.':ref,'اسم العميل':`${fname} ${lname}`,'اسم السيارة':carLabel,'كود السيارة':String(carId||''),'بداية التعاقد':pickup,'نهاية التعاقد':dropoff,'سعر السيارة اليومي بالجنيه المصري':fmtMoney(daily),'إجمالي المستحق (Total)':fmtMoney(total),'المدفوع EGP':String(pEGP),'المدفوع USD':String(pUSD),'المدفوع EUR':String(pEUR),'الوديعة المعلقة لدينا':fmtMoney(dEGP),'حالة الطلب':'Active','closed':false,'فرع الإصدار':branchCode,'assigned_user':G.user?.username||'','proposal_ref':propRef,'نوع التأمين':insPkg,'rental_days':String(days),'مكان الاستلام':`${document.getElementById('en-ploc-type')?.value} - ${document.getElementById('en-ploc-addr')?.value||''}`,'مكان التسليم':`${document.getElementById('en-dloc-type')?.value} - ${document.getElementById('en-dloc-addr')?.value||''}`,'_sys_updated':Date.now()};
+    await db.collection('bookings').doc(ref).set(bookingData);
+    if(propRef){await db.collection('proposals').doc(propRef).update({status:'Converted',converted_to:ref}).catch(()=>{});}
+    await logAction('GENERATE','English Contract',`Contract ${ref} for ${fname} ${lname} | ${carLabel} | ${fmtMoney(total)} | Paid: ${fmtMoney(paidNow)}`);
+    toast(`Contract ${ref} saved to database!`,'success');
+  }catch(e){toast('Warning: Could not save to database. '+e.message,'warning');}
+  // Build A4
+  const html=buildENContractA4(ref,{fname,lname,passport,license,carLabel,days,pickup,dropoff,daily,base,insT,kmCost,pickFee,delFee,drT,stT,fees,total,paidNow,depHeld,pending,pEGP,pUSD,pEUR,pCard,dEGP,dUSD,dEUR,dCard,reqDep,insPkg,kmPkg,kmPkgMap,insPkgMap,branchCode,propRef,addDr,drRate,addSt,stRate});
+  const a4=document.getElementById('en-a4');if(a4)a4.innerHTML=html;
+  document.getElementById('en-output').style.display='block';
+  document.getElementById('en-placeholder').style.display='none';
+  attachQRAndBarcode(ref);
+}
+
+function buildENContractA4(ref,d){
+  return`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:16px;">
+      <div>
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:38px;margin-bottom:5px;" alt="Brothers EGY"/>
+        <div style="font-size:17px;font-weight:900;color:#1e40af;">BROTHERS EGY</div>
+        <div style="font-size:9px;color:#64748b;">Car Rental Services • www.brothersegy.com</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:15px;font-weight:800;color:#1e40af;text-transform:uppercase;">Rental Agreement</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">Contract No: <strong>${ref}</strong></div>
+        <div style="font-size:10px;color:#64748b;">Date: ${new Date().toLocaleDateString('en-GB')}</div>
+        <div style="font-size:10px;color:#64748b;">Branch: ${BRANCH_MAP[d.branchCode]||d.branchCode}</div>
+        ${d.propRef?`<div style="font-size:10px;color:#3b82f6;">From Proposal: ${d.propRef}</div>`:''}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">Lessee Information</div>
+        <div style="font-size:11px;font-weight:700;">${d.fname} ${d.lname}</div>
+        <div style="font-size:10px;color:#475569;margin-top:3px;">Passport/ID: ${d.passport||'─────────────'}</div>
+        <div style="font-size:10px;color:#475569;">Nationality: ${document.getElementById('en-nationality')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">Phone: ${document.getElementById('en-phone')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">Email: ${document.getElementById('en-email')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">License: ${d.license||'─────────────'}</div>
+        <div style="font-size:10px;color:#475569;">Address: ${document.getElementById('en-address')?.value||'-'}</div>
+        ${document.getElementById('en-add-dr-name')?.value?`<div style="font-size:10px;color:#475569;margin-top:3px;">Add. Driver: ${document.getElementById('en-add-dr-name')?.value} | ${document.getElementById('en-add-dr-lic')?.value||'-'}</div>`:''}
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">Vehicle Information</div>
+        <div style="font-size:11px;font-weight:700;">${d.carLabel}</div>
+        <div style="font-size:10px;color:#475569;margin-top:3px;">KM at Pickup: ${document.getElementById('en-km-out')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">Fuel Level: ${document.getElementById('en-fuel')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;margin-top:5px;">Pickup: ${new Date(document.getElementById('en-pickup')?.value||'').toLocaleString('en-GB')}</div>
+        <div style="font-size:10px;color:#475569;">Dropoff: ${new Date(document.getElementById('en-dropoff')?.value||'').toLocaleString('en-GB')}</div>
+        <div style="font-size:10px;color:#475569;font-weight:700;">Duration: ${d.days} Days</div>
+        <div style="font-size:10px;color:#475569;">Pickup Location: ${document.getElementById('en-ploc-type')?.value} – ${document.getElementById('en-ploc-addr')?.value||'Office'}</div>
+        <div style="font-size:10px;color:#475569;">Dropoff Location: ${document.getElementById('en-dloc-type')?.value} – ${document.getElementById('en-dloc-addr')?.value||'Office'}</div>
+        <div style="font-size:10px;color:#475569;">KM Package: ${d.kmPkgMap[d.kmPkg]||d.kmPkg}</div>
+        <div style="font-size:10px;color:#475569;">Insurance: ${d.insPkgMap[d.insPkg]||d.insPkg}</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">Financial Summary</div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:11px;">
+      <thead><tr style="background:#1e40af;color:#fff;"><th style="padding:6px 9px;text-align:left;">Description</th><th style="padding:6px 9px;text-align:left;">Calculation</th><th style="padding:6px 9px;text-align:right;">Amount (EGP)</th></tr></thead>
+      <tbody>
+        <tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">Base Rent</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${d.days} days × ${fmtMoney(d.daily)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${fmtMoney(d.base)}</td></tr>
+        ${d.insT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">Insurance Fee</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${d.days} days × ${fmtMoney(parseFloat(document.getElementById('en-ins-fee')?.value||0))}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtMoney(d.insT)}</td></tr>`:''}
+        ${d.kmCost>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">KM Package</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${d.kmPkgMap[d.kmPkg]||d.kmPkg}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtMoney(d.kmCost)}</td></tr>`:''}
+        ${d.pickFee>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">Pickup Fee</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">─</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtMoney(d.pickFee)}</td></tr>`:''}
+        ${d.delFee>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">Delivery Fee</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">─</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtMoney(d.delFee)}</td></tr>`:''}
+        ${d.drT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">Additional Driver</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${d.days} days × ${fmtMoney(d.drRate)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtMoney(d.drT)}</td></tr>`:''}
+        ${d.stT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">Child Seat</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${d.days} days × ${fmtMoney(d.stRate)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtMoney(d.stT)}</td></tr>`:''}
+      </tbody>
+    </table>
+    <div style="background:#1e40af;color:#fff;padding:9px 12px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;">
+      <span style="font-weight:800;font-size:12px;">TOTAL CONTRACT VALUE</span><span style="font-size:16px;font-weight:900;">${fmtMoney(d.total)}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px;font-size:10px;">
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:9px;">
+        <div style="font-weight:800;color:#166534;margin-bottom:5px;">PAYMENT RECEIVED</div>
+        ${d.pEGP>0?`<div>Cash EGP: ${fmtMoney(d.pEGP)}</div>`:''}
+        ${d.pUSD>0?`<div>Cash USD: $${d.pUSD} = ${fmtMoney(d.pUSD*G.ratesUSD)}</div>`:''}
+        ${d.pEUR>0?`<div>Cash EUR: €${d.pEUR} = ${fmtMoney(d.pEUR*G.ratesEUR)}</div>`:''}
+        ${d.pCard>0?`<div>Card: ${fmtMoney(d.pCard)}</div>`:''}
+        <div style="border-top:1px solid #86efac;margin-top:4px;padding-top:4px;font-weight:700;color:#166534;">Total Paid: ${fmtMoney(d.paidNow)}</div>
+        <div style="color:${d.pending>0?'#dc2626':'#166534'};font-weight:700;">Remaining: ${fmtMoney(d.pending)}</div>
+      </div>
+      <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:9px;">
+        <div style="font-weight:800;color:#854d0e;margin-bottom:5px;">DEPOSIT HELD</div>
+        ${d.dEGP>0?`<div>EGP: ${fmtMoney(d.dEGP)}</div>`:''}
+        ${d.dUSD>0?`<div>USD: $${d.dUSD}</div>`:''}
+        ${d.dEUR>0?`<div>EUR: €${d.dEUR}</div>`:''}
+        ${d.dCard>0?`<div>Card: ${fmtMoney(d.dCard)}</div>`:''}
+        <div style="border-top:1px solid #fde047;margin-top:4px;padding-top:4px;font-weight:700;color:#854d0e;">Total Held: ${fmtMoney(d.depHeld)}</div>
+        <div style="color:#64748b;">Required: ${fmtMoney(d.reqDep)}</div>
+      </div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:9px 11px;font-size:9px;color:#475569;line-height:1.6;margin-bottom:11px;">
+      <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:4px;">TERMS & CONDITIONS</div>
+      <strong>1. ELIGIBILITY:</strong> Min age 21. Valid license & ID mandatory.<br>
+      <strong>2. RENTAL CYCLE:</strong> 24-hr units. Exceeding by 5+ hours = full extra day.<br>
+      <strong>3. MILEAGE:</strong> 120 KM/day included. Excess charged at return rate.<br>
+      <strong>4. FUEL:</strong> Same-to-Same policy.<br>
+      <strong>5. INSURANCE:</strong> Void if no Police Report filed immediately.<br>
+      <strong>6. DEPOSIT:</strong> Refunded upon safe return.<br>
+      <strong>7. LIABILITY:</strong> Lessee bears full legal liability during rental period.
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:11px;">
+      <div style="text-align:center;"><div style="width:150px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">Lessee Signature</div><div style="font-size:9px;">${d.fname} ${d.lname}</div></div>
+      <div style="text-align:center;"><div style="width:150px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">Lessor Signature</div><div style="font-size:9px;">Brothers EGY – ${BRANCH_MAP[d.branchCode]||d.branchCode}</div></div>
+    </div>
+    ${a4FooterHTML(ref,'RENTAL AGREEMENT',false)}`;
+}
+
+function clearContractForm(prefix){
+  ['fname','lname','phone','email','passport','nationality','license','address','add-dr-name','add-dr-lic','pickup','dropoff','km-out','client-search','proposal-ref'].forEach(f=>{const el=document.getElementById(`${prefix}-${f}`);if(el)el.value='';});
+  ['paid-egp','paid-usd','paid-eur','paid-card','dep-egp','dep-usd','dep-eur','dep-card','ins-fee','km-cost','del-fee','pick-fee','req-dep'].forEach(f=>{const el=document.getElementById(`${prefix}-${f}`);if(el)el.value='0';});
+  const carEl=document.getElementById(`${prefix}-car`);if(carEl)carEl.value='';
+  const badge=document.getElementById(`${prefix}-car-badge`);if(badge)badge.className='car-info-badge';
+  const crmId=document.getElementById(`${prefix}-crm-id`);if(crmId)crmId.style.display='none';
+  const editBtn=document.getElementById(`${prefix}-edit-btn`);if(editBtn)editBtn.style.display='none';
+  window[`_crm_${prefix}_id`]=null;
+  if(prefix==='en'){
+    const out=document.getElementById('en-output');if(out)out.style.display='none';
+    const ph=document.getElementById('en-placeholder');if(ph)ph.style.display='block';
+    document.getElementById('en-ref-preview').textContent='';
+    enCalc();
+  }else{
+    const out=document.getElementById('ar-output');if(out)out.style.display='none';
+    const ph=document.getElementById('ar-placeholder');if(ph)ph.style.display='block';
+    document.getElementById('ar-ref-preview').textContent='';
+    arCalc();
+  }
+}
+
+/* ============================================================
+   PART 4: ARABIC CONTRACT
+   ============================================================ */
+async function loadARContract(){
+  const el=document.getElementById('page-ar-contract');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>📝 العقد بالعربية</h2><p>إنشاء عقود إيجار رسمية باللغة العربية</p></div>
+      <div style="display:flex;gap:7px;">
+        <div style="padding:4px 9px;background:var(--glass);border:1px solid var(--border);border-radius:7px;font-size:11px;text-align:center;">
+          <div style="font-size:9px;color:var(--text3);">دولار</div>
+          <div id="ar-usd-rate" style="font-weight:800;color:var(--success);">${G.ratesUSD.toFixed(2)}</div>
+        </div>
+        <div style="padding:4px 9px;background:var(--glass);border:1px solid var(--border);border-radius:7px;font-size:11px;text-align:center;">
+          <div style="font-size:9px;color:var(--text3);">يورو</div>
+          <div id="ar-eur-rate" style="font-weight:800;color:var(--success);">${G.ratesEUR.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:400px 1fr;gap:14px;align-items:start;">
+      <div class="panel sticky-panel" dir="rtl">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
+          <h3 style="font-size:13px;font-weight:800;">📝 عقد جديد</h3>
+          <span id="ar-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+        </div>
+        <!-- Load from Proposal -->
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:9px;padding:11px;margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:7px;">📋 تحميل من عرض سعر (اختياري)</div>
+          <div style="display:flex;gap:7px;">
+            <input type="text" id="ar-proposal-ref" placeholder="رقم عرض السعر مثال PR-HRG-..."
+                   style="flex:1;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+                   oninput="searchProposalRef('ar')"/>
+            <button class="btn btn-ghost btn-xs" onclick="document.getElementById('ar-proposal-ref').value='';document.getElementById('ar-proposal-status').textContent=''">✕</button>
+          </div>
+          <div id="ar-proposal-status" style="font-size:10px;color:var(--text2);margin-top:5px;"></div>
+        </div>
+        <!-- Contract Info -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">① العقد والفرع</div>
+          <div class="form-grid">
+            <div class="field"><label>فرع الإصدار</label>
+              <select id="ar-branch">
+                <option value="HRG">فرع الغردقة</option><option value="ALX">الإسكندرية (المركز الرئيسي)</option>
+                <option value="CAI">فرع القاهرة</option><option value="RSH">فرع رشيد</option>
+              </select></div>
+            <div class="field"><label>نظام الإيجار</label>
+              <select id="ar-mode" onchange="arCalc()">
+                <option value="daily">يومي (قصير الأمد)</option>
+                <option value="monthly">شهري (طويل الأمد)</option>
+              </select></div>
+            <div class="field"><label>نوع الاتفاقية</label>
+              <select id="ar-agr" onchange="arTogglePrev()">
+                <option value="new">اتفاقية جديدة</option>
+                <option value="extension">تمديد</option>
+              </select></div>
+            <div class="field" id="ar-prev-wrap" style="display:none;"><label>رقم العقد السابق</label><input type="text" id="ar-prev-con" placeholder="رقم العقد السابق"/></div>
+          </div>
+        </div>
+        <!-- Vehicle -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">② تفاصيل المركبة</div>
+          <div class="field" style="margin-bottom:7px;"><label>اختر من الأسطول</label>
+            <select id="ar-car" onchange="arSelectCar()"><option value="">-- اختر السيارة --</option></select>
+          </div>
+          <div id="ar-car-badge" class="car-info-badge"></div>
+          <div class="form-grid" style="margin-top:7px;">
+            <div class="field"><label>عداد الخروج</label><input type="number" id="ar-km-out" placeholder="مثال 52747"/></div>
+            <div class="field"><label>مستوى الوقود</label>
+              <select id="ar-fuel">
+                <option value="ممتلئ (8/8)">ممتلئ (8/8)</option><option value="3/4">3/4</option>
+                <option value="1/2">1/2</option><option value="1/4">1/4</option><option value="احتياطي">احتياطي</option>
+              </select></div>
+            <div class="field"><label>الإيجار اليومي (ج.م)</label><input type="number" id="ar-daily" placeholder="0" oninput="arCalc()"/></div>
+            <div class="field"><label>رسوم التأمين (يومي)</label><input type="number" id="ar-ins-fee" value="0" oninput="arCalc()"/></div>
+          </div>
+        </div>
+        <!-- Client -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">③ بيانات العميل</div>
+          <div class="crm-search-wrap">
+            <div class="crm-search-header">
+              🔍 بحث وتعبئة تلقائية للعميل
+              <span id="ar-crm-id" class="crm-id-badge" style="display:none;"></span>
+            </div>
+            <div class="crm-input-row">
+              <input type="text" id="ar-client-search" placeholder="الاسم، جواز السفر، الهاتف..." oninput="crmSearch('ar')"/>
+            </div>
+            <div class="crm-actions">
+              <button class="crm-action-btn new" onclick="openAddCustomerModal()">+ جديد</button>
+              <button class="crm-action-btn edit" id="ar-edit-btn" style="display:none;" onclick="crmEditMode('ar')">✏️ تعديل</button>
+              <button class="crm-action-btn save" id="ar-save-btn" style="display:none;" onclick="crmSaveEdit('ar')">💾 حفظ</button>
+              <button class="crm-action-btn cancel" id="ar-cancel-btn" style="display:none;" onclick="crmCancelEdit('ar')">✕ إلغاء</button>
+            </div>
+            <div class="crm-suggestions" id="ar-suggestions"></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>الاسم الأول *</label><input type="text" id="ar-fname" placeholder="الاسم الأول" readonly/></div>
+            <div class="field"><label>اللقب *</label><input type="text" id="ar-lname" placeholder="اللقب" readonly/></div>
+            <div class="field"><label>جواز السفر / الهوية *</label><input type="text" id="ar-passport" placeholder="رقم الهوية" readonly/></div>
+            <div class="field"><label>الجنسية</label><input type="text" id="ar-nationality" placeholder="الجنسية" readonly/></div>
+            <div class="field"><label>الهاتف</label><input type="text" id="ar-phone" placeholder="الهاتف" readonly/></div>
+            <div class="field"><label>البريد الإلكتروني</label><input type="text" id="ar-email" placeholder="البريد" readonly/></div>
+            <div class="field"><label>رخصة القيادة *</label><input type="text" id="ar-license" placeholder="رقم الرخصة" readonly/></div>
+            <div class="field"><label>العنوان</label><input type="text" id="ar-address" placeholder="العنوان" readonly/></div>
+            <div class="field"><label>اسم سائق إضافي</label><input type="text" id="ar-add-dr-name" placeholder="اختياري"/></div>
+            <div class="field"><label>رخصة سائق إضافي</label><input type="text" id="ar-add-dr-lic" placeholder="اختياري"/></div>
+          </div>
+        </div>
+        <!-- Dates -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">④ التواريخ والمواقع</div>
+          <div class="form-grid">
+            <div class="field"><label>تاريخ/وقت الاستلام</label><input type="datetime-local" id="ar-pickup" onchange="arCalc()"/></div>
+            <div class="field"><label>تاريخ/وقت التسليم</label><input type="datetime-local" id="ar-dropoff" onchange="arCalc()"/></div>
+            <div class="field"><label>نوع مكان الاستلام</label>
+              <select id="ar-ploc-type"><option>المكتب</option><option>المطار</option><option>الفندق</option></select></div>
+            <div class="field"><label>تفاصيل مكان الاستلام</label><input type="text" id="ar-ploc-addr" placeholder="العنوان بالتفصيل"/></div>
+            <div class="field"><label>نوع مكان التسليم</label>
+              <select id="ar-dloc-type"><option>المكتب</option><option>المطار</option><option>الفندق</option></select></div>
+            <div class="field"><label>تفاصيل مكان التسليم</label><input type="text" id="ar-dloc-addr" placeholder="العنوان بالتفصيل"/></div>
+          </div>
+        </div>
+        <!-- Payments -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">⑤ المدفوعات</div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:700;">الإيجار المدفوع الآن</div>
+          <div class="form-grid g3" style="margin-bottom:7px;">
+            <div class="field"><label>ج.م</label><input type="number" id="ar-paid-egp" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>دولار</label><input type="number" id="ar-paid-usd" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>يورو</label><input type="number" id="ar-paid-eur" value="0" oninput="arCalc()"/></div>
+          </div>
+          <div class="form-grid" style="margin-bottom:10px;">
+            <div class="field"><label>بطاقة (ج.م)</label><input type="number" id="ar-paid-card" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>رسوم التوصيل</label><input type="number" id="ar-del-fee" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>رسوم الاستلام</label><input type="number" id="ar-pick-fee" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>التأمين المطلوب</label><input type="number" id="ar-req-dep" value="0" oninput="arCalc()"/></div>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:700;">التأمين المحتجز</div>
+          <div class="form-grid g3" style="margin-bottom:7px;">
+            <div class="field"><label>ج.م</label><input type="number" id="ar-dep-egp" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>دولار</label><input type="number" id="ar-dep-usd" value="0" oninput="arCalc()"/></div>
+            <div class="field"><label>يورو</label><input type="number" id="ar-dep-eur" value="0" oninput="arCalc()"/></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>تأمين بطاقة (ج.م)</label><input type="number" id="ar-dep-card" value="0" oninput="arCalc()"/></div>
+          </div>
+        </div>
+        <!-- Package -->
+        <div style="margin-bottom:13px;">
+          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">⑥ الباقات والإضافات</div>
+          <div class="form-grid">
+            <div class="field"><label>باقة التأمين</label>
+              <select id="ar-ins-pkg">
+                <option value="none">بدون تأمين (مسؤولية 100%)</option>
+                <option value="basic">أساسي (مسؤولية العميل 100%)</option>
+                <option value="intermediate">متوسط (70% / 30%)</option>
+                <option value="full">حماية كاملة (مسؤولية صفر)</option>
+              </select></div>
+            <div class="field"><label>باقة الكيلومترات</label>
+              <select id="ar-km-pkg" onchange="arCalc()">
+                <option value="standard">قياسي (120 كم/يوم)</option>
+                <option value="500">500 كم إضافي</option>
+                <option value="750">750 كم إضافي</option>
+                <option value="1000">1000 كم إضافي</option>
+                <option value="1500">باقة 1500 كم</option>
+                <option value="2000">باقة 2000 كم</option>
+                <option value="3000">باقة 3000 كم</option>
+                <option value="unlimited">كيلومتر مفتوح يوميًا</option>
+              </select></div>
+            <div class="field"><label>تكلفة باقة الكيلومترات (ج.م)</label><input type="number" id="ar-km-cost" value="0" oninput="arCalc()"/></div>
+          </div>
+          <div style="display:flex;gap:13px;margin-top:7px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+              <input type="checkbox" id="ar-add-driver" onchange="arCalc()" style="width:14px;height:14px;"/>
+              سائق إضافي
+              <input type="number" id="ar-dr-rate" value="500" oninput="arCalc()" style="width:65px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);"/>
+              <span style="font-size:10px;color:var(--text3);">ج.م/يوم</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+              <input type="checkbox" id="ar-add-seat" onchange="arCalc()" style="width:14px;height:14px;"/>
+              كرسي طفل
+              <input type="number" id="ar-seat-rate" value="250" oninput="arCalc()" style="width:65px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);"/>
+              <span style="font-size:10px;color:var(--text3);">ج.م/يوم</span>
+            </label>
+          </div>
+        </div>
+        <!-- Live Estimate AR -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;margin-bottom:13px;">
+          <div style="font-size:10px;color:var(--text3);font-weight:700;margin-bottom:7px;text-transform:uppercase;">تقدير الإيجار</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
+            <span style="color:var(--text3);">الأساسي:</span><span id="ar-est-base" style="font-weight:700;">£0.00</span>
+            <span style="color:var(--text3);">الأيام:</span><span id="ar-est-days">0</span>
+            <span style="color:var(--text3);">رسوم/إضافات:</span><span id="ar-est-fees">£0.00</span>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;display:flex;justify-content:space-between;">
+            <span style="font-weight:700;">الإجمالي</span>
+            <span id="ar-est-total" style="font-size:15px;font-weight:900;color:var(--accent);">£0.00</span>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:7px;padding-top:7px;font-size:11px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+              <span style="color:var(--text3);">التأمين المطلوب:</span><span id="ar-dep-target">£0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+              <span style="color:var(--text3);">المدفوع الآن:</span><span id="ar-paid-now" style="color:var(--success);">£0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:var(--text3);">الإيجار المتبقي:</span><span id="ar-pending" style="color:var(--warning);">£0.00</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="generateARContract()">📝 إنشاء معاينة العقد</button>
+        <button class="btn btn-ghost btn-full mt-8" onclick="clearContractForm('ar')">✕ مسح النموذج</button>
+      </div>
+      <!-- Output -->
+      <div>
+        <div id="ar-output" style="display:none;">
+          <div style="display:flex;gap:7px;margin-bottom:11px;">
+            <button class="btn btn-primary" onclick="printModule('ar-a4')">🖨️ طباعة / حفظ PDF</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('ar-output').style.display='none'">✕ إغلاق</button>
+          </div>
+          <div class="a4-page" id="ar-a4" dir="rtl"></div>
+        </div>
+        <div id="ar-placeholder" class="empty-state" style="padding:80px 20px;">
+          <div style="font-size:40px;margin-bottom:11px;">📝</div>
+          <p>املأ النموذج واضغط إنشاء معاينة العقد</p>
+        </div>
+      </div>
+    </div>`;
+  populateFleetDropdowns();
+}
+
+function arTogglePrev(){
+  const agr=document.getElementById('ar-agr')?.value;
+  const wrap=document.getElementById('ar-prev-wrap');
+  if(wrap)wrap.style.display=agr==='extension'?'flex':'none';
+}
+
+function arSelectCar(){
+  const carId=document.getElementById('ar-car')?.value;
+  showCarInfoBadge(carId,'ar-car-badge');
+  arCalc();
+}
+
+function arCalc(){
+  const pickup=document.getElementById('ar-pickup')?.value;
+  const dropoff=document.getElementById('ar-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('ar-daily')?.value)||0;
+  const insFee=parseFloat(document.getElementById('ar-ins-fee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('ar-km-cost')?.value)||0;
+  const delFee=parseFloat(document.getElementById('ar-del-fee')?.value)||0;
+  const pickFee=parseFloat(document.getElementById('ar-pick-fee')?.value)||0;
+  const addDr=document.getElementById('ar-add-driver')?.checked;
+  const drRate=parseFloat(document.getElementById('ar-dr-rate')?.value)||500;
+  const addSt=document.getElementById('ar-add-seat')?.checked;
+  const stRate=parseFloat(document.getElementById('ar-seat-rate')?.value)||250;
+  const pEGP=parseFloat(document.getElementById('ar-paid-egp')?.value)||0;
+  const pUSD=parseFloat(document.getElementById('ar-paid-usd')?.value)||0;
+  const pEUR=parseFloat(document.getElementById('ar-paid-eur')?.value)||0;
+  const pCard=parseFloat(document.getElementById('ar-paid-card')?.value)||0;
+  const reqDep=parseFloat(document.getElementById('ar-req-dep')?.value)||0;
+  let days=0;
+  if(pickup&&dropoff){days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));}
+  const base=daily*days;const insT=insFee*days;
+  const drT=addDr?drRate*days:0;const stT=addSt?stRate*days:0;
+  const fees=delFee+pickFee+kmCost+drT+stT+insT;
+  const total=base+fees;
+  const paidNow=pEGP+(pUSD*G.ratesUSD)+(pEUR*G.ratesEUR)+pCard;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  s('ar-est-base',fmtMoney(base));s('ar-est-days',String(days));s('ar-est-fees',fmtMoney(fees));s('ar-est-total',fmtMoney(total));
+  s('ar-dep-target',fmtMoney(reqDep));s('ar-paid-now',fmtMoney(paidNow));s('ar-pending',fmtMoney(Math.max(0,total-paidNow)));
+}
+
+async function generateARContract(){
+  const fname=document.getElementById('ar-fname')?.value.trim();
+  const lname=document.getElementById('ar-lname')?.value.trim();
+  const carId=document.getElementById('ar-car')?.value;
+  const pickup=document.getElementById('ar-pickup')?.value;
+  const dropoff=document.getElementById('ar-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('ar-daily')?.value)||0;
+  const passport=document.getElementById('ar-passport')?.value.trim();
+  const license=document.getElementById('ar-license')?.value.trim();
+  if(!fname||!lname){toast('اسم العميل مطلوب. ابحث وحدد عميلاً أولاً.','error');return;}
+  if(!pickup||!dropoff){toast('تواريخ الاستلام والتسليم مطلوبة.','error');return;}
+  if(daily<=0){toast('الإيجار اليومي يجب أن يكون أكبر من صفر.','error');return;}
+  if(!passport)toast('تحذير: جواز السفر / الهوية غير مكتمل.','warning');
+  if(!license)toast('تحذير: رخصة القيادة غير مكتملة.','warning');
+  const branchCode=document.getElementById('ar-branch')?.value||G.user?.branch||'GEN';
+  const ref=await generateDocRef('CN',branchCode);
+  document.getElementById('ar-ref-preview').textContent=ref;
+  const car=getCarById(carId);
+  const carLabel=car?getCarLabel(car,'ar'):(carId||'-');
+  const days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));
+  const insFee=parseFloat(document.getElementById('ar-ins-fee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('ar-km-cost')?.value)||0;
+  const delFee=parseFloat(document.getElementById('ar-del-fee')?.value)||0;
+  const pickFee=parseFloat(document.getElementById('ar-pick-fee')?.value)||0;
+  const addDr=document.getElementById('ar-add-driver')?.checked;
+  const drRate=parseFloat(document.getElementById('ar-dr-rate')?.value)||500;
+  const addSt=document.getElementById('ar-add-seat')?.checked;
+  const stRate=parseFloat(document.getElementById('ar-seat-rate')?.value)||250;
+  const insPkg=document.getElementById('ar-ins-pkg')?.value||'basic';
+  const kmPkg=document.getElementById('ar-km-pkg')?.value||'standard';
+  const pEGP=parseFloat(document.getElementById('ar-paid-egp')?.value)||0;
+  const pUSD=parseFloat(document.getElementById('ar-paid-usd')?.value)||0;
+  const pEUR=parseFloat(document.getElementById('ar-paid-eur')?.value)||0;
+  const pCard=parseFloat(document.getElementById('ar-paid-card')?.value)||0;
+  const dEGP=parseFloat(document.getElementById('ar-dep-egp')?.value)||0;
+  const dUSD=parseFloat(document.getElementById('ar-dep-usd')?.value)||0;
+  const dEUR=parseFloat(document.getElementById('ar-dep-eur')?.value)||0;
+  const dCard=parseFloat(document.getElementById('ar-dep-card')?.value)||0;
+  const reqDep=parseFloat(document.getElementById('ar-req-dep')?.value)||0;
+  const drT=addDr?drRate*days:0;const stT=addSt?stRate*days:0;
+  const base=daily*days;const insT=insFee*days;
+  const fees=delFee+pickFee+kmCost+drT+stT+insT;
+  const total=base+fees;
+  const paidNow=pEGP+(pUSD*G.ratesUSD)+(pEUR*G.ratesEUR)+pCard;
+  const depHeld=dEGP+(dUSD*G.ratesUSD)+(dEUR*G.ratesEUR)+dCard;
+  const pending=Math.max(0,total-paidNow);
+  const propRef=document.getElementById('ar-proposal-ref')?.value.trim()||'';
+  const branchAr={HRG:'الغردقة',ALX:'الإسكندرية',CAI:'القاهرة',RSH:'رشيد'};
+  const kmPkgAr={standard:'قياسي 120 كم/يوم',500:'500 كم إضافي',750:'750 كم إضافي',1000:'1000 كم إضافي',1500:'باقة 1500 كم',2000:'باقة 2000 كم',3000:'باقة 3000 كم',unlimited:'كيلومتر مفتوح يوميًا'};
+  const insPkgAr={none:'بدون تأمين – مسؤولية 100%',basic:'أساسي – مسؤولية العميل 100%',intermediate:'متوسط – العميل 70% / الشركة 30%',full:'حماية كاملة – مسؤولية صفر'};
+  try{
+    const bookingData={'No.':ref,'اسم العميل':`${fname} ${lname}`,'اسم السيارة':carLabel,'كود السيارة':String(carId||''),'بداية التعاقد':pickup,'نهاية التعاقد':dropoff,'سعر السيارة اليومي بالجنيه المصري':fmtMoney(daily),'إجمالي المستحق (Total)':fmtMoney(total),'المدفوع EGP':String(pEGP),'المدفوع USD':String(pUSD),'المدفوع EUR':String(pEUR),'الوديعة المعلقة لدينا':fmtMoney(dEGP),'حالة الطلب':'Active','closed':false,'فرع الإصدار':branchCode,'assigned_user':G.user?.username||'','proposal_ref':propRef,'rental_days':String(days),'_sys_updated':Date.now()};
+    await db.collection('bookings').doc(ref).set(bookingData);
+    if(propRef)await db.collection('proposals').doc(propRef).update({status:'Converted',converted_to:ref}).catch(()=>{});
+    await logAction('GENERATE','Arabic Contract',`Contract ${ref} for ${fname} ${lname} | ${carLabel} | ${fmtMoney(total)}`);
+    toast(`العقد ${ref} تم حفظه بنجاح!`,'success');
+  }catch(e){toast('تحذير: فشل الحفظ. '+e.message,'warning');}
+  // Build A4 Arabic
+  const html=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:16px;direction:rtl;">
+      <div style="text-align:right;">
+        <div style="font-size:15px;font-weight:800;color:#1e40af;">عقد إيجار سيارة</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">رقم العقد: <strong>${ref}</strong></div>
+        <div style="font-size:10px;color:#64748b;">التاريخ: ${new Date().toLocaleDateString('ar-EG')}</div>
+        <div style="font-size:10px;color:#64748b;">الفرع: ${branchAr[branchCode]||branchCode}</div>
+        ${propRef?`<div style="font-size:10px;color:#3b82f6;">عرض السعر: ${propRef}</div>`:''}
+      </div>
+      <div style="text-align:left;">
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:38px;margin-bottom:5px;" alt="Brothers EGY"/>
+        <div style="font-size:17px;font-weight:900;color:#1e40af;">برازرز إيجي</div>
+        <div style="font-size:9px;color:#64748b;">خدمات تأجير السيارات • www.brothersegy.com</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:14px;direction:rtl;">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">بيانات المستأجر</div>
+        <div style="font-size:11px;font-weight:700;">${fname} ${lname}</div>
+        <div style="font-size:10px;color:#475569;margin-top:3px;">جواز السفر/الهوية: ${passport||'─────────────'}</div>
+        <div style="font-size:10px;color:#475569;">الجنسية: ${document.getElementById('ar-nationality')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">الهاتف: ${document.getElementById('ar-phone')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">البريد: ${document.getElementById('ar-email')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">رخصة القيادة: ${license||'─────────────'}</div>
+        <div style="font-size:10px;color:#475569;">العنوان: ${document.getElementById('ar-address')?.value||'-'}</div>
+        ${document.getElementById('ar-add-dr-name')?.value?`<div style="font-size:10px;color:#475569;margin-top:3px;">سائق إضافي: ${document.getElementById('ar-add-dr-name')?.value}</div>`:''}
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">بيانات المركبة</div>
+        <div style="font-size:11px;font-weight:700;">${carLabel}</div>
+        <div style="font-size:10px;color:#475569;margin-top:3px;">عداد الخروج: ${document.getElementById('ar-km-out')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">مستوى الوقود: ${document.getElementById('ar-fuel')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;margin-top:5px;">الاستلام: ${new Date(pickup).toLocaleString('ar-EG')}</div>
+        <div style="font-size:10px;color:#475569;">التسليم: ${new Date(dropoff).toLocaleString('ar-EG')}</div>
+        <div style="font-size:10px;color:#475569;font-weight:700;">المدة: ${days} يوم</div>
+        <div style="font-size:10px;color:#475569;">مكان الاستلام: ${document.getElementById('ar-ploc-type')?.value} – ${document.getElementById('ar-ploc-addr')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">مكان التسليم: ${document.getElementById('ar-dloc-type')?.value} – ${document.getElementById('ar-dloc-addr')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">باقة الكيلومترات: ${kmPkgAr[kmPkg]||kmPkg}</div>
+        <div style="font-size:10px;color:#475569;">التأمين: ${insPkgAr[insPkg]||insPkg}</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;direction:rtl;">الملخص المالي</div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:11px;direction:rtl;">
+      <thead><tr style="background:#1e40af;color:#fff;"><th style="padding:6px 9px;text-align:right;">البيان</th><th style="padding:6px 9px;text-align:right;">الحساب</th><th style="padding:6px 9px;text-align:left;">المبلغ (ج.م)</th></tr></thead>
+      <tbody>
+        <tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">الإيجار الأساسي</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(daily)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:700;">${fmtMoney(base)}</td></tr>
+        ${insT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">رسوم التأمين</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(insFee)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(insT)}</td></tr>`:''}
+        ${kmCost>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">باقة الكيلومترات</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${kmPkgAr[kmPkg]||kmPkg}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(kmCost)}</td></tr>`:''}
+        ${pickFee>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">رسوم الاستلام</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">─</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(pickFee)}</td></tr>`:''}
+        ${delFee>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">رسوم التوصيل</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">─</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(delFee)}</td></tr>`:''}
+        ${drT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">سائق إضافي</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(drRate)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(drT)}</td></tr>`:''}
+        ${stT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">كرسي طفل</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(stRate)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(stT)}</td></tr>`:''}
+      </tbody>
+    </table>
+    <div style="background:#1e40af;color:#fff;padding:9px 12px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;direction:rtl;">
+      <span style="font-weight:800;font-size:12px;">إجمالي قيمة العقد</span><span style="font-size:16px;font-weight:900;">${fmtMoney(total)}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px;font-size:10px;direction:rtl;">
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:9px;">
+        <div style="font-weight:800;color:#166534;margin-bottom:5px;">الإيجار المدفوع</div>
+        ${pEGP>0?`<div>نقداً ج.م: ${fmtMoney(pEGP)}</div>`:''}
+        ${pUSD>0?`<div>دولار: $${pUSD} = ${fmtMoney(pUSD*G.ratesUSD)}</div>`:''}
+        ${pEUR>0?`<div>يورو: €${pEUR} = ${fmtMoney(pEUR*G.ratesEUR)}</div>`:''}
+        ${pCard>0?`<div>بطاقة: ${fmtMoney(pCard)}</div>`:''}
+        <div style="border-top:1px solid #86efac;margin-top:4px;padding-top:4px;font-weight:700;color:#166534;">إجمالي المدفوع: ${fmtMoney(paidNow)}</div>
+        <div style="color:${pending>0?'#dc2626':'#166534'};font-weight:700;">المتبقي: ${fmtMoney(pending)}</div>
+      </div>
+      <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:9px;">
+        <div style="font-weight:800;color:#854d0e;margin-bottom:5px;">التأمين المحتجز</div>
+        ${dEGP>0?`<div>ج.م: ${fmtMoney(dEGP)}</div>`:''}
+        ${dUSD>0?`<div>دولار: $${dUSD}</div>`:''}
+        ${dEUR>0?`<div>يورو: €${dEUR}</div>`:''}
+        ${dCard>0?`<div>بطاقة: ${fmtMoney(dCard)}</div>`:''}
+        <div style="border-top:1px solid #fde047;margin-top:4px;padding-top:4px;font-weight:700;color:#854d0e;">إجمالي المحتجز: ${fmtMoney(depHeld)}</div>
+        <div style="color:#64748b;">المطلوب: ${fmtMoney(reqDep)}</div>
+      </div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:9px 11px;font-size:9px;color:#475569;line-height:1.6;margin-bottom:11px;direction:rtl;">
+      <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:4px;">الشروط والأحكام</div>
+      <strong>1. الأهلية:</strong> الحد الأدنى للسن 21 عامًا. رخصة قيادة وهوية سارية إلزامية.<br>
+      <strong>2. دورة الإيجار:</strong> وحدات 24 ساعة. تجاوز 5 ساعات = يوم كامل إضافي.<br>
+      <strong>3. الكيلومترات:</strong> 120 كم/يوم مشمولة. الزائد يُحتسب عند الإرجاع.<br>
+      <strong>4. الوقود:</strong> سياسة المثل بالمثل.<br>
+      <strong>5. التأمين:</strong> يُلغى في حالة عدم تقديم محضر شرطي فوري.<br>
+      <strong>6. التأمين الأمني:</strong> يُرد عند الإرجاع السليم.<br>
+      <strong>7. المسؤولية:</strong> المستأجر يتحمل كامل المسؤولية القانونية خلال فترة الإيجار.
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:11px;direction:rtl;">
+      <div style="text-align:center;"><div style="width:150px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">توقيع المستأجر</div><div style="font-size:9px;">${fname} ${lname}</div></div>
+      <div style="text-align:center;"><div style="width:150px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">توقيع المؤجر</div><div style="font-size:9px;">برازرز إيجي – ${branchAr[branchCode]||branchCode}</div></div>
+    </div>
+    ${a4FooterHTML(ref,'عقد إيجار',true)}`;
+  const a4=document.getElementById('ar-a4');if(a4)a4.innerHTML=html;
+  document.getElementById('ar-output').style.display='block';
+  document.getElementById('ar-placeholder').style.display='none';
+  attachQRAndBarcode(ref);
+}
+
+/* ============================================================
+   PART 4: RECEIPTS MODULE
+   ============================================================ */
+let rcCurrentBooking=null;
+let rcLookupTimeout=null;
+
+async function loadReceiptsPage(){
+  const el=document.getElementById('page-receipts');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>🧾 Receipts</h2><p>Generate and manage digital payment receipts</p></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" id="rc-tab-new" onclick="switchReceiptTab('new',this)" style="border-color:var(--accent);color:var(--accent);">➕ New Receipt</button>
+        <button class="btn btn-ghost btn-sm" id="rc-tab-list" onclick="switchReceiptTab('list',this)">📋 Saved Receipts</button>
+      </div>
+    </div>
+    <!-- New Receipt Tab -->
+    <div id="rc-new-pane">
+      <div style="display:grid;grid-template-columns:380px 1fr;gap:14px;align-items:start;">
+        <div class="panel sticky-panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
+            <h3 style="font-size:13px;font-weight:800;">🧾 New Receipt</h3>
+            <span id="rc-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+          </div>
+          <div style="display:flex;gap:7px;margin-bottom:13px;">
+            <div style="flex:1;background:var(--glass);border:1px solid var(--border);border-radius:7px;padding:7px;text-align:center;">
+              <div style="font-size:9px;color:var(--text3);">USD</div>
+              <div id="rc-usd-rate" style="font-weight:800;color:var(--success);font-size:12px;">${G.ratesUSD.toFixed(2)}</div>
+            </div>
+            <div style="flex:1;background:var(--glass);border:1px solid var(--border);border-radius:7px;padding:7px;text-align:center;">
+              <div style="font-size:9px;color:var(--text3);">EUR</div>
+              <div id="rc-eur-rate" style="font-weight:800;color:var(--success);font-size:12px;">${G.ratesEUR.toFixed(2)}</div>
+            </div>
+          </div>
+          <!-- Doc Info -->
+          <div style="margin-bottom:13px;">
+            <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">① Document Info</div>
+            <div class="field" style="margin-bottom:7px;">
+              <label>Contract / Order No.</label>
+              <input type="text" id="rc-contract-no" placeholder="e.g. 578 or CN-HRG-0402-001"
+                     oninput="rcLookupContractDebounced()"/>
+            </div>
+            <div id="rc-contract-status" style="font-size:10px;color:var(--text2);margin-bottom:7px;min-height:14px;"></div>
+            <div id="rc-no-contract-warn" style="display:none;background:rgba(239,68,68,0.1);border:1px solid var(--danger);border-radius:8px;padding:9px;font-size:11px;color:var(--danger);margin-bottom:9px;">
+              ⚠️ No contract found.
+              <button class="btn btn-ghost btn-xs" style="margin-left:7px;" onclick="showPage('en-contract')">Go to Contracts</button>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label>Receipt Date</label><input type="date" id="rc-date"/></div>
+              <div class="field"><label>Receipt Title</label><input type="text" id="rc-title" placeholder="e.g. Rental Payment"/></div>
+              <div class="field" style="grid-column:1/-1;"><label>Receipt Type</label>
+                <select id="rc-type">
+                  <option value="Income">Rental Payment</option>
+                  <option value="Deposit">Deposit Collected</option>
+                  <option value="Deposit Return">Deposit Returned</option>
+                  <option value="Overdue Settlement">Overdue Settlement</option>
+                  <option value="Accident Settlement">Accident Settlement</option>
+                  <option value="Partial Payment">Partial Payment</option>
+                </select></div>
+            </div>
+          </div>
+          <!-- Client & Vehicle (Auto-filled) -->
+          <div style="margin-bottom:13px;">
+            <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">② Client & Vehicle (Auto-filled)</div>
+            <div class="form-grid">
+              <div class="field"><label>Client Name</label><input type="text" id="rc-client-name" readonly placeholder="Auto-filled"/></div>
+              <div class="field"><label>Passport / ID</label><input type="text" id="rc-client-id" readonly placeholder="Auto-filled"/></div>
+              <div class="field"><label>Phone</label><input type="text" id="rc-phone" placeholder="Phone"/></div>
+              <div class="field"><label>Vehicle</label><input type="text" id="rc-vehicle" readonly placeholder="Auto-filled"/></div>
+              <div class="field"><label>Rental Start</label><input type="text" id="rc-start" readonly placeholder="Auto-filled"/></div>
+              <div class="field"><label>Rental End</label><input type="text" id="rc-end" readonly placeholder="Auto-filled"/></div>
+            </div>
+          </div>
+          <!-- Payment Received -->
+          <div style="margin-bottom:13px;">
+            <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">③ Payment Received Now</div>
+            <div class="form-grid">
+              <div class="field"><label>EGP</label><input type="number" id="rc-egp" value="0" oninput="rcCalc()"/></div>
+              <div class="field"><label>USD</label><input type="number" id="rc-usd-amount" value="0" oninput="rcCalc()"/></div>
+              <div class="field"><label>EUR</label><input type="number" id="rc-eur-amount" value="0" oninput="rcCalc()"/></div>
+              <div class="field"><label>Card (EGP)</label><input type="number" id="rc-card" value="0" oninput="rcCalc()"/></div>
+            </div>
+            <!-- Account Summary -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;margin-top:9px;">
+              <div style="font-size:10px;color:var(--text3);font-weight:700;margin-bottom:7px;text-transform:uppercase;">Account Summary</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
+                <span style="color:var(--text3);">Total Due:</span><span id="rc-total-due" style="font-weight:700;">£0.00</span>
+                <span style="color:var(--text3);">Previously Paid:</span><span id="rc-prev-paid">£0.00</span>
+                <span style="color:var(--text3);">This Payment:</span><span id="rc-this-payment" style="color:var(--success);font-weight:700;">£0.00</span>
+                <span style="color:var(--text3);">Outstanding After:</span><span id="rc-outstanding" style="color:var(--warning);font-weight:700;">£0.00</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;margin-top:11px;">
+              <input type="checkbox" id="rc-autosign" style="width:14px;height:14px;"/>
+              <label style="font-size:11px;cursor:pointer;" for="rc-autosign">Digitally Auto-Sign Receipt</label>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="generateReceipt()">🧾 Generate Receipt</button>
+          <button class="btn btn-ghost btn-full mt-8" onclick="clearReceiptForm()">✕ Clear Form</button>
+        </div>
+        <!-- Output -->
+        <div>
+          <div id="rc-output" style="display:none;">
+            <div style="display:flex;gap:7px;margin-bottom:11px;">
+              <button class="btn btn-primary" onclick="printModule('rc-a4')">🖨️ Print / Save PDF</button>
+              <button class="btn btn-ghost" onclick="document.getElementById('rc-output').style.display='none'">✕ Close</button>
+            </div>
+            <div class="a4-page" id="rc-a4"></div>
+          </div>
+          <div id="rc-placeholder" class="empty-state" style="padding:80px 20px;">
+            <div style="font-size:40px;margin-bottom:11px;">🧾</div>
+            <p>Enter a contract number to auto-fill all details, then add the payment amount to generate a receipt</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Saved Receipts Tab -->
+    <div id="rc-list-pane" style="display:none;">
+      <div class="panel" style="margin-bottom:14px;">
+        <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:160px;">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">🔍 SEARCH</div>
+            <input type="text" id="rcl-search" placeholder="Client, receipt ref, contract..."
+                   style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+                   oninput="filterSavedReceipts()"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">TYPE</div>
+            <select id="rcl-type" onchange="filterSavedReceipts()" style="padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              <option value="all">All Types</option>
+              <option value="Income">Rental Payment</option>
+              <option value="Deposit">Deposit</option>
+              <option value="Deposit Return">Deposit Return</option>
+              <option value="Overdue Settlement">Overdue Settlement</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">BRANCH</div>
+            <select id="rcl-branch" onchange="filterSavedReceipts()" style="padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              <option value="all">All Branches</option>
+              <option value="HRG">Hurghada</option>
+              <option value="ALX">Alexandria</option>
+              <option value="CAI">Cairo</option>
+              <option value="RSH">Rashid</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadSavedReceipts()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div id="rcl-table-wrap" class="table-wrap">
+          <div class="empty-state"><div class="spinner lg"></div></div>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('rc-date').value=todayISO();
+  loadSavedReceipts();
+}
+
+function switchReceiptTab(tab,btn){
+  document.querySelectorAll('#page-receipts .btn-ghost').forEach(b=>{b.style.borderColor='var(--border)';b.style.color='var(--text2)';});
+  if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
+  document.getElementById('rc-new-pane').style.display=tab==='new'?'block':'none';
+  document.getElementById('rc-list-pane').style.display=tab==='list'?'block':'none';
+}
+
+function rcLookupContractDebounced(){
+  clearTimeout(rcLookupTimeout);
+  rcLookupTimeout=setTimeout(doRCLookup,600);
+}
+
+async function doRCLookup(){
+  const no=(document.getElementById('rc-contract-no')?.value||'').trim();
+  const stEl=document.getElementById('rc-contract-status');
+  const warnEl=document.getElementById('rc-no-contract-warn');
+  if(!no||no.length<2){if(stEl)stEl.textContent='';rcCurrentBooking=null;return;}
+  if(stEl)stEl.textContent='Searching...';
+  try{
+    let snap=await db.collection('bookings').doc(no).get();
+    let data=null;
+    if(snap.exists){data={id:snap.id,...snap.data()};}
+    else{const q=await db.collection('bookings').where('No.','==',no).limit(1).get();if(!q.empty)data={id:q.docs[0].id,...q.docs[0].data()};}
+    if(!data){if(stEl){stEl.textContent='';stEl.style.color='var(--danger)';}if(warnEl)warnEl.style.display='block';rcCurrentBooking=null;return;}
+    if(warnEl)warnEl.style.display='none';
+    rcCurrentBooking=data;
+    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+    set('rc-client-name',data['اسم العميل']||'');
+    set('rc-client-id',data['كود العميل']||'');
+    set('rc-vehicle',data['اسم السيارة']||'');
+    set('rc-start',data['بداية التعاقد']||'');
+    set('rc-end',data['نهاية التعاقد']||'');
+    if(data['كود العميل']){const cust=G.customers.find(c=>String(c['No.'])===String(data['كود العميل']));if(cust)set('rc-phone',cust['رقم التليفون']||'');}
+    const totalDue=parseAmount(data['إجمالي المستحق (Total)']);
+    const prevPaidEGP=parseAmount(data['المدفوع EGP']);
+    const prevPaidUSD=parseAmount(data['المدفوع USD']||'0')*G.ratesUSD;
+    const prevPaidEUR=parseAmount(data['المدفوع EUR']||'0')*G.ratesEUR;
+    const prevPaid=prevPaidEGP+prevPaidUSD+prevPaidEUR;
+    document.getElementById('rc-total-due').textContent=fmtMoney(totalDue);
+    document.getElementById('rc-prev-paid').textContent=fmtMoney(prevPaid);
+    document.getElementById('rc-outstanding').textContent=fmtMoney(Math.max(0,totalDue-prevPaid));
+    if(stEl){stEl.textContent=`✅ Found: ${data['اسم العميل']} | Due: ${fmtMoney(totalDue)} | Prev Paid: ${fmtMoney(prevPaid)}`;stEl.style.color='var(--success)';}
+    rcCalc();
+  }catch(e){if(stEl){stEl.textContent='Lookup failed: '+e.message;stEl.style.color='var(--danger)';}}
+}
+
+function rcCalc(){
+  const egp=parseFloat(document.getElementById('rc-egp')?.value)||0;
+  const usd=parseFloat(document.getElementById('rc-usd-amount')?.value)||0;
+  const eur=parseFloat(document.getElementById('rc-eur-amount')?.value)||0;
+  const card=parseFloat(document.getElementById('rc-card')?.value)||0;
+  const total=egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card;
+  document.getElementById('rc-this-payment').textContent=fmtMoney(total);
+  if(rcCurrentBooking){
+    const totalDue=parseAmount(rcCurrentBooking['إجمالي المستحق (Total)']);
+    const prevPaidEGP=parseAmount(rcCurrentBooking['المدفوع EGP']);
+    const prevPaidUSD=parseAmount(rcCurrentBooking['المدفوع USD']||'0')*G.ratesUSD;
+    const prevPaidEUR=parseAmount(rcCurrentBooking['المدفوع EUR']||'0')*G.ratesEUR;
+    const prevPaid=prevPaidEGP+prevPaidUSD+prevPaidEUR;
+    document.getElementById('rc-outstanding').textContent=fmtMoney(Math.max(0,totalDue-prevPaid-total));
+  }
+}
+
+async function generateReceipt(){
+  const contractNo=document.getElementById('rc-contract-no')?.value.trim();
+  const clientName=document.getElementById('rc-client-name')?.value.trim();
+  const rcDate=document.getElementById('rc-date')?.value;
+  const rcTitle=document.getElementById('rc-title')?.value.trim()||'Payment Receipt';
+  const rcType=document.getElementById('rc-type')?.value||'Income';
+  const egp=parseFloat(document.getElementById('rc-egp')?.value)||0;
+  const usd=parseFloat(document.getElementById('rc-usd-amount')?.value)||0;
+  const eur=parseFloat(document.getElementById('rc-eur-amount')?.value)||0;
+  const card=parseFloat(document.getElementById('rc-card')?.value)||0;
+  const totalThisPayment=egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card;
+  const autoSign=document.getElementById('rc-autosign')?.checked;
+  if(!contractNo){toast('Contract number is required.','error');return;}
+  if(!clientName){toast('Client name is required. Enter a valid contract number first.','error');return;}
+  if(totalThisPayment<=0){toast('Payment amount must be greater than 0.','error');return;}
+  const branchCode=G.user?.branch||'GEN';
+  const ref=await generateDocRef('RC',branchCode);
+  document.getElementById('rc-ref-preview').textContent=ref;
+  let totalDue=0,prevPaidEGP=0,prevPaidUSD=0,prevPaidEUR=0,prevPaid=0;
+  if(rcCurrentBooking){
+    totalDue=parseAmount(rcCurrentBooking['إجمالي المستحق (Total)']);
+    prevPaidEGP=parseAmount(rcCurrentBooking['المدفوع EGP']);
+    prevPaidUSD=parseAmount(rcCurrentBooking['المدفوع USD']||'0');
+    prevPaidEUR=parseAmount(rcCurrentBooking['المدفوع EUR']||'0');
+    prevPaid=prevPaidEGP+(prevPaidUSD*G.ratesUSD)+(prevPaidEUR*G.ratesEUR);
+  }
+  const newTotalPaid=prevPaid+totalThisPayment;
+  const newOutstanding=Math.max(0,totalDue-newTotalPaid);
+  try{
+    const receiptData={receipt_ref:ref,contract_no:contractNo,client_name:clientName,client_id:document.getElementById('rc-client-id')?.value.trim()||'',car_id:rcCurrentBooking?.['كود السيارة']||'',car_label:document.getElementById('rc-vehicle')?.value.trim()||'',branch:branchCode,issued_by:G.user?.username||'',receipt_title:rcTitle,receipt_date:rcDate,amount_egp:egp,amount_usd:usd,amount_eur:eur,amount_card:card,total_egp_equiv:totalThisPayment,type:rcType,running_total_paid:newTotalPaid,outstanding_balance:newOutstanding,rental_start:document.getElementById('rc-start')?.value.trim()||'',rental_end:document.getElementById('rc-end')?.value.trim()||'',timestamp:Date.now()};
+    await db.collection('receipts').doc(ref).set(receiptData);
+    if(rcCurrentBooking){
+      const bookingRef=rcCurrentBooking.id;
+      const updateData={'_sys_updated':Date.now()};
+      updateData['المدفوع EGP']=String(prevPaidEGP+egp);
+      if(usd>0)updateData['المدفوع USD']=String(prevPaidUSD+usd);
+      if(eur>0)updateData['المدفوع EUR']=String(prevPaidEUR+eur);
+      const{end}=getOrderDates(rcCurrentBooking);
+      const status=getOrderStatus(rcCurrentBooking);
+      if(newTotalPaid>=totalDue&&end&&new Date()>end&&status!=='Accident'){
+        updateData['closed']=true;updateData['حالة الطلب']='Closed';
+        const carId=rcCurrentBooking['كود السيارة'];
+        if(carId)await db.collection('fleet').doc(String(carId)).update({status:'available',_sys_updated:Date.now()}).catch(()=>{});
+        toast('Order fully paid and closed! Fleet status updated.','success');
+      }
+      await db.collection('bookings').doc(bookingRef).update(updateData);
+      rcCurrentBooking={...rcCurrentBooking,...updateData};
+    }
+    await logAction('GENERATE','Receipts',`Receipt ${ref} | Contract: ${contractNo} | Client: ${clientName} | ${fmtMoney(totalThisPayment)} | Outstanding: ${fmtMoney(newOutstanding)}`);
+    toast(`Receipt ${ref} saved!`,'success');
+  }catch(e){toast('Warning: Save failed. '+e.message,'warning');}
+  // Build A4 Receipt
+  const payRows=[
+    egp>0?['Cash – EGP',fmtMoney(egp)]:null,
+    usd>0?['Cash – USD',`$${usd} × ${G.ratesUSD.toFixed(2)} = ${fmtMoney(usd*G.ratesUSD)}`]:null,
+    eur>0?['Cash – EUR',`€${eur} × ${G.ratesEUR.toFixed(2)} = ${fmtMoney(eur*G.ratesEUR)}`]:null,
+    card>0?['Card Payment – EGP',fmtMoney(card)]:null
+  ].filter(Boolean);
+  const html=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:16px;">
+      <div>
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:38px;margin-bottom:5px;" alt="Brothers EGY"/>
+        <div style="font-size:17px;font-weight:900;color:#1e40af;">BROTHERS EGY</div>
+        <div style="font-size:9px;color:#64748b;">Car Rental Services • www.brothersegy.com</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:16px;font-weight:800;color:#1e40af;">${rcTitle}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">Receipt No: <strong>${ref}</strong></div>
+        <div style="font-size:10px;color:#64748b;">Contract No: <strong>${contractNo}</strong></div>
+        <div style="font-size:10px;color:#64748b;">Date: ${rcDate?new Date(rcDate).toLocaleDateString('en-GB'):new Date().toLocaleDateString('en-GB')}</div>
+        <div style="font-size:10px;color:#64748b;">Branch: ${BRANCH_MAP[branchCode]||branchCode}</div>
+        <div style="font-size:10px;color:#64748b;">Type: ${rcType}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">Client Details</div>
+        <div style="font-size:11px;font-weight:700;">${clientName}</div>
+        <div style="font-size:10px;color:#475569;margin-top:3px;">Passport/ID: ${document.getElementById('rc-client-id')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">Phone: ${document.getElementById('rc-phone')?.value||'-'}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">Rental Details</div>
+        <div style="font-size:11px;font-weight:700;">${document.getElementById('rc-vehicle')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;margin-top:3px;">Start: ${document.getElementById('rc-start')?.value||'-'}</div>
+        <div style="font-size:10px;color:#475569;">End: ${document.getElementById('rc-end')?.value||'-'}</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">Payment Breakdown</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:11px;">
+      <thead><tr style="background:#1e40af;color:#fff;"><th style="padding:6px 9px;text-align:left;">Payment Method</th><th style="padding:6px 9px;text-align:right;">Amount</th></tr></thead>
+      <tbody>
+        ${payRows.map(r=>`<tr><td style="padding:6px 9px;border-bottom:1px solid #e2e8f0;">${r[0]}</td><td style="padding:6px 9px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${r[1]}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="background:#1e40af;color:#fff;padding:9px 12px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;">
+      <span style="font-weight:800;font-size:12px;">TOTAL RECEIVED</span><span style="font-size:16px;font-weight:900;">${fmtMoney(totalThisPayment)}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:13px;font-size:11px;">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:9px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:#64748b;">Total Contract Value:</span><span style="font-weight:700;">${fmtMoney(totalDue)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:#64748b;">Previously Paid:</span><span>${fmtMoney(prevPaid)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:#64748b;">This Payment:</span><span style="font-weight:700;color:#22c55e;">${fmtMoney(totalThisPayment)}</span></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:5px;margin-top:4px;">
+          <span style="font-weight:700;">Total Paid to Date:</span><span style="font-weight:800;color:#22c55e;">${fmtMoney(newTotalPaid)}</span>
+        </div>
+      </div>
+      <div style="background:${newOutstanding>0?'#fff7ed':'#f0fdf4'};border:1px solid ${newOutstanding>0?'#fed7aa':'#86efac'};border-radius:6px;padding:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Outstanding Balance</div>
+        <div style="font-size:22px;font-weight:900;color:${newOutstanding>0?'#dc2626':'#16a34a'};">${newOutstanding>0?fmtMoney(newOutstanding):'✅ FULLY PAID'}</div>
+      </div>
+    </div>
+    ${autoSign?`
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:13px;">
+      <div style="text-align:center;"><div style="width:140px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">Client Signature</div><div style="font-size:9px;">${clientName}</div></div>
+      <div style="border:3px solid #1e40af;border-radius:50%;width:68px;height:68px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(30,64,175,0.06);">
+        <div style="font-size:8px;font-weight:900;color:#1e40af;text-align:center;">${G.user?.username?.toUpperCase()||'STAFF'}</div>
+        <div style="font-size:6px;color:#64748b;text-align:center;">${BRANCH_MAP[branchCode]||branchCode}</div>
+        <div style="font-size:6px;color:#94a3b8;text-align:center;">${new Date().toLocaleDateString('en-GB')}</div>
+        <div style="font-size:5px;color:#94a3b8;text-align:center;">${new Date().toLocaleTimeString('en-GB')}</div>
+      </div>
+      <div style="text-align:center;"><div style="width:140px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">Authorized By</div><div style="font-size:9px;">${G.user?.username||'Staff'} – Brothers EGY</div></div>
+    </div>`:''}
+    <div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:13px;">
+      Thank you for choosing Brothers EGY Car Rental Services.<br>
+      This is an official receipt. Please retain for your records.
+    </div>
+    ${a4FooterHTML(ref,'PAYMENT RECEIPT',false)}`;
+  const a4=document.getElementById('rc-a4');if(a4)a4.innerHTML=html;
+  document.getElementById('rc-output').style.display='block';
+  document.getElementById('rc-placeholder').style.display='none';
+  attachQRAndBarcode(ref);
+}
+
+function clearReceiptForm(){
+  ['rc-contract-no','rc-client-name','rc-client-id','rc-phone','rc-vehicle','rc-start','rc-end','rc-title'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['rc-egp','rc-usd-amount','rc-eur-amount','rc-card'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+  document.getElementById('rc-date').value=todayISO();
+  document.getElementById('rc-contract-status').textContent='';
+  document.getElementById('rc-no-contract-warn').style.display='none';
+  document.getElementById('rc-total-due').textContent='£0.00';
+  document.getElementById('rc-prev-paid').textContent='£0.00';
+  document.getElementById('rc-this-payment').textContent='£0.00';
+  document.getElementById('rc-outstanding').textContent='£0.00';
+  document.getElementById('rc-output').style.display='none';
+  document.getElementById('rc-placeholder').style.display='block';
+  document.getElementById('rc-ref-preview').textContent='';
+  rcCurrentBooking=null;
+}
+
+async function loadSavedReceipts(){
+  const wrap=document.getElementById('rcl-table-wrap');if(!wrap)return;
+  wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  try{
+    let snap;
+    if(isPriv)snap=await db.collection('receipts').orderBy('timestamp','desc').limit(200).get();
+    else snap=await db.collection('receipts').where('branch','==',G.user?.branch||'').orderBy('timestamp','desc').limit(100).get();
+    window._receiptsCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    filterSavedReceipts();
+  }catch(e){wrap.innerHTML=`<div class="empty-state"><p>Could not load receipts: ${e.message}</p></div>`;}
+}
+
+function filterSavedReceipts(){
+  const search=(document.getElementById('rcl-search')?.value||'').toLowerCase();
+  const type=document.getElementById('rcl-type')?.value||'all';
+  const branch=document.getElementById('rcl-branch')?.value||'all';
+  let receipts=window._receiptsCache||[];
+  if(search)receipts=receipts.filter(r=>[r.receipt_ref,r.client_name,r.contract_no,r.client_id].join(' ').toLowerCase().includes(search));
+  if(type!=='all')receipts=receipts.filter(r=>r.type===type);
+  if(branch!=='all')receipts=receipts.filter(r=>r.branch===branch);
+  const wrap=document.getElementById('rcl-table-wrap');if(!wrap)return;
+  if(!receipts.length){wrap.innerHTML='<div class="empty-state"><div class="es-icon">🧾</div><p>No receipts found</p></div>';return;}
+  const typeColors={Income:'pill-active','Deposit':'pill-warning','Deposit Return':'pill-accepted','Overdue Settlement':'pill-overdue','Accident Settlement':'pill-accident','Partial Payment':'pill-draft'};
+  wrap.innerHTML=`<table class="data-table">
+    <thead><tr><th>Receipt Ref</th><th>Date</th><th>Client</th><th>Contract</th><th>Vehicle</th><th>Type</th><th>Amount</th><th>Outstanding</th><th>Branch</th><th>Issued By</th><th>Actions</th></tr></thead>
+    <tbody>
+      ${receipts.map(r=>`<tr>
+        <td><span style="color:var(--accent);font-weight:700;">${r.receipt_ref||r.id}</span></td>
+        <td style="font-size:10px;white-space:nowrap;">${r.receipt_date?new Date(r.receipt_date).toLocaleDateString('en-GB'):'-'}</td>
+        <td>
+          <div style="font-weight:600;">${r.client_name||'-'}</div>
+          ${r.client_id?`<div style="font-size:10px;color:var(--text3);">ID: ${r.client_id}</div>`:''}
+        </td>
+        <td><span style="color:var(--accent);">${r.contract_no||'-'}</span></td>
+        <td style="font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.car_label||'-'}</td>
+        <td><span class="pill ${typeColors[r.type]||'pill-draft'}">${r.type||'-'}</span></td>
+        <td><strong style="color:var(--success);">${fmtMoney(r.total_egp_equiv||0)}</strong></td>
+        <td style="color:${(r.outstanding_balance||0)>0?'var(--danger)':'var(--success)'};">
+          <strong>${(r.outstanding_balance||0)>0?fmtMoney(r.outstanding_balance):'✅ Clear'}</strong>
+        </td>
+        <td style="font-size:11px;">${BRANCH_MAP[r.branch]||r.branch||'-'}</td>
+        <td style="font-size:11px;">${r.issued_by||'-'}</td>
+        <td>
+          <div style="display:flex;gap:3px;">
+            <button class="btn btn-ghost btn-xs" onclick="reprintReceipt('${r.id}')">🖨️</button>
+            <a href="https://brothersegy.com/verify/?ref=${r.receipt_ref||r.id}" target="_blank" class="btn btn-ghost btn-xs">🔗</a>
+          </div>
+        </td>
+      </tr>`).join('')}
+    </tbody></table>
+    <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${receipts.length} receipt${receipts.length!==1?'s':''}</div>`;
+}
+
+async function reprintReceipt(receiptId){
+  const r=(window._receiptsCache||[]).find(x=>x.id===receiptId);
+  if(!r){toast('Receipt not found','error');return;}
+  // Pre-fill the new receipt form and generate preview
+  switchReceiptTab('new',document.getElementById('rc-tab-new'));
+  setTimeout(async()=>{
+    document.getElementById('rc-contract-no').value=r.contract_no||'';
+    document.getElementById('rc-client-name').value=r.client_name||'';
+    document.getElementById('rc-client-id').value=r.client_id||'';
+    document.getElementById('rc-vehicle').value=r.car_label||'';
+    document.getElementById('rc-start').value=r.rental_start||'';
+    document.getElementById('rc-end').value=r.rental_end||'';
+    document.getElementById('rc-date').value=r.receipt_date||todayISO();
+    document.getElementById('rc-title').value=r.receipt_title||'Payment Receipt';
+    document.getElementById('rc-egp').value=String(r.amount_egp||0);
+    document.getElementById('rc-usd-amount').value=String(r.amount_usd||0);
+    document.getElementById('rc-eur-amount').value=String(r.amount_eur||0);
+    document.getElementById('rc-card').value=String(r.amount_card||0);
+    document.getElementById('rc-total-due').textContent='--';
+    document.getElementById('rc-prev-paid').textContent='--';
+    document.getElementById('rc-this-payment').textContent=fmtMoney(r.total_egp_equiv||0);
+    document.getElementById('rc-outstanding').textContent=fmtMoney(r.outstanding_balance||0);
+    document.getElementById('rc-ref-preview').textContent=r.receipt_ref||r.id;
+    toast('Receipt loaded for reprint. Click Print to save as PDF.','info');
+    // Show a simple reprint view
+    const payRows=[
+      (r.amount_egp||0)>0?['Cash – EGP',fmtMoney(r.amount_egp)]:null,
+      (r.amount_usd||0)>0?['Cash – USD',`$${r.amount_usd}`]:null,
+      (r.amount_eur||0)>0?['Cash – EUR',`€${r.amount_eur}`]:null,
+      (r.amount_card||0)>0?['Card – EGP',fmtMoney(r.amount_card)]:null
+    ].filter(Boolean);
+    const html=`
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:16px;">
+        <div>
+          <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:38px;margin-bottom:5px;"/>
+          <div style="font-size:17px;font-weight:900;color:#1e40af;">BROTHERS EGY</div>
+          <div style="font-size:9px;color:#64748b;">Car Rental Services</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:15px;font-weight:800;color:#1e40af;">${r.receipt_title||'Payment Receipt'}</div>
+          <div style="font-size:10px;color:#64748b;">Receipt No: <strong>${r.receipt_ref||r.id}</strong></div>
+          <div style="font-size:10px;color:#64748b;">Contract: <strong>${r.contract_no||'-'}</strong></div>
+          <div style="font-size:10px;color:#64748b;">Date: ${r.receipt_date?new Date(r.receipt_date).toLocaleDateString('en-GB'):'-'}</div>
+          <div style="font-size:10px;color:#64748b;">Branch: ${BRANCH_MAP[r.branch]||r.branch||'-'}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:13px;font-size:11px;">
+        <strong>${r.client_name||'-'}</strong><br>
+        ID: ${r.client_id||'-'}<br>
+        Vehicle: ${r.car_label||'-'}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:11px;">
+        <thead><tr style="background:#1e40af;color:#fff;"><th style="padding:6px 9px;text-align:left;">Payment Method</th><th style="padding:6px 9px;text-align:right;">Amount</th></tr></thead>
+        <tbody>${payRows.map(row=>`<tr><td style="padding:6px 9px;border-bottom:1px solid #e2e8f0;">${row[0]}</td><td style="padding:6px 9px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${row[1]}</td></tr>`).join('')}</tbody>
+      </table>
+      <div style="background:#1e40af;color:#fff;padding:9px 12px;border-radius:5px;display:flex;justify-content:space-between;margin-bottom:11px;">
+        <span style="font-weight:800;">TOTAL RECEIVED</span><span style="font-size:15px;font-weight:900;">${fmtMoney(r.total_egp_equiv||0)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:11px;padding:9px;background:#f8fafc;border-radius:6px;">
+        <span>Total Paid to Date: <strong style="color:#22c55e;">${fmtMoney(r.running_total_paid||0)}</strong></span>
+        <span>Outstanding: <strong style="color:${(r.outstanding_balance||0)>0?'#dc2626':'#22c55e'};">${(r.outstanding_balance||0)>0?fmtMoney(r.outstanding_balance):'✅ CLEAR'}</strong></span>
+      </div>
+      <div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:11px;">REPRINT — Original issued: ${new Date(r.timestamp).toLocaleString('en-GB')}</div>
+      ${a4FooterHTML(r.receipt_ref||r.id,'PAYMENT RECEIPT',false)}`;
+    const a4=document.getElementById('rc-a4');if(a4)a4.innerHTML=html;
+    document.getElementById('rc-output').style.display='block';
+    document.getElementById('rc-placeholder').style.display='none';
+    attachQRAndBarcode(r.receipt_ref||r.id);
+  },200);
+}
+
+/* Close outside click for CRM suggestions */
+document.addEventListener('click',e=>{
+  ['pr','en','ar'].forEach(prefix=>{
+    const sugBox=document.getElementById(`${prefix}-suggestions`);
+    const input=document.getElementById(`${prefix}-client-search`);
+    if(sugBox&&input&&!sugBox.contains(e.target)&&e.target!==input)sugBox.style.display='none';
+  });
+});  
 
 </script>
 </body>
