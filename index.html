@@ -1354,6 +1354,8 @@ function onLoginSuccess() {
   loadSettings();
   resetInactivity();
   showPage('dashboard');
+  diagnoseDashboard(); // TEMPORARY - remove after diagnosis
+
 }
 
 /* ============================================================
@@ -3488,7 +3490,56 @@ function openPhotoLightbox(url) {
     </div>`);
 }
 
+/* ============================================================
+   DIAGNOSTIC - run once then remove
+   ============================================================ */
+async function diagnoseDashboard() {
+  console.log('=== BROTHERS EGY DIAGNOSTIC ===');
 
+  // Check bookings
+  try {
+    const snap = await db.collection('bookings').limit(10).get();
+    console.log('Total bookings fetched:', snap.size);
+    snap.docs.forEach(d => {
+      const data = d.data();
+      console.log('Order:', d.id,
+        '| حالة الطلب:', JSON.stringify(data['حالة الطلب']),
+        '| closed:', data.closed,
+        '| _sys_updated:', data['_sys_updated']
+      );
+    });
+  } catch(e) { console.error('Bookings error:', e); }
+
+  // Check collections
+  try {
+    const snap = await db.collection('collections').limit(5).get();
+    console.log('Total collections fetched:', snap.size);
+    snap.docs.forEach(d => {
+      const data = d.data();
+      console.log('Income record:', d.id,
+        '| شهر:', JSON.stringify(data['شهر']),
+        '| سنة:', JSON.stringify(data['سنة']),
+        '| قيمة التحصيل:', data['قيمة التحصيل']
+      );
+    });
+  } catch(e) { console.error('Collections error:', e); }
+
+  // Check fleet status values
+  console.log('=== FLEET STATUS VALUES ===');
+  const statusValues = {};
+  const contractValues = {};
+  G.fleet.forEach(car => {
+    const st = car.status || 'MISSING';
+    const ct = car.Contract || car['حاله التعاقد'] || 'MISSING';
+    statusValues[st]  = (statusValues[st]  || 0) + 1;
+    contractValues[ct]= (contractValues[ct]|| 0) + 1;
+  });
+  console.log('Status field values:', statusValues);
+  console.log('Contract field values:', contractValues);
+
+  console.log('=== END DIAGNOSTIC ===');
+}
+   
 </script>
 </body>
 </html>
