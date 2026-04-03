@@ -1354,7 +1354,6 @@ function onLoginSuccess() {
   loadSettings();
   resetInactivity();
   showPage('dashboard');
-  diagnoseDashboard(); // TEMPORARY - remove after diagnosis
 
 }
 
@@ -3491,54 +3490,515 @@ function openPhotoLightbox(url) {
 }
 
 /* ============================================================
-   DIAGNOSTIC - run once then remove
+   FIX 1: ORDER STATUS - handle missing حالة الطلب field
+   The migrated orders have no status field.
+   We treat missing/undefined status as 'Active' since they
+   are all rental records that were imported.
    ============================================================ */
-async function diagnoseDashboard() {
-  console.log('=== BROTHERS EGY DIAGNOSTIC ===');
 
-  // Check bookings
-  try {
-    const snap = await db.collection('bookings').limit(10).get();
-    console.log('Total bookings fetched:', snap.size);
-    snap.docs.forEach(d => {
-      const data = d.data();
-      console.log('Order:', d.id,
-        '| حالة الطلب:', JSON.stringify(data['حالة الطلب']),
-        '| closed:', data.closed,
-        '| _sys_updated:', data['_sys_updated']
-      );
-    });
-  } catch(e) { console.error('Bookings error:', e); }
-
-  // Check collections
-  try {
-    const snap = await db.collection('collections').limit(5).get();
-    console.log('Total collections fetched:', snap.size);
-    snap.docs.forEach(d => {
-      const data = d.data();
-      console.log('Income record:', d.id,
-        '| شهر:', JSON.stringify(data['شهر']),
-        '| سنة:', JSON.stringify(data['سنة']),
-        '| قيمة التحصيل:', data['قيمة التحصيل']
-      );
-    });
-  } catch(e) { console.error('Collections error:', e); }
-
-  // Check fleet status values
-  console.log('=== FLEET STATUS VALUES ===');
-  const statusValues = {};
-  const contractValues = {};
-  G.fleet.forEach(car => {
-    const st = car.status || 'MISSING';
-    const ct = car.Contract || car['حاله التعاقد'] || 'MISSING';
-    statusValues[st]  = (statusValues[st]  || 0) + 1;
-    contractValues[ct]= (contractValues[ct]|| 0) + 1;
-  });
-  console.log('Status field values:', statusValues);
-  console.log('Contract field values:', contractValues);
-
-  console.log('=== END DIAGNOSTIC ===');
+// Override getOrderDates to also handle the status field
+function getOrderStatus(order) {
+  const raw = order['حالة الطلب'] || order['order_status'] || order['Status'] || '';
+  // If field is completely missing, treat as Active
+  if (!raw || raw === '') return 'Active';
+  return raw;
 }
+
+// Fix loadDashKPIs to handle missing status
+async function loadDashKPIs() {
+  try {
+    const isPriv = ['Admin','Executive'].includes(G.user?.role);
+    const now    = new Date();
+    const month  = String(now.getMonth()+1);
+    const year   = String(now.getFullYear());
+
+    // Fetch ALL bookings since status field may be missing
+    // We cannot use .where() on a field that may not exist
+    const allBookingsSnap = await db.collection('bookings')
+      .orderBy('_sys_updated','desc').limit(500).get();
+
+    let allBookings = allBookingsSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+    // Branch filter for non-admin
+    if (!isPriv) {
+      allBookings = allBookings.filter(o =>
+        o['فرع الإصدار']===G.user.branch ||
+        o.assigned_user===G.user.username ||
+        // If no branch assigned, show all (migrated data)
+        (!o['فرع الإصدار'] && !o.assigned_user)
+      );
+    }
+
+    // Determine active orders - status is Active OR missing
+    const active = allBookings.filter(o => {
+      const st = getOrderStatus(o);
+      return st === 'Active' || st === 'active';
+    });
+
+    document.getElementById('kpi-active').textContent = active.length;
+
+    // Overdue
+    const today = new Date();
+    const overdue = active.filter(o => {
+      const {end} = getOrderDates(o);
+      return end && today > end && !o.closed;
+    });
+    document.getElementById('kpi-overdue').textContent = overdue.length;
+
+    // Available cars
+    const avail = G.fleet.filter(c => getCarStatusCategory(c) === 'available');
+    document.getElementById('kpi-avail').textContent = avail.length;
+
+    // Tasks
+    try {
+      const taskSnap = await db.collection('tasks')
+        .where('assigned_to','==',G.user.username)
+        .where('status','in',['pending','inprogress']).get();
+      document.getElementById('kpi-tasks').textContent = taskSnap.size;
+    } catch(e) {
+      document.getElementById('kpi-tasks').textContent = '0';
+    }
+
+    // Proposals
+    document.getElementById('kpi-proposals').textContent =
+      G.proposals.filter(p=>p.status==='Draft').length;
+
+    // Revenue - fix month comparison to handle both "4" and "04"
+    try {
+      const colSnap = await db.collection('collections').get();
+      let revenue = 0;
+      colSnap.docs.forEach(d => {
+        const data = d.data();
+        if (!isPriv) {
+          const b = data['موقع الفرع']||data.Branch||'';
+          if (!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()) &&
+              !b.includes(BRANCH_AR[G.user.branch]||'')) return;
+        }
+        // Normalize month - strip leading zeros for comparison
+        const recMonth = String(data['شهر']||'').replace(/^0+/,'');
+        const recYear  = String(data['سنة']||'');
+        if (recMonth === month && recYear === year) {
+          revenue += parseAmount(data['قيمة التحصيل']);
+        }
+      });
+      document.getElementById('kpi-revenue').textContent = fmtMoney(revenue);
+    } catch(e) {
+      document.getElementById('kpi-revenue').textContent = fmtMoney(0);
+    }
+
+    document.getElementById('kpi-revenue-sub').textContent =
+      `${now.toLocaleString('en-GB',{month:'long'})} ${year}`;
+
+  } catch(e) {
+    console.warn('KPI error:',e.message);
+  }
+}
+
+/* ============================================================
+   FIX 2: ORDER BOOK - handle missing status field
+   ============================================================ */
+
+function subscribeOrders() {
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  const unsub = db.collection('bookings')
+    .orderBy('_sys_updated','desc').limit(300)
+    .onSnapshot(snap => {
+      let orders = snap.docs.map(d=>({id:d.id,...d.data()}));
+      if (!isPriv) {
+        orders = orders.filter(o =>
+          o['فرع الإصدار']===G.user.branch ||
+          o.assigned_user===G.user.username ||
+          (!o['فرع الإصدار'] && !o.assigned_user)
+        );
+      }
+      allOrders = orders;
+      filterOrders();
+      updateOrderSummaryBar();
+    }, e => console.warn('Orders subscribe error:',e.message));
+  G.unsubscribers.push(unsub);
+}
+
+function filterOrders() {
+  const search  = (document.getElementById('ob-search')?.value||'').toLowerCase();
+  const status  = document.getElementById('ob-status')?.value||'all';
+  const branch  = document.getElementById('ob-branch')?.value||'all';
+  const from    = document.getElementById('ob-from')?.value||'';
+  const to      = document.getElementById('ob-to')?.value||'';
+  const today   = new Date();
+
+  let filtered = allOrders.filter(o => {
+    // Search
+    if (search) {
+      const hay = [
+        o['اسم العميل'],o['No.'],o['اسم السيارة'],
+        o['كود العميل'],o['فرع الإصدار'],o.assigned_user
+      ].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+
+    // Status - handle missing field
+    if (status !== 'all') {
+      const st = getOrderStatus(o);
+      if (status === 'overdue') {
+        const {end} = getOrderDates(o);
+        const isOD = end && today>end && !o.closed &&
+                     (st==='Active'||st==='active'||st==='');
+        if (!isOD) return false;
+      } else {
+        // Treat missing status as Active
+        const effectiveStatus = st || 'Active';
+        if (effectiveStatus !== status) return false;
+      }
+    }
+
+    // Branch
+    if (branch !== 'all' && o['فرع الإصدار'] !== branch) return false;
+
+    // Date range
+    if (from || to) {
+      const {start} = getOrderDates(o);
+      if (from && start && start < new Date(from)) return false;
+      if (to   && start && start > new Date(to))   return false;
+    }
+    return true;
+  });
+
+  renderOrdersTable(filtered);
+  updateFilterPills(search, status, branch, from, to);
+}
+
+function updateOrderSummaryBar() {
+  const bar = document.getElementById('ob-summary-bar');
+  if (!bar || !allOrders.length) return;
+  const today = new Date();
+
+  const active = allOrders.filter(o => {
+    const st = getOrderStatus(o);
+    return st==='Active'||st==='active'||st==='';
+  }).length;
+
+  const overdue = allOrders.filter(o => {
+    const {end} = getOrderDates(o);
+    const st = getOrderStatus(o);
+    return end && today>end && !o.closed &&
+           (st==='Active'||st==='active'||st==='');
+  }).length;
+
+  const accident = allOrders.filter(o => getOrderStatus(o)==='Accident').length;
+  const closed   = allOrders.filter(o =>
+    getOrderStatus(o)==='Closed' || o.closed===true
+  ).length;
+
+  const totalDebt = allOrders.reduce((sum,o) => {
+    const total = parseAmount(o['إجمالي المستحق (Total)']);
+    const paid  = parseAmount(o['المدفوع EGP']);
+    const {end} = getOrderDates(o);
+    const daily = parseAmount(o['سعر السيارة اليومي بالجنيه المصري']) ||
+                  (total/Math.max(1,parseFloat(o.rental_days||1)));
+    let debt = total - paid;
+    const st = getOrderStatus(o);
+    if (end && today>end && !o.closed &&
+        (st==='Active'||st==='active'||st===''||st==='Accident')) {
+      debt += Math.max(0,Math.ceil((today-end)/86400000)) * daily;
+    }
+    return sum + Math.max(0,debt);
+  }, 0);
+
+  bar.innerHTML = `
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Active</div>
+      <div class="kpi-value text-accent" style="font-size:20px;">${active}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Overdue</div>
+      <div class="kpi-value text-danger" style="font-size:20px;">${overdue}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Accident</div>
+      <div class="kpi-value text-warning" style="font-size:20px;">${accident}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Closed</div>
+      <div class="kpi-value" style="font-size:20px;color:var(--text3);">${closed}</div>
+    </div>
+    <div class="kpi-card" style="padding:10px 14px;">
+      <div class="kpi-label">Total Debt</div>
+      <div class="kpi-value text-danger" style="font-size:15px;">${fmtMoney(totalDebt)}</div>
+    </div>`;
+}
+
+function renderOrdersTable(orders) {
+  const wrap = document.getElementById('ob-table-wrap');
+  if (!wrap) return;
+  if (!orders.length) {
+    wrap.innerHTML = `<div class="empty-state">
+      <div class="es-icon">📋</div>
+      <p>No orders match your filters</p></div>`;
+    return;
+  }
+  const today = new Date();
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Order #</th><th>Client</th><th>Car</th>
+        <th>Start</th><th>End</th><th>Total</th>
+        <th>Paid</th><th>Debt</th><th>Status</th>
+        <th>Branch</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+        ${orders.map(o => {
+          const {start,end} = getOrderDates(o);
+          const total   = parseAmount(o['إجمالي المستحق (Total)']);
+          const paid    = parseAmount(o['المدفوع EGP']);
+          const daily   = parseAmount(o['سعر السيارة اليومي بالجنيه المصري']) ||
+                          (total/Math.max(1,parseFloat(o.rental_days||1)));
+          const statusRaw  = getOrderStatus(o);
+          const isAccident = statusRaw==='Accident';
+          const isOverdue  = end&&today>end&&!o.closed&&
+                             (statusRaw==='Active'||statusRaw==='active'||statusRaw==='');
+          let lateDays=0, latePenalty=0;
+          if ((isOverdue||isAccident) && end && !o.closed) {
+            lateDays    = Math.max(0,Math.ceil((today-end)/86400000));
+            latePenalty = lateDays * daily;
+          }
+          const totalDue  = total + latePenalty;
+          const debt      = Math.max(0, totalDue - paid);
+          const pct       = totalDue>0 ? Math.min(100,Math.round(paid/totalDue*100)) : 0;
+          const statusKey = isAccident?'accident':isOverdue?'overdue':
+                            statusRaw?statusRaw.toLowerCase():'active';
+          const statusLabel = isAccident?'ACCIDENT':isOverdue?'OVERDUE':
+                              statusRaw||'Active';
+          const carCode     = o['كود السيارة'];
+          const carInFleet  = G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
+          const carLabel    = carInFleet ? getCarLabel(carInFleet,'en') :
+                              (o['اسم السيارة']||'-');
+          const clientId    = o['كود العميل']||'';
+          return `
+            <tr style="cursor:pointer;" onclick="openOrderDetail('${o.id}')">
+              <td><span style="color:var(--accent);font-weight:700;">
+                #${o['No.']||o.id}</span>
+              </td>
+              <td>
+                <div style="font-weight:600;">${o['اسم العميل']||'-'}</div>
+                ${clientId?`<div style="font-size:10px;color:var(--text3);">
+                  ID: ${clientId}</div>`:''}
+              </td>
+              <td style="font-size:11px;max-width:150px;white-space:nowrap;
+                         overflow:hidden;text-overflow:ellipsis;">${carLabel}</td>
+              <td style="font-size:11px;white-space:nowrap;">
+                ${start?fmtDateShort(start):
+                  '<span style="color:var(--danger);">Invalid</span>'}
+              </td>
+              <td style="font-size:11px;white-space:nowrap;">
+                ${end?fmtDateShort(end):
+                  '<span style="color:var(--danger);">Invalid</span>'}
+                ${isOverdue?`<div style="font-size:9px;color:var(--danger);">
+                  ${lateDays}d overdue</div>`:''}
+              </td>
+              <td style="white-space:nowrap;">${fmtMoney(total)}</td>
+              <td>
+                <div style="white-space:nowrap;">${fmtMoney(paid)}</div>
+                <div style="background:var(--surface3);border-radius:99px;
+                            height:3px;width:60px;margin-top:3px;overflow:hidden;">
+                  <div style="height:100%;width:${pct}%;border-radius:99px;
+                              background:${pct>=100?'var(--success)':
+                              pct>50?'var(--accent)':'var(--warning)'};"></div>
+                </div>
+              </td>
+              <td style="white-space:nowrap;">
+                <span style="font-weight:700;
+                             color:${debt>0?'var(--danger)':'var(--success)'};">
+                  ${debt>0?fmtMoney(debt):'✅ Clear'}
+                </span>
+                ${latePenalty>0?`<div style="font-size:9px;color:var(--danger);">
+                  +${fmtMoney(latePenalty)}</div>`:''}
+              </td>
+              <td><span class="pill pill-${statusKey}">${statusLabel}</span></td>
+              <td style="font-size:11px;">
+                ${BRANCH_MAP[o['فرع الإصدار']]||o['فرع الإصدار']||'-'}
+              </td>
+              <td onclick="event.stopPropagation()">
+                <div style="display:flex;gap:4px;">
+                  <button class="btn btn-ghost btn-xs"
+                          onclick="openOrderDetail('${o.id}')">👁</button>
+                  <button class="btn btn-warning btn-xs"
+                          onclick="openOrderEdit('${o.id}')">✏️</button>
+                  <button class="btn btn-primary btn-xs"
+                          onclick="quickAddPayment('${o.id}')">💰</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="padding:10px 12px;font-size:11px;color:var(--text3);
+                border-top:1px solid var(--border);">
+      Showing ${orders.length} order${orders.length!==1?'s':''}
+    </div>`;
+}
+
+/* ============================================================
+   FIX 3: DASHBOARD RECENT ORDERS - use getOrderStatus
+   ============================================================ */
+async function loadDashRecentOrders() {
+  const el = document.getElementById('dash-orders');
+  if (!el) return;
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  try {
+    const snap = await db.collection('bookings')
+      .orderBy('_sys_updated','desc').limit(20).get();
+    let orders = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if (!isPriv) {
+      orders = orders.filter(o =>
+        o['فرع الإصدار']===G.user.branch ||
+        o.assigned_user===G.user.username ||
+        (!o['فرع الإصدار'] && !o.assigned_user)
+      );
+    }
+    orders = orders.slice(0,5);
+    if (!orders.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:20px;">
+        <div style="font-size:24px;">📋</div><p>No recent orders</p></div>`;
+      return;
+    }
+    const today = new Date();
+    el.innerHTML = orders.map(o => {
+      const {start,end} = getOrderDates(o);
+      const total       = parseAmount(o['إجمالي المستحق (Total)']);
+      const paid        = parseAmount(o['المدفوع EGP']);
+      const daily       = parseAmount(o['سعر السيارة اليومي بالجنيه المصري']) ||
+                          (total/Math.max(1,parseFloat(o.rental_days||1)));
+      const statusRaw   = getOrderStatus(o);
+      const isAccident  = statusRaw==='Accident';
+      const isOverdue   = end&&today>end&&!o.closed&&
+                          (statusRaw==='Active'||statusRaw==='active'||statusRaw==='');
+      let lateDays=0, latePenalty=0;
+      if ((isOverdue||isAccident)&&end&&!o.closed){
+        lateDays    = Math.max(0,Math.ceil((today-end)/86400000));
+        latePenalty = lateDays*daily;
+      }
+      const totalDue    = total+latePenalty;
+      const debt        = Math.max(0,totalDue-paid);
+      const pct         = totalDue>0?Math.min(100,Math.round(paid/totalDue*100)):0;
+      const statusKey   = isAccident?'accident':isOverdue?'overdue':
+                          statusRaw?statusRaw.toLowerCase():'active';
+      const statusLabel = isAccident?'ACCIDENT':isOverdue?'OVERDUE':statusRaw||'Active';
+      const carCode     = o['كود السيارة'];
+      const carInFleet  = G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
+      const carLabel    = carInFleet?getCarLabel(carInFleet,'en'):(o['اسم السيارة']||'-');
+      return `
+        <div style="padding:8px;border-radius:8px;margin-bottom:6px;
+                    background:var(--surface2);border:1px solid var(--border);
+                    cursor:pointer;transition:all 0.2s;"
+             onclick="openOrderDetail('${o.id}')"
+             onmouseover="this.style.borderColor='var(--accent)'"
+             onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+            <span style="font-size:10px;color:var(--accent);font-weight:700;">
+              #${o['No.']||o.id}
+            </span>
+            <span style="font-size:11px;font-weight:600;flex:1;white-space:nowrap;
+                         overflow:hidden;text-overflow:ellipsis;">
+              ${o['اسم العميل']||'-'}
+            </span>
+            <span class="pill pill-${statusKey}">${statusLabel}</span>
+          </div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:3px;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${carLabel}
+          </div>
+          ${latePenalty>0?`
+          <div style="font-size:9px;color:var(--danger);margin-bottom:3px;">
+            ⚠️ ${lateDays}d ${isAccident?'accident':'overdue'}
+            +${fmtMoney(latePenalty)} penalty
+          </div>`:''}
+          <div style="background:var(--surface3);border-radius:99px;
+                      height:4px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;border-radius:99px;
+                        background:${pct>=100?'var(--success)':
+                        pct>50?'var(--accent)':'var(--warning)'};
+                        transition:width 0.5s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;
+                      font-size:9px;color:var(--text3);margin-top:3px;">
+            <span>Paid: ${fmtMoney(paid)}</span>
+            <span style="color:${debt>0?'var(--danger)':'var(--success)'};">
+              ${debt>0?'Debt: '+fmtMoney(debt):'✅ Clear'}
+            </span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML='<div class="empty-state" style="padding:20px;"><p>Could not load</p></div>';
+    console.warn('Recent orders error:',e.message);
+  }
+}
+
+/* ============================================================
+   FIX 4: FINANCE - normalize month comparison
+   ============================================================ */
+async function loadDashFinance() {
+  const isPriv = ['Admin','Executive'].includes(G.user?.role);
+  try {
+    const now   = new Date();
+    const month = String(now.getMonth()+1); // "4" no leading zero
+    const year  = String(now.getFullYear());
+    let income=0, expenses=0;
+
+    const [cSnap,ceSnap,geSnap] = await Promise.all([
+      db.collection('collections').get(),
+      db.collection('car_expenses').get(),
+      db.collection('gen_expenses').get()
+    ]);
+
+    cSnap.docs.forEach(d => {
+      const data = d.data();
+      if (!isPriv) {
+        const b = data['موقع الفرع']||data.Branch||'';
+        if (!b.toLowerCase().includes(
+          (BRANCH_MAP[G.user.branch]||'').toLowerCase())) return;
+      }
+      // Normalize: strip leading zeros from stored month
+      const recMonth = String(data['شهر']||'').replace(/^0+/,'');
+      const recYear  = String(data['سنة']||'');
+      if (recMonth===month && recYear===year)
+        income += parseAmount(data['قيمة التحصيل']);
+    });
+
+    ceSnap.docs.forEach(d => {
+      const data = d.data();
+      if (!isPriv) {
+        const b = data['موقع الفرع']||'';
+        if (!b.includes(BRANCH_AR[G.user.branch]||G.user.branch)) return;
+      }
+      const recMonth = String(data['شهر']||'').replace(/^0+/,'');
+      const recYear  = String(data['paid_year']||data['سنة']||'');
+      if (recMonth===month && recYear===year)
+        expenses += parseAmount(data['قيمة المصروف']);
+    });
+
+    geSnap.docs.forEach(d => {
+      const data = d.data();
+      if (!isPriv) {
+        const b = data.Branch||data['موقع الفرع']||'';
+        if (!b.toLowerCase().includes(
+          (BRANCH_MAP[G.user.branch]||'').toLowerCase())) return;
+      }
+      const recMonth = String(data['شهر']||'').replace(/^0+/,'');
+      const recYear  = String(data['سنة']||'');
+      if (recMonth===month && recYear===year)
+        expenses += parseAmount(data['قيمة المصروف']);
+    });
+
+    const net = income - expenses;
+    document.getElementById('dash-income').textContent   = fmtMoney(income);
+    document.getElementById('dash-expenses').textContent = fmtMoney(expenses);
+    const netEl = document.getElementById('dash-net');
+    netEl.textContent = fmtMoney(net);
+    netEl.style.color = net>=0?'var(--success)':'var(--danger)';
+  } catch(e) { console.warn('Finance error:',e.message); }
+}
+
    
 </script>
 </body>
