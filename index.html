@@ -35,7 +35,7 @@ button{cursor:pointer;}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:99px;}
-#bg-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:0.35;}
+#bg-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:0.65;}
 #bg-overlay{position:fixed;inset:0;z-index:-1;
   background:linear-gradient(135deg,rgba(7,11,20,0.82) 0%,rgba(13,19,33,0.78) 50%,rgba(7,11,20,0.85) 100%);}
 /* LOGIN */
@@ -2445,6 +2445,1813 @@ function openPhotoLightbox(url){
       <a href="${url}" download class="btn btn-primary btn-sm">⬇️ Download</a>
     </div></div>`);
 }
+
+ /* ============================================================
+   PART 3: FLEET RADAR (GANTT CHART)
+   ============================================================ */
+async function loadFleetRadar(){
+  const el=document.getElementById('page-fleet-radar');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>📡 Fleet Radar</h2><p>Real-time Gantt timeline — all cars and bookings</p></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="loadFleetRadar()">🔄 Refresh</button>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 11px;background:var(--glass);border:1px solid var(--border);border-radius:8px;font-size:11px;">
+          <span style="color:var(--text3);">Timeline:</span>
+          <select id="gantt-range" onchange="renderGantt()" style="background:transparent;border:none;color:var(--text);font-size:11px;font-weight:700;outline:none;cursor:pointer;">
+            <option value="60">60 Days</option>
+            <option value="90" selected>90 Days</option>
+            <option value="180">180 Days</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="fleet-filter-bar-gantt"></div>
+    <!-- Legend -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);">
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
+        <div style="width:28px;height:10px;border-radius:3px;background:#3b82f6;"></div>Active
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
+        <div style="width:28px;height:10px;border-radius:3px;background:linear-gradient(90deg,#ef4444 60%,rgba(0,0,0,0.5) 60%);background-size:6px 10px;"></div>Overdue
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
+        <div style="width:28px;height:10px;border-radius:3px;background:repeating-linear-gradient(45deg,#f59e0b,#f59e0b 3px,#111 3px,#111 6px);"></div>Accident
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
+        <div style="width:28px;height:10px;border-radius:3px;background:#475569;"></div>Closed
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
+        <div style="width:28px;height:10px;border-radius:3px;border:2px dashed #3b82f6;"></div>Future
+      </div>
+    </div>
+    <div id="gantt-wrap" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);">
+      <div class="empty-state"><div class="spinner lg"></div></div>
+    </div>
+    <!-- Hover Tooltip -->
+    <div id="gantt-tooltip" style="display:none;position:fixed;z-index:3000;width:300px;
+         background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
+         padding:13px;box-shadow:0 12px 40px rgba(0,0,0,0.6);pointer-events:none;"></div>`;
+
+  buildFleetFilterBar('fleet-filter-bar-gantt','renderGantt');
+  await renderGantt();
+}
+
+async function renderGantt(){
+  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
+  wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
+
+  try{
+    // Load all bookings
+    const snap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(500).get();
+    const bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    const today=new Date();today.setHours(0,0,0,0);
+    const rangeEl=document.getElementById('gantt-range');
+    const totalDays=parseInt(rangeEl?.value||90);
+    const pastDays=Math.floor(totalDays*0.33);
+    const ganttStart=new Date(today);ganttStart.setDate(ganttStart.getDate()-pastDays);
+    const ganttEnd=new Date(ganttStart);ganttEnd.setDate(ganttEnd.getDate()+totalDays);
+
+    const DAY_PX=14;
+    const CAR_COL=200;
+    const ASSIGN_COL=200;
+    const ROW_H=36;
+    const HEADER_H=44;
+
+    // Filter fleet based on current filter state
+    let cars=G.fleet.filter(c=>carMatchesFilter(c));
+
+    // Build date headers
+    const totalPx=totalDays*DAY_PX;
+    let headerHTML='';
+    let monthMark=null;
+    for(let i=0;i<totalDays;i++){
+      const d=new Date(ganttStart);d.setDate(d.getDate()+i);
+      const isToday=d.toDateString()===today.toDateString();
+      if(d.getDate()===1||i===0){
+        const mLabel=d.toLocaleString('en-GB',{month:'short',year:'2-digit'});
+        headerHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;height:${HEADER_H}px;padding:4px 5px;font-size:10px;font-weight:800;color:var(--accent);white-space:nowrap;border-left:1px solid rgba(59,130,246,0.3);">${mLabel}</div>`;
+      }
+      if(d.getDate()%7===0){
+        headerHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;bottom:0;height:16px;padding:2px 4px;font-size:9px;color:var(--text3);border-left:1px solid var(--border);">${d.getDate()}</div>`;
+      }
+      if(isToday){
+        headerHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;height:${HEADER_H}px;width:${DAY_PX}px;background:rgba(59,130,246,0.08);border-left:2px solid var(--accent);"></div>`;
+      }
+    }
+
+    // Build car rows
+    let rowsHTML='';
+    let gridHTML='';
+    let totalRows=0;
+
+    cars.forEach(car=>{
+      const carId=String(car.ID||car.id);
+      const carLabel=getCarLabel(car,'en');
+      const carOrders=bookings.filter(b=>String(b['كود السيارة'])===carId);
+      carOrders.sort((a,b)=>{
+        const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);
+        return(as||new Date(0))-(bs||new Date(0));
+      });
+
+      // Chain orders into rows - non-overlapping on same row
+      const rows=[];
+      carOrders.forEach(order=>{
+        const{start,end}=getOrderDates(order);
+        if(!start)return;
+        const effectiveEnd=end?new Date(Math.max(end.getTime(),today.getTime())):today;
+        let placed=false;
+        for(let r=0;r<rows.length;r++){
+          const rowEnd=rows[r].end;
+          if(!rowEnd||start>=rowEnd){
+            rows[r].orders.push(order);rows[r].end=effectiveEnd;placed=true;break;
+          }
+        }
+        if(!placed)rows.push({orders:[order],end:effectiveEnd});
+      });
+
+      const numRows=Math.max(1,rows.length);
+
+      // Car label cell (spans all rows for this car)
+      rowsHTML+=`<div style="position:sticky;left:0;z-index:10;background:var(--surface);
+        display:flex;align-items:center;height:${numRows*ROW_H}px;
+        padding:0 10px;border-bottom:1px solid var(--border);
+        border-right:1px solid var(--border2);min-width:${CAR_COL}px;width:${CAR_COL}px;">
+        <div style="overflow:hidden;">
+          <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-20}px;">${carLabel}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:1px;">
+            <span class="pill pill-${getCarStatusCategory(car)}" style="font-size:8px;padding:1px 5px;">${getCarStatusCategory(car)}</span>
+          </div>
+        </div>
+      </div>`;
+
+      // Gantt bars for each row
+      rows.forEach((row,ri)=>{
+        let barsHTML='';
+
+        // Today line
+        const todayPx=Math.floor((today-ganttStart)/86400000)*DAY_PX;
+        barsHTML+=`<div style="position:absolute;left:${todayPx}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.5);z-index:2;pointer-events:none;"></div>`;
+
+        // Grid background
+        for(let i=0;i<totalDays;i++){
+          const d=new Date(ganttStart);d.setDate(d.getDate()+i);
+          const isToday=d.toDateString()===today.toDateString();
+          const isWeekend=d.getDay()===0||d.getDay()===6;
+          if(isToday){barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;bottom:0;width:${DAY_PX}px;background:rgba(59,130,246,0.06);pointer-events:none;z-index:0;"></div>`;}
+          else if(isWeekend){barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;bottom:0;width:${DAY_PX}px;background:rgba(255,255,255,0.01);pointer-events:none;z-index:0;"></div>`;}
+        }
+
+        row.orders.forEach(order=>{
+          const{start,end}=getOrderDates(order);if(!start)return;
+          const statusRaw=getOrderStatus(order);
+          const isAccident=statusRaw==='Accident';
+          const isClosed=statusRaw==='Closed'||order.closed===true;
+          const isOverdue=!isClosed&&end&&today>end&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+          const total=parseAmount(order['إجمالي المستحق (Total)']);
+          const paid=parseAmount(order['المدفوع EGP']);
+          const daily=parseAmount(order['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(order.rental_days||1)));
+
+          // Bar start pixel
+          const startPx=Math.max(0,Math.floor((start-ganttStart)/86400000)*DAY_PX);
+          // Bar base end pixel (contract period)
+          const baseEndDate=end||start;
+          const baseEndPx=Math.min(totalPx,Math.floor((baseEndDate-ganttStart)/86400000)*DAY_PX);
+          // Tail end pixel (overdue/accident continues to today)
+          const tailEndPx=Math.min(totalPx,Math.floor((today-ganttStart)/86400000)*DAY_PX+DAY_PX);
+
+          const barW=Math.max(4,baseEndPx-startPx);
+          const tailW=(isOverdue||isAccident)&&!isClosed?Math.max(0,tailEndPx-baseEndPx):0;
+          const barTop=4;const barH=ROW_H-8;
+
+          // Choose bar color
+          let barBg,tailBg;
+          if(isClosed){barBg='#475569';tailBg=null;}
+          else if(isAccident){
+            barBg='#ef4444';
+            tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';
+          }
+          else if(isOverdue){
+            barBg='#ef4444';
+            tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 4px,rgba(0,0,0,0.6) 4px,rgba(0,0,0,0.6) 8px)';
+          }
+          else if(start>today){barBg='transparent';tailBg=null;} // future - dashed handled separately
+          else{barBg='#3b82f6';tailBg=null;}
+
+          const isFuture=start>today&&!isClosed;
+          const orderDataStr=JSON.stringify({
+            id:order.id,no:order['No.']||order.id,
+            client:order['اسم العميل']||'-',
+            clientId:order['كود العميل']||'-',
+            car:carLabel,
+            start:start?fmtDate(start):'N/A',
+            end:end?fmtDate(end):'N/A',
+            total,paid,daily,
+            status:statusRaw,
+            isAccident,isOverdue,isClosed,isFuture,
+            deposit:order['الوديعة المعلقة لدينا']||'£0.00',
+            insurance:order['نوع التأمين']||'-',
+            pickup:order['مكان الاستلام']||'-',
+            dropoff:order['مكان التسليم']||'-',
+            branch:order['فرع الإصدار']||'-'
+          }).replace(/"/g,'&quot;');
+
+          // Main bar
+          if(barW>0&&!isFuture){
+            barsHTML+=`<div 
+              style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;
+                     background:${barBg};border-radius:${tailW>0?'4px 0 0 4px':'4px'};
+                     cursor:pointer;z-index:3;transition:filter 0.15s;overflow:hidden;
+                     box-shadow:0 2px 6px rgba(0,0,0,0.3);"
+              onmouseenter="showGanttTooltip(event,'${orderDataStr}')"
+              onmouseleave="hideGanttTooltip()"
+              onclick="openOrderDetail('${order.id}')">
+              <div style="padding:2px 5px;font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${order['اسم العميل']||''}
+              </div>
+            </div>`;
+          }
+          // Future dashed bar
+          if(isFuture&&barW>0){
+            barsHTML+=`<div
+              style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;
+                     border:2px dashed #3b82f6;border-radius:4px;cursor:pointer;z-index:3;
+                     background:rgba(59,130,246,0.08);"
+              onmouseenter="showGanttTooltip(event,'${orderDataStr}')"
+              onmouseleave="hideGanttTooltip()"
+              onclick="openOrderDetail('${order.id}')">
+              <div style="padding:2px 5px;font-size:9px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${order['اسم العميل']||''}
+              </div>
+            </div>`;
+          }
+          // Tail bar (overdue/accident)
+          if(tailW>0&&tailBg){
+            barsHTML+=`<div
+              style="position:absolute;left:${baseEndPx}px;top:${barTop}px;width:${tailW}px;height:${barH}px;
+                     background:${tailBg};border-radius:0 4px 4px 0;cursor:pointer;z-index:3;
+                     box-shadow:0 2px 6px rgba(0,0,0,0.3);"
+              onmouseenter="showGanttTooltip(event,'${orderDataStr}')"
+              onmouseleave="hideGanttTooltip()"
+              onclick="openOrderDetail('${order.id}')">
+            </div>`;
+          }
+        });
+
+        // Find latest relevant assignment info
+        const lastOrder=row.orders[row.orders.length-1];
+        let assignHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
+        if(lastOrder){
+          const{end}=getOrderDates(lastOrder);
+          const st=getOrderStatus(lastOrder);
+          const total=parseAmount(lastOrder['إجمالي المستحق (Total)']);
+          const paid=parseAmount(lastOrder['المدفوع EGP']);
+          const isAccident=st==='Accident';
+          const isClosed=st==='Closed'||lastOrder.closed===true;
+          const isOverdue=!isClosed&&end&&today>end&&(st==='Active'||st==='Overdue_Legacy');
+          if(isClosed||(paid>=total&&total>0&&!isAccident)){
+            assignHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
+          }else if(isAccident){
+            const daily=parseAmount(lastOrder['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(lastOrder.rental_days||1)));
+            const lateDays=end?Math.max(0,Math.ceil((today-end)/86400000)):0;
+            const debt=Math.max(0,total+(lateDays*daily)-paid);
+            assignHTML=`<div style="font-size:10px;color:var(--orange);font-weight:700;">🚨 ACCIDENT</div>
+              <div style="font-size:9px;color:var(--text3);">${lastOrder['اسم العميل']||'-'}</div>
+              <div style="font-size:9px;color:var(--danger);">Debt: ${fmtMoney(debt)}</div>`;
+          }else if(isOverdue){
+            const daily=parseAmount(lastOrder['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(lastOrder.rental_days||1)));
+            const lateDays=end?Math.max(0,Math.ceil((today-end)/86400000)):0;
+            const debt=Math.max(0,total+(lateDays*daily)-paid);
+            assignHTML=`<div style="font-size:10px;color:var(--danger);font-weight:700;">⚠️ ${lastOrder['اسم العميل']||'-'}</div>
+              <div style="font-size:9px;color:var(--text3);">ID: ${lastOrder['كود العميل']||'-'}</div>
+              <div style="font-size:9px;color:var(--danger);">OVERDUE ${lateDays}d • ${fmtMoney(debt)}</div>`;
+          }else{
+            assignHTML=`<div style="font-size:10px;font-weight:700;">${lastOrder['اسم العميل']||'-'}</div>
+              <div style="font-size:9px;color:var(--text3);">ID: ${lastOrder['كود العميل']||'-'}</div>
+              <div style="font-size:9px;color:var(--success);">Ends: ${end?fmtDateShort(end):'N/A'}</div>`;
+          }
+        }
+
+        rowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
+          <!-- Timeline row -->
+          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
+            ${barsHTML}
+          </div>
+          <!-- Assignment info -->
+          <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;
+               padding:4px 10px;background:var(--surface2);border-left:1px solid var(--border2);
+               display:flex;align-items:center;z-index:5;">
+            ${assignHTML}
+          </div>
+        </div>`;
+        totalRows++;
+      });
+
+      if(rows.length===0){
+        // Car with no orders
+        rowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
+          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
+            <div style="position:absolute;left:${Math.max(0,(today-ganttStart)/86400000*DAY_PX)}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.4);"></div>
+          </div>
+          <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;padding:4px 10px;background:var(--surface2);border-left:1px solid var(--border2);display:flex;align-items:center;z-index:5;">
+            <span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>
+          </div>
+        </div>`;
+        totalRows++;
+      }
+    });
+
+    const containerH=Math.max(200,totalRows*ROW_H+HEADER_H);
+
+    wrap.innerHTML=`
+      <div style="min-width:${CAR_COL+totalPx+ASSIGN_COL}px;">
+        <!-- Header row -->
+        <div style="display:flex;position:sticky;top:0;z-index:20;background:var(--surface3);border-bottom:1px solid var(--border2);">
+          <div style="position:sticky;left:0;z-index:21;background:var(--surface3);width:${CAR_COL}px;min-width:${CAR_COL}px;height:${HEADER_H}px;display:flex;align-items:center;padding:0 10px;border-right:1px solid var(--border2);">
+            <span style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;">Vehicle</span>
+          </div>
+          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${HEADER_H}px;overflow:hidden;flex-shrink:0;">
+            ${headerHTML}
+          </div>
+          <div style="position:sticky;right:0;z-index:21;background:var(--surface3);width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${HEADER_H}px;display:flex;align-items:center;padding:0 10px;border-left:1px solid var(--border2);">
+            <span style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;">Assignment</span>
+          </div>
+        </div>
+        <!-- Car rows -->
+        <div>
+          ${cars.map((car,ci)=>{
+            const carId=String(car.ID||car.id);
+            const carOrders=bookings.filter(b=>String(b['كود السيارة'])===carId);
+            carOrders.sort((a,b)=>{const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);return(as||new Date(0))-(bs||new Date(0));});
+            const rows2=[];
+            carOrders.forEach(order=>{
+              const{start,end}=getOrderDates(order);if(!start)return;
+              const effectiveEnd=end?new Date(Math.max(end.getTime(),today.getTime())):today;
+              let placed=false;
+              for(let r=0;r<rows2.length;r++){if(!rows2[r].end||start>=rows2[r].end){rows2[r].orders.push(order);rows2[r].end=effectiveEnd;placed=true;break;}}
+              if(!placed)rows2.push({orders:[order],end:effectiveEnd});
+            });
+            const numRows2=Math.max(1,rows2.length);
+            const carLabel2=getCarLabel(car,'en');
+            const rowsBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.01)';
+
+            let carRowsHTML=`<div style="display:flex;background:${rowsBg};">
+              <div style="position:sticky;left:0;z-index:10;background:${rowsBg};width:${CAR_COL}px;min-width:${CAR_COL}px;height:${numRows2*ROW_H}px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--border);border-right:1px solid var(--border2);">
+                <div style="overflow:hidden;width:100%;">
+                  <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${carLabel2}</div>
+                  <div style="margin-top:2px;"><span class="pill pill-${getCarStatusCategory(car)}" style="font-size:8px;padding:1px 5px;">${getCarStatusCategory(car)}</span></div>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;">`;
+
+            if(rows2.length===0){
+              carRowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
+                <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;">
+                  <div style="position:absolute;left:${Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX)}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.4);pointer-events:none;"></div>
+                </div>
+                <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;padding:4px 10px;background:${rowsBg};border-left:1px solid var(--border2);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:5;">
+                  <span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>
+                </div>
+              </div>`;
+            }else{
+              rows2.forEach((row,ri)=>{
+                let barsHTML2='';
+                // Today line
+                barsHTML2+=`<div style="position:absolute;left:${Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX)}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.4);z-index:2;pointer-events:none;"></div>`;
+
+                row.orders.forEach(order=>{
+                  const{start,end}=getOrderDates(order);if(!start)return;
+                  const statusRaw=getOrderStatus(order);
+                  const isAccident=statusRaw==='Accident';
+                  const isClosed=statusRaw==='Closed'||order.closed===true;
+                  const isOverdue=!isClosed&&end&&today>end&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+                  const isFuture=start>today&&!isClosed;
+                  const total=parseAmount(order['إجمالي المستحق (Total)']);
+                  const paid=parseAmount(order['المدفوع EGP']);
+                  const daily=parseAmount(order['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(order.rental_days||1)));
+                  const startPx=Math.max(0,Math.floor((start-ganttStart)/86400000)*DAY_PX);
+                  const baseEndDate=end||start;
+                  const baseEndPx=Math.min(totalPx,Math.floor((baseEndDate-ganttStart)/86400000)*DAY_PX);
+                  const tailEndPx=Math.min(totalPx,Math.floor((today-ganttStart)/86400000)*DAY_PX+DAY_PX);
+                  const barW=Math.max(4,baseEndPx-startPx);
+                  const tailW=(isOverdue||isAccident)&&!isClosed?Math.max(0,tailEndPx-baseEndPx):0;
+                  const barTop=4;const barH=ROW_H-8;
+                  let barBg;
+                  if(isClosed)barBg='#475569';
+                  else if(isAccident)barBg='#ef4444';
+                  else if(isOverdue)barBg='#ef4444';
+                  else if(isFuture)barBg='transparent';
+                  else barBg='#3b82f6';
+                  let tailBg=null;
+                  if(isAccident&&!isClosed)tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';
+                  else if(isOverdue)tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 4px,rgba(0,0,0,0.6) 4px,rgba(0,0,0,0.6) 8px)';
+                  const lateDays=end&&(isOverdue||isAccident)?Math.max(0,Math.ceil((today-end)/86400000)):0;
+                  const latePenalty=lateDays*daily;
+                  const debt=isClosed?0:Math.max(0,total+latePenalty-paid);
+                  const od=JSON.stringify({
+                    id:order.id,no:order['No.']||order.id,
+                    client:order['اسم العميل']||'-',clientId:order['كود العميل']||'-',
+                    car:carLabel2,start:start?fmtDate(start):'N/A',end:end?fmtDate(end):'N/A',
+                    total,paid,daily,debt,lateDays,latePenalty,
+                    status:statusRaw,isAccident,isOverdue,isClosed,isFuture,
+                    deposit:order['الوديعة المعلقة لدينا']||'£0.00',
+                    insurance:order['نوع التأمين']||'-',
+                    pickup:order['مكان الاستلام']||'-',dropoff:order['مكان التسليم']||'-',
+                    branch:order['فرع الإصدار']||'-'
+                  }).replace(/"/g,'&quot;');
+
+                  if(barW>0){
+                    if(isFuture){
+                      barsHTML2+=`<div style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;border:2px dashed #3b82f6;border-radius:4px;background:rgba(59,130,246,0.08);cursor:pointer;z-index:3;" onmouseenter="showGanttTooltip(event,'${od}')" onmouseleave="hideGanttTooltip()" onclick="openOrderDetail('${order.id}')"><div style="padding:2px 5px;font-size:9px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${order['اسم العميل']||''}</div></div>`;
+                    }else{
+                      barsHTML2+=`<div style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;background:${barBg};border-radius:${tailW>0?'4px 0 0 4px':'4px'};cursor:pointer;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,0.3);" onmouseenter="showGanttTooltip(event,'${od}')" onmouseleave="hideGanttTooltip()" onclick="openOrderDetail('${order.id}')"><div style="padding:2px 5px;font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${order['اسم العميل']||''}</div></div>`;
+                      if(tailW>0&&tailBg){barsHTML2+=`<div style="position:absolute;left:${baseEndPx}px;top:${barTop}px;width:${tailW}px;height:${barH}px;background:${tailBg};border-radius:0 4px 4px 0;cursor:pointer;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,0.3);" onmouseenter="showGanttTooltip(event,'${od}')" onmouseleave="hideGanttTooltip()" onclick="openOrderDetail('${order.id}')"></div>`;}
+                    }
+                  }
+                });
+
+                // Assignment info for this row
+                const lastOrd=row.orders[row.orders.length-1];
+                let aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
+                if(lastOrd){
+                  const{end:le}=getOrderDates(lastOrd);
+                  const lst=getOrderStatus(lastOrd);
+                  const lt=parseAmount(lastOrd['إجمالي المستحق (Total)']);
+                  const lp=parseAmount(lastOrd['المدفوع EGP']);
+                  const lday=parseAmount(lastOrd['سعر السيارة اليومي بالجنيه المصري'])||(lt/Math.max(1,parseFloat(lastOrd.rental_days||1)));
+                  const lac=lst==='Accident';
+                  const lcl=lst==='Closed'||lastOrd.closed===true;
+                  const lov=!lcl&&le&&today>le&&(lst==='Active'||lst==='Overdue_Legacy');
+                  if(lcl||(lp>=lt&&lt>0&&!lac)){aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';}
+                  else if(lac){const ldays=le?Math.max(0,Math.ceil((today-le)/86400000)):0;const ldebt=Math.max(0,lt+(ldays*lday)-lp);aHTML=`<div style="font-size:10px;color:var(--orange);font-weight:700;">🚨 ACCIDENT</div><div style="font-size:9px;color:var(--text3);">${lastOrd['اسم العميل']||'-'}</div><div style="font-size:9px;color:var(--danger);">Debt: ${fmtMoney(ldebt)}</div>`;}
+                  else if(lov){const ldays=le?Math.max(0,Math.ceil((today-le)/86400000)):0;const ldebt=Math.max(0,lt+(ldays*lday)-lp);aHTML=`<div style="font-size:10px;color:var(--danger);font-weight:700;">⚠️ ${lastOrd['اسم العميل']||'-'}</div><div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div><div style="font-size:9px;color:var(--danger);">OVERDUE ${ldays}d • ${fmtMoney(ldebt)}</div>`;}
+                  else{aHTML=`<div style="font-size:10px;font-weight:700;">${lastOrd['اسم العميل']||'-'}</div><div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div><div style="font-size:9px;color:var(--success);">Ends: ${le?fmtDateShort(le):'N/A'}</div>`;}
+                }
+
+                carRowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
+                  <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">${barsHTML2}</div>
+                  <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;padding:4px 10px;background:${rowsBg};border-left:1px solid var(--border2);display:flex;align-items:center;z-index:5;">${aHTML}</div>
+                </div>`;
+              });
+            }
+
+            carRowsHTML+='</div></div>';
+            return carRowsHTML;
+          }).join('')}
+        </div>
+      </div>`;
+
+  }catch(e){
+    wrap.innerHTML=`<div class="empty-state"><div class="es-icon">⚠️</div><p>Failed to load Gantt: ${e.message}</p></div>`;
+    console.warn('Gantt error:',e.message);
+  }
+}
+
+function carMatchesFilter(car){
+  const cEN=(car.Contract||'').toLowerCase().trim();
+  const cAR=(car['حاله التعاقد']||'').toLowerCase().trim();
+  const st=(car.status||'available').toLowerCase().trim();
+  const handover=parseDBDate(car['تاريخ التسليم']||'');
+  const isPast=handover&&new Date()>handover;
+  const isArchived=cEN==='finished'||cAR==='منتهى'||isPast;
+  const isAccident=st==='accident'||cEN==='accident';
+  const isMaint=st==='maintenance'||cEN==='maintenance';
+  const isActive=!isArchived&&!isAccident&&!isMaint;
+  const statusPass=(isArchived&&FLEET_FILTER.status.archived)||(isAccident&&FLEET_FILTER.status.accident)||(isMaint&&FLEET_FILTER.status.maintenance)||(isActive&&FLEET_FILTER.status.active);
+  if(!statusPass)return false;
+  const allOff=!Object.values(FLEET_FILTER.branches).some(v=>v);
+  const branchPass=allOff||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
+    if(!on)return false;
+    const bn=(BRANCH_MAP[code]||code).toLowerCase();
+    const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
+    return b.includes(bn)||(car.Branch||'').toLowerCase().includes(bn)||(car.City||'').toLowerCase().includes(bn);
+  });
+  if(!branchPass)return false;
+  if(FLEET_FILTER.search){
+    const q=FLEET_FILTER.search.toLowerCase();
+    const hay=[car.plate,car.model,car.Color,car.year,car.Type,car['اللون'],car['الطراز'],car['رقم اللوحة'],car['سنة الصنع'],car.ID,car.id].join(' ').toLowerCase();
+    if(!hay.includes(q))return false;
+  }
+  return true;
+}
+
+function showGanttTooltip(e,dataStr){
+  const tooltip=document.getElementById('gantt-tooltip');if(!tooltip)return;
+  let d;
+  try{d=JSON.parse(dataStr.replace(/&quot;/g,'"'));}catch(ex){return;}
+  const today=new Date();
+  const isOverdue=d.isOverdue||false;
+  const isAccident=d.isAccident||false;
+  const isClosed=d.isClosed||false;
+  const lateDays=d.lateDays||0;
+  const latePenalty=d.latePenalty||0;
+  const debt=d.debt||0;
+  let statusBadge='';
+  if(isAccident)statusBadge=`<span style="background:var(--orange);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚨 ACCIDENT</span>`;
+  else if(isOverdue)statusBadge=`<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">⚠️ OVERDUE</span>`;
+  else if(isClosed)statusBadge=`<span style="background:var(--text3);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">✅ CLOSED</span>`;
+  else if(d.isFuture)statusBadge=`<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">📅 UPCOMING</span>`;
+  else statusBadge=`<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚗 ACTIVE</span>`;
+  tooltip.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+      ${statusBadge}
+      <span style="font-size:10px;font-weight:800;color:var(--accent);">Order #${d.no}</span>
+    </div>
+    <div style="font-size:13px;font-weight:800;margin-bottom:2px;">${d.client}</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:9px;">(ID: ${d.clientId})</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;margin-bottom:9px;">
+      <span style="color:var(--text3);">Branch:</span><span style="font-weight:700;">${d.branch}</span>
+      <span style="color:var(--text3);">Pickup:</span><span>${d.pickup}</span>
+      <span style="color:var(--text3);">Dropoff:</span><span>${d.dropoff}</span>
+      <span style="color:var(--text3);">Start:</span><span>${d.start}</span>
+      <span style="color:var(--text3);">End:</span><span>${d.end}</span>
+      <span style="color:var(--text3);">Insurance:</span><span>${d.insurance}</span>
+    </div>
+    <div style="background:${debt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)'};border:1px solid ${debt>0?'rgba(239,68,68,0.3)':'rgba(34,197,94,0.3)'};border-radius:8px;padding:8px;font-size:11px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="color:var(--text3);">Base Value:</span>
+        <span style="font-weight:700;">${fmtMoney(d.total)}</span>
+      </div>
+      ${latePenalty>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:var(--danger);">+ Late Penalty (${lateDays} days):</span><span style="font-weight:700;color:var(--danger);">${fmtMoney(latePenalty)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="color:var(--text3);">Paid:</span>
+        <span style="font-weight:700;color:var(--success);">${fmtMoney(d.paid)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;">
+        <span style="font-weight:800;">Current Debt:</span>
+        <span style="font-weight:900;font-size:13px;color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?fmtMoney(debt):'✅ CLEAR'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:3px;">
+        <span style="color:var(--text3);">Deposit:</span>
+        <span>${d.deposit}</span>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:9px;color:var(--text3);">Click bar to edit order</div>`;
+  tooltip.style.display='block';
+  const tx=Math.min(e.clientX+12,window.innerWidth-320);
+  const ty=Math.min(e.clientY-20,window.innerHeight-420);
+  tooltip.style.left=tx+'px';tooltip.style.top=ty+'px';
+}
+function hideGanttTooltip(){
+  const t=document.getElementById('gantt-tooltip');if(t)t.style.display='none';
+}
+
+/* ============================================================
+   RISK RADAR
+   ============================================================ */
+async function loadRiskRadar(){
+  const el=document.getElementById('page-risk-radar');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>⚠️ Risk Radar</h2><p>License, insurance and contract expiry monitoring</p></div>
+      <div style="display:flex;gap:7px;">
+        <select id="risk-range" onchange="loadRiskRadar()" style="padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;">
+          <option value="7">Next 7 Days</option>
+          <option value="30" selected>Next 30 Days</option>
+          <option value="60">Next 60 Days</option>
+          <option value="90">Next 90 Days</option>
+          <option value="180">Next 6 Months</option>
+          <option value="365">Next 1 Year</option>
+        </select>
+      </div>
+    </div>
+    <div id="risk-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
+    <div class="panel"><div id="risk-table-wrap" class="table-wrap"><div class="empty-state"><div class="spinner lg"></div></div></div></div>`;
+  const rangeEl=document.getElementById('risk-range');
+  const days=parseInt(rangeEl?.value||30);
+  const today=new Date();const futureDate=new Date(today.getTime()+days*86400000);
+  const risks=[];
+  G.fleet.forEach(car=>{
+    [{field:'نهاية الترخيص',label:'License',icon:'📋',statusField:'License'},{field:'نهاية التأمين',label:'Insurance',icon:'🛡',statusField:'Insurance'},{field:'نهاية التعاقد',label:'Contract',icon:'📄',statusField:'Contract'}].forEach(({field,label,icon,statusField})=>{
+      const d=parseDBDate(car[field]);if(!d)return;
+      const daysLeft=Math.ceil((d-today)/86400000);
+      if(daysLeft>days)return;
+      const risk=daysLeft<=0?'expired':daysLeft<=7?'high':daysLeft<=30?'medium':'low';
+      risks.push({car,label,icon,date:d,daysLeft,risk,carLabel:getCarLabel(car,'en'),statusField});
+    });
+  });
+  risks.sort((a,b)=>a.daysLeft-b.daysLeft);
+  // KPIs
+  const expired=risks.filter(r=>r.risk==='expired').length;
+  const high=risks.filter(r=>r.risk==='high').length;
+  const medium=risks.filter(r=>r.risk==='medium').length;
+  const low=risks.filter(r=>r.risk==='low').length;
+  const kpiEl=document.getElementById('risk-kpis');
+  if(kpiEl){
+    kpiEl.innerHTML=`
+      <div class="kpi-card"><div class="kpi-label">Expired</div><div class="kpi-value text-danger">${expired}</div><div class="kpi-sub">Immediate action</div></div>
+      <div class="kpi-card"><div class="kpi-label">High Risk</div><div class="kpi-value text-danger">${high}</div><div class="kpi-sub">Within 7 days</div></div>
+      <div class="kpi-card"><div class="kpi-label">Medium Risk</div><div class="kpi-value text-warning">${medium}</div><div class="kpi-sub">Within 30 days</div></div>
+      <div class="kpi-card"><div class="kpi-label">Low Risk</div><div class="kpi-value text-success">${low}</div><div class="kpi-sub">Within ${days} days</div></div>`;
+  }
+  const badge=document.getElementById('badge-risk');
+  if(badge){badge.textContent=expired+high;badge.classList.toggle('hidden',expired+high===0);}
+  const wrap=document.getElementById('risk-table-wrap');
+  if(!risks.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">✅</div><p>No risks in the next ${days} days</p></div>`;return;}
+  wrap.innerHTML=`<table class="data-table">
+    <thead><tr><th>Car</th><th>Risk Type</th><th>Expires</th><th>Days Left</th><th>Risk Level</th><th>Owner</th></tr></thead>
+    <tbody>
+      ${risks.map(r=>{
+        const riskColor=r.risk==='expired'||r.risk==='high'?'var(--danger)':r.risk==='medium'?'var(--warning)':'var(--success)';
+        const owner=((r.car['الاسم الأول']||'')+' '+(r.car['الاسم الأخير']||'')).trim()||'-';
+        return`<tr>
+          <td style="font-size:11px;">${r.carLabel}</td>
+          <td>${r.icon} ${r.label}</td>
+          <td>${fmtDateShort(r.date)}</td>
+          <td><strong style="color:${riskColor};">${r.daysLeft<=0?`EXPIRED ${Math.abs(r.daysLeft)}d ago`:r.daysLeft+' days'}</strong></td>
+          <td><span class="pill pill-${r.risk==='expired'?'high':r.risk}">${r.risk.toUpperCase()}</span></td>
+          <td style="font-size:11px;">${owner}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>`;
+}
+
+/* ============================================================
+   SYSTEM LOGS
+   ============================================================ */
+async function loadSystemLogs(){
+  const el=document.getElementById('page-system-logs');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>📜 System Logs</h2><p>Complete audit trail — all user actions</p></div>
+      <button class="btn btn-ghost btn-sm" onclick="loadSystemLogs()">🔄 Refresh</button>
+    </div>
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="kpi-card"><div class="kpi-label">Total Actions</div><div class="kpi-value text-accent" id="log-kpi-total">--</div><div class="kpi-sub">All time</div></div>
+      <div class="kpi-card"><div class="kpi-label">Active Session</div><div class="kpi-value text-success" id="log-kpi-session">0m</div><div class="kpi-sub">Since login</div></div>
+      <div class="kpi-card"><div class="kpi-label">Records Edited</div><div class="kpi-value text-warning" id="log-kpi-edits">--</div><div class="kpi-sub">This session</div></div>
+      <div class="kpi-card"><div class="kpi-label">Current User</div><div class="kpi-value text-success" style="font-size:16px;" id="log-kpi-user">--</div><div class="kpi-sub">Logged in</div></div>
+    </div>
+    <!-- Filters -->
+    <div class="panel" style="margin-bottom:14px;">
+      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">🔍 SEARCH</div>
+          <input type="text" id="log-search" placeholder="User, action, details..."
+                 style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+                 oninput="filterLogs()"/>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">ACTION</div>
+          <select id="log-action-filter" onchange="filterLogs()" style="padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            <option value="all">All Actions</option>
+            <option value="LOGIN">Login</option>
+            <option value="LOGOUT">Logout</option>
+            <option value="GENERATE">Generate</option>
+            <option value="EDIT">Edit</option>
+            <option value="ADD">Add</option>
+            <option value="PRINT">Print</option>
+            <option value="VIEW">View</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">USER</div>
+          <select id="log-user-filter" onchange="filterLogs()" style="padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            <option value="all">All Users</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <!-- Table -->
+    <div class="panel">
+      <div id="log-table-wrap" class="table-wrap">
+        <div class="empty-state"><div class="spinner lg"></div></div>
+      </div>
+    </div>`;
+
+  // Session timer
+  const loginTime=Date.now();
+  const sessionInterval=setInterval(()=>{
+    const el2=document.getElementById('log-kpi-session');
+    if(!el2){clearInterval(sessionInterval);return;}
+    const mins=Math.floor((Date.now()-loginTime)/60000);
+    el2.textContent=mins<60?`${mins}m`:`${Math.floor(mins/60)}h ${mins%60}m`;
+  },10000);
+
+  // Load logs with realtime
+  const unsub=db.collection('logs').orderBy('timestamp','desc').limit(300)
+    .onSnapshot(snap=>{
+      const logs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      // Update KPIs
+      const kpiTotal=document.getElementById('log-kpi-total');
+      const kpiEdits=document.getElementById('log-kpi-edits');
+      const kpiUser=document.getElementById('log-kpi-user');
+      if(kpiTotal)kpiTotal.textContent=snap.size;
+      if(kpiEdits)kpiEdits.textContent=logs.filter(l=>l.action==='EDIT'||l.action==='ADD').length;
+      if(kpiUser)kpiUser.textContent=G.user?.username||'-';
+      // Populate user filter
+      const userFilter=document.getElementById('log-user-filter');
+      if(userFilter){
+        const users=[...new Set(logs.map(l=>l.user).filter(Boolean))];
+        const current=userFilter.value;
+        userFilter.innerHTML='<option value="all">All Users</option>'+users.map(u=>`<option value="${u}" ${u===current?'selected':''}>${u}</option>`).join('');
+      }
+      window._logsCache=logs;filterLogs();
+    },e=>console.warn('Logs error:',e.message));
+  G.unsubscribers.push(unsub);
+}
+window._logsCache=[];
+function filterLogs(){
+  const search=(document.getElementById('log-search')?.value||'').toLowerCase();
+  const action=document.getElementById('log-action-filter')?.value||'all';
+  const user=document.getElementById('log-user-filter')?.value||'all';
+  let logs=window._logsCache||[];
+  if(action!=='all')logs=logs.filter(l=>l.action===action);
+  if(user!=='all')logs=logs.filter(l=>l.user===user);
+  if(search)logs=logs.filter(l=>[l.user,l.action,l.module,l.details].join(' ').toLowerCase().includes(search));
+  renderLogsTable(logs);
+}
+function renderLogsTable(logs){
+  const wrap=document.getElementById('log-table-wrap');if(!wrap)return;
+  if(!logs.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">📜</div><p>No logs match your filters</p></div>`;return;}
+  const AC={LOGIN:{bg:'rgba(34,197,94,0.1)',color:'var(--success)'},LOGOUT:{bg:'rgba(100,116,139,0.1)',color:'var(--text3)'},GENERATE:{bg:'rgba(59,130,246,0.1)',color:'var(--accent)'},EDIT:{bg:'rgba(245,158,11,0.1)',color:'var(--warning)'},ADD:{bg:'rgba(168,85,247,0.1)',color:'var(--purple)'},PRINT:{bg:'rgba(14,165,233,0.1)',color:'var(--accent3)'},VIEW:{bg:'rgba(100,116,139,0.05)',color:'var(--text3)'},DELETE:{bg:'rgba(239,68,68,0.1)',color:'var(--danger)'}};
+  wrap.innerHTML=`<table class="data-table">
+    <thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Module</th><th>Details</th><th>Branch</th></tr></thead>
+    <tbody>
+      ${logs.map(l=>{
+        const ac=AC[l.action]||AC.VIEW;
+        return`<tr>
+          <td style="font-size:10px;white-space:nowrap;color:var(--text3);">${l.timeStr||new Date(l.timestamp).toLocaleString('en-GB')}</td>
+          <td><span style="color:var(--accent);font-weight:700;cursor:pointer;">${l.user||'-'}</span></td>
+          <td><span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;background:${ac.bg};color:${ac.color};">${l.action}</span></td>
+          <td style="font-size:11px;">${l.module||'-'}</td>
+          <td style="font-size:11px;max-width:300px;">${l.details||'-'}</td>
+          <td style="font-size:11px;">${l.branch||'-'}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>
+    <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${logs.length} log${logs.length!==1?'s':''}</div>`;
+}
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+async function loadSettingsPage(){
+  const el=document.getElementById('page-settings');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>⚙️ Settings</h2><p>System configuration — Admin only</p></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <!-- Shift Hours -->
+      <div class="panel">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">🕐 Shift Hours</h3>
+        <div class="form-grid">
+          <div class="field"><label>Shift Start (Hour)</label><input type="number" id="set-shift-start" value="${G.settings.shiftStart||10}" min="0" max="23"/></div>
+          <div class="field"><label>Shift End (Hour)</label><input type="number" id="set-shift-end" value="${G.settings.shiftEnd||18}" min="0" max="23"/></div>
+        </div>
+      </div>
+      <!-- Discount Threshold -->
+      <div class="panel">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">💲 Rate Control</h3>
+        <div class="field">
+          <label>Max Discount % Without Approval</label>
+          <input type="number" id="set-discount" value="${G.settings.discountThreshold||5}" min="0" max="100"/>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px;">Discounts above this % will require Admin approval</div>
+      </div>
+      <!-- Task Penalties -->
+      <div class="panel">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">⚠️ Task Penalties (EGP)</h3>
+        <div class="form-grid">
+          <div class="field"><label>Low Priority</label><input type="number" id="set-pen-low" value="${G.settings.penaltyLow||50}"/></div>
+          <div class="field"><label>Medium Priority</label><input type="number" id="set-pen-med" value="${G.settings.penaltyMedium||100}"/></div>
+          <div class="field"><label>High Priority</label><input type="number" id="set-pen-high" value="${G.settings.penaltyHigh||200}"/></div>
+          <div class="field"><label>Urgent Priority</label><input type="number" id="set-pen-urg" value="${G.settings.penaltyUrgent||500}"/></div>
+        </div>
+      </div>
+      <!-- WhatsApp -->
+      <div class="panel">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">📱 WhatsApp Notifications</h3>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:11px;">
+          Each employee must send <strong style="color:var(--accent);">"I allow callmebot to send me messages"</strong> to <strong>+34 644 60 42 42</strong> on WhatsApp and share their API key below.
+        </div>
+        <div id="whatsapp-keys-list"></div>
+        <button class="btn btn-ghost btn-sm mt-8" onclick="loadWhatsAppKeys()">🔄 Refresh Users</button>
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <button class="btn btn-success" onclick="saveSettings()">💾 Save All Settings</button>
+    </div>`;
+  loadWhatsAppKeys();
+}
+
+async function loadWhatsAppKeys(){
+  const list=document.getElementById('whatsapp-keys-list');if(!list)return;
+  try{
+    const snap=await db.collection('users').get();
+    const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    list.innerHTML=users.map(u=>`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:7px;align-items:end;">
+        <div class="field"><label>User</label><input type="text" value="${u.id}" readonly/></div>
+        <div class="field"><label>Phone (with country code)</label><input type="text" id="wa-phone-${u.id}" value="${G.settings.callmebotPhones?.[u.id]||''}" placeholder="+201234567890"/></div>
+        <div class="field"><label>CallMeBot API Key</label><input type="text" id="wa-key-${u.id}" value="${G.settings.callmebotKeys?.[u.id]||''}" placeholder="API Key"/></div>
+      </div>`).join('');
+    window._settingsUsers=users;
+  }catch(e){if(list)list.innerHTML='<p style="color:var(--danger);">Could not load users</p>';}
+}
+
+async function saveSettings(){
+  try{
+    const phones={},keys={};
+    (window._settingsUsers||[]).forEach(u=>{
+      const phone=document.getElementById(`wa-phone-${u.id}`)?.value.trim();
+      const key=document.getElementById(`wa-key-${u.id}`)?.value.trim();
+      if(phone)phones[u.id]=phone;if(key)keys[u.id]=key;
+    });
+    const newSettings={
+      shiftStart:parseInt(document.getElementById('set-shift-start')?.value||10),
+      shiftEnd:parseInt(document.getElementById('set-shift-end')?.value||18),
+      discountThreshold:parseFloat(document.getElementById('set-discount')?.value||5),
+      penaltyLow:parseFloat(document.getElementById('set-pen-low')?.value||50),
+      penaltyMedium:parseFloat(document.getElementById('set-pen-med')?.value||100),
+      penaltyHigh:parseFloat(document.getElementById('set-pen-high')?.value||200),
+      penaltyUrgent:parseFloat(document.getElementById('set-pen-urg')?.value||500),
+      callmebotPhones:phones,callmebotKeys:keys
+    };
+    await db.collection('settings').doc('main').set(newSettings,{merge:true});
+    G.settings={...G.settings,...newSettings};
+    await logAction('EDIT','Settings','System settings updated');
+    toast('Settings saved successfully!','success');
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+/* ============================================================
+   TASKS
+   ============================================================ */
+async function loadTasks(){
+  const el=document.getElementById('page-tasks');if(!el)return;
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>✅ Task Manager</h2><p>${isPriv?'Assign and monitor all branch tasks':'My assigned tasks'}</p></div>
+      ${isPriv?`<button class="btn btn-primary btn-sm" onclick="openCreateTaskModal()">➕ Create Task</button>`:''}
+    </div>
+    <!-- Filter tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" id="task-tab-mine" onclick="switchTaskTab('mine',this)" style="border-color:var(--accent);color:var(--accent);">My Tasks</button>
+      ${isPriv?`<button class="btn btn-ghost btn-sm" id="task-tab-all" onclick="switchTaskTab('all',this)">All Tasks</button>`:''}
+      <button class="btn btn-ghost btn-sm" id="task-tab-pending" onclick="switchTaskTab('pending',this)">Pending</button>
+      <button class="btn btn-ghost btn-sm" id="task-tab-done" onclick="switchTaskTab('done',this)">Completed</button>
+    </div>
+    <div id="tasks-list"></div>`;
+  switchTaskTab('mine',document.getElementById('task-tab-mine'));
+}
+
+async function switchTaskTab(tab,btn){
+  document.querySelectorAll('[id^="task-tab-"]').forEach(b=>{b.style.borderColor='var(--border)';b.style.color='var(--text2)';});
+  if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  const list=document.getElementById('tasks-list');if(!list)return;
+  list.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
+  try{
+    let snap;
+    if(tab==='mine')snap=await db.collection('tasks').where('assigned_to','==',G.user.username).orderBy('created_at','desc').limit(50).get();
+    else if(tab==='all'&&isPriv)snap=await db.collection('tasks').orderBy('created_at','desc').limit(100).get();
+    else if(tab==='pending')snap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).orderBy('due_date','asc').limit(50).get();
+    else snap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','==','done').orderBy('created_at','desc').limit(50).get();
+    if(snap.empty){list.innerHTML=`<div class="empty-state"><div class="es-icon">✅</div><p>No tasks found</p></div>`;return;}
+    const pColors={urgent:'var(--danger)',high:'var(--orange)',medium:'var(--warning)',low:'var(--success)'};
+    const today=new Date();
+    list.innerHTML=snap.docs.map(d=>{
+      const t={id:d.id,...d.data()};
+      const due=t.due_date?new Date(t.due_date):null;
+      const isOD=due&&today>due&&t.status!=='done';
+      const pColor=pColors[t.priority]||'var(--text3)';
+      return`<div style="padding:13px;border-radius:var(--radius);margin-bottom:9px;background:var(--surface2);border:1px solid ${isOD?'rgba(239,68,68,0.3)':'var(--border)'};transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='${isOD?'rgba(239,68,68,0.3)':'var(--border)'}'">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <div style="width:4px;min-height:40px;border-radius:2px;background:${pColor};flex-shrink:0;margin-top:2px;"></div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;">
+              <span style="font-size:13px;font-weight:700;">${t.title||'Task'}</span>
+              <span class="pill pill-${t.status}">${t.status}</span>
+              <span class="pill pill-${t.priority||'low'}">${(t.priority||'low').toUpperCase()}</span>
+            </div>
+            ${t.description?`<div style="font-size:11px;color:var(--text2);margin-bottom:5px;">${t.description}</div>`:''}
+            <div style="display:flex;gap:13px;flex-wrap:wrap;font-size:10px;color:var(--text3);">
+              ${t.assigned_by?`<span>👤 Assigned by: ${t.assigned_by}</span>`:''}
+              ${t.branch?`<span>🏢 Branch: ${BRANCH_MAP[t.branch]||t.branch}</span>`:''}
+              ${t.linked_order?`<span>📋 Order: #${t.linked_order}</span>`:''}
+              ${due?`<span style="color:${isOD?'var(--danger)':'var(--text3)'};">${isOD?'⚠️ Overdue:':'📅 Due:'} ${fmtDateShort(due)}</span>`:''}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+            ${t.status==='pending'?`<button class="btn btn-primary btn-xs" onclick="updateTaskStatus('${t.id}','inprogress')">▶ Start</button>`:''}
+            ${t.status==='inprogress'?`<button class="btn btn-success btn-xs" onclick="updateTaskStatus('${t.id}','done')">✅ Done</button>`:''}
+            ${t.status!=='done'&&t.status!=='appealed'?`<button class="btn btn-warning btn-xs" onclick="openTaskAppeal('${t.id}')">📝 Appeal</button>`:''}
+            ${['Admin','Executive'].includes(G.user?.role)?`<button class="btn btn-danger btn-xs" onclick="deleteTask('${t.id}')">🗑️</button>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){list.innerHTML=`<div class="empty-state"><p>Could not load tasks: ${e.message}</p></div>`;}
+}
+
+function openCreateTaskModal(){
+  const html=`
+    <div class="form-grid">
+      <div class="field g1" style="grid-column:1/-1;"><label>Task Title *</label><input type="text" id="task-title" placeholder="What needs to be done?"/></div>
+      <div class="field g1" style="grid-column:1/-1;"><label>Description</label><textarea id="task-desc" placeholder="Details..."></textarea></div>
+      <div class="field"><label>Type</label>
+        <select id="task-type">
+          <option value="rental">Rental Task</option><option value="admin">Admin Task</option>
+          <option value="maintenance">Maintenance</option><option value="followup">Follow-up</option>
+          <option value="general">General</option>
+        </select></div>
+      <div class="field"><label>Priority</label>
+        <select id="task-priority">
+          <option value="low">Low</option><option value="medium" selected>Medium</option>
+          <option value="high">High</option><option value="urgent">Urgent</option>
+        </select></div>
+      <div class="field"><label>Assign To (Username)</label><input type="text" id="task-assign" placeholder="Username"/></div>
+      <div class="field"><label>Branch</label>
+        <select id="task-branch">
+          <option value="HRG">Hurghada</option><option value="ALX">Alexandria</option>
+          <option value="CAI">Cairo</option><option value="RSH">Rashid</option>
+        </select></div>
+      <div class="field"><label>Due Date</label><input type="date" id="task-due"/></div>
+      <div class="field"><label>Linked Order # (Optional)</label><input type="text" id="task-order" placeholder="Order number"/></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-success" onclick="saveNewTask()">💾 Create Task</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal('➕ Create New Task',html);
+}
+
+async function saveNewTask(){
+  const title=document.getElementById('task-title')?.value.trim();
+  const assignTo=document.getElementById('task-assign')?.value.trim();
+  if(!title){toast('Task title is required','error');return;}
+  if(!assignTo){toast('Assigned user is required','error');return;}
+  const dueDate=document.getElementById('task-due')?.value;
+  const branch=document.getElementById('task-branch')?.value;
+  const priority=document.getElementById('task-priority')?.value||'medium';
+  const penaltyMap={low:G.settings.penaltyLow||50,medium:G.settings.penaltyMedium||100,high:G.settings.penaltyHigh||200,urgent:G.settings.penaltyUrgent||500};
+  try{
+    const shiftEnd=G.settings.shiftEnd||18;
+    let dueDateFinal=dueDate?new Date(dueDate):new Date();
+    dueDateFinal.setHours(shiftEnd,0,0,0);
+    await db.collection('tasks').add({
+      title,description:document.getElementById('task-desc')?.value.trim(),
+      type:document.getElementById('task-type')?.value,priority,
+      assigned_to:assignTo,assigned_by:G.user.username,branch,
+      linked_order:document.getElementById('task-order')?.value.trim()||'',
+      status:'pending',due_date:dueDateFinal.getTime(),
+      created_at:Date.now(),penalty_amount:penaltyMap[priority]
+    });
+    await createNotification(assignTo,'task',`New task assigned: "${title}" by ${G.user.username}`,'tasks','');
+    await logAction('ADD','Task Manager',`Task created: "${title}" → ${assignTo}`);
+    toast('Task created and assigned!','success');
+    closeModal();loadTasks();
+  }catch(e){toast('Failed to create task: '+e.message,'error');}
+}
+
+async function updateTaskStatus(taskId,newStatus){
+  try{
+    const upd={status:newStatus};
+    if(newStatus==='done')upd.completed_at=Date.now();
+    await db.collection('tasks').doc(taskId).update(upd);
+    await logAction('EDIT','Task Manager',`Task ${taskId} marked as ${newStatus}`);
+    toast(`Task marked as ${newStatus}!`,newStatus==='done'?'success':'info');
+    loadTasks();
+  }catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+function openTaskAppeal(taskId){
+  const html=`
+    <div class="field">
+      <label>Appeal Reason *</label>
+      <textarea id="appeal-reason" placeholder="Explain why you are appealing this task..." style="min-height:100px;"></textarea>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-warning" onclick="submitTaskAppeal('${taskId}')">📝 Submit Appeal</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal('📝 Appeal Task',html);
+}
+
+async function submitTaskAppeal(taskId){
+  const reason=document.getElementById('appeal-reason')?.value.trim();
+  if(!reason){toast('Appeal reason is required','error');return;}
+  try{
+    await db.collection('tasks').doc(taskId).update({status:'appealed',appeal_reason:reason,appeal_status:'pending'});
+    await db.collection('approvals').add({type:'task_appeal',requested_by:G.user.username,branch:G.user.branch,subject:`Task appeal from ${G.user.username}`,details:reason,linked_ref:taskId,status:'pending',created_at:Date.now()});
+    const adminSnap=await db.collection('users').get();
+    adminSnap.docs.forEach(d=>{if(['Admin','Executive'].includes(d.data().role))createNotification(d.id,'approval',`Task appeal from ${G.user.username}:`+reason.slice(0,60),'approvals',taskId);});
+    await logAction('ADD','Task Manager',`Task appeal submitted: ${taskId}`);
+    toast('Appeal submitted for Admin review','info');closeModal();loadTasks();
+  }catch(e){toast('Appeal failed: '+e.message,'error');}
+}
+
+async function deleteTask(taskId){
+  if(!confirm('Delete this task permanently?'))return;
+  try{
+    await db.collection('tasks').doc(taskId).delete();
+    await logAction('DELETE','Task Manager',`Task deleted: ${taskId}`);
+    toast('Task deleted','success');loadTasks();
+  }catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+/* ============================================================
+   APPROVALS
+   ============================================================ */
+async function loadApprovals(){
+  const el=document.getElementById('page-approvals');if(!el)return;
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>🔔 Approvals</h2><p>Pending approval requests from all branches</p></div>
+      <button class="btn btn-ghost btn-sm" onclick="loadApprovals()">🔄 Refresh</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" style="border-color:var(--accent);color:var(--accent);" onclick="loadApprovalsList('pending',this)">⏳ Pending</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadApprovalsList('approved',this)">✅ Approved</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadApprovalsList('rejected',this)">❌ Rejected</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadApprovalsList('all',this)">📋 All</button>
+    </div>
+    <div id="approvals-list"></div>`;
+  loadApprovalsList('pending',null);
+}
+
+async function loadApprovalsList(statusFilter,btn){
+  if(btn){document.querySelectorAll('#page-approvals .btn-ghost').forEach(b=>{b.style.borderColor='var(--border)';b.style.color='var(--text2)';});btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
+  const list=document.getElementById('approvals-list');if(!list)return;
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  list.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
+  try{
+    let snap;
+    if(statusFilter==='all'){
+      if(isPriv)snap=await db.collection('approvals').orderBy('created_at','desc').limit(100).get();
+      else snap=await db.collection('approvals').where('requested_by','==',G.user.username).orderBy('created_at','desc').limit(50).get();
+    }else{
+      if(isPriv)snap=await db.collection('approvals').where('status','==',statusFilter).orderBy('created_at','desc').limit(100).get();
+      else snap=await db.collection('approvals').where('requested_by','==',G.user.username).where('status','==',statusFilter).orderBy('created_at','desc').limit(50).get();
+    }
+    if(snap.empty){list.innerHTML=`<div class="empty-state"><div class="es-icon">🔔</div><p>No ${statusFilter} approvals</p></div>`;return;}
+    const typeIcons={rate_change:'💲',cancellation:'❌',task_appeal:'📝',expense:'💰',blacklist:'🚫',deposit_waiver:'🔓',general:'🔔'};
+    list.innerHTML=snap.docs.map(d=>{
+      const a={id:d.id,...d.data()};
+      const isPending=a.status==='pending';
+      return`<div style="padding:13px;border-radius:var(--radius);margin-bottom:9px;background:var(--surface2);border:1px solid ${isPending?'rgba(245,158,11,0.3)':'var(--border)'};">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-size:22px;">${typeIcons[a.type]||'🔔'}</span>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;">
+              <span style="font-size:13px;font-weight:700;">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span>
+              <span class="pill pill-${a.status}">${a.status}</span>
+              <span style="font-size:10px;color:var(--text3);">${getTimeAgo(a.created_at)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">${a.subject||'-'}</div>
+            <div style="font-size:11px;color:var(--text3);">${a.details||'-'}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:4px;">
+              Requested by: <strong style="color:var(--accent);">${a.requested_by||'-'}</strong>
+              ${a.branch?' | Branch: '+(BRANCH_MAP[a.branch]||a.branch):''}
+            </div>
+            ${a.admin_note?`<div style="font-size:11px;color:var(--warning);margin-top:5px;padding:5px 9px;background:rgba(245,158,11,0.08);border-radius:6px;">Admin note: ${a.admin_note}</div>`:''}
+          </div>
+          ${isPriv&&isPending?`
+            <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+              <button class="btn btn-success btn-xs" onclick="decideApproval('${a.id}','approved')">✅ Approve</button>
+              <button class="btn btn-danger btn-xs" onclick="openRejectModal('${a.id}')">❌ Reject</button>
+            </div>`:''} 
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){list.innerHTML=`<div class="empty-state"><p>Could not load: ${e.message}</p></div>`;}
+}
+
+async function decideApproval(approvalId,decision){
+  try{
+    const snap=await db.collection('approvals').doc(approvalId).get();
+    if(!snap.exists)return;
+    const a=snap.data();
+    await db.collection('approvals').doc(approvalId).update({status:decision,decided_by:G.user.username,decided_at:Date.now()});
+    // Execute the approved action
+    if(decision==='approved'){
+      if(a.type==='cancellation'&&a.linked_ref){
+        await db.collection('bookings').doc(a.linked_ref).update({'حالة الطلب':'Closed','closed':true,'_sys_updated':Date.now()});
+        toast('Order closed as approved','success');
+      }
+      if(a.type==='rate_change'&&a.linked_ref){
+        await db.collection('bookings').doc(a.linked_ref).update({'سعر السيارة اليومي بالجنيه المصري':fmtMoney(parseFloat(a.requested_value||0)),'_sys_updated':Date.now()});
+        toast('Rate change applied','success');
+      }
+      if(a.type==='task_appeal'&&a.linked_ref){
+        await db.collection('tasks').doc(a.linked_ref).update({status:'cancelled',appeal_status:'approved'});
+        toast('Task appeal approved — task cancelled','success');
+      }
+    }
+    if(a.requested_by)createNotification(a.requested_by,decision==='approved'?'approval':'general',`Your ${(a.type||'').replace(/_/g,' ')} request was ${decision} by ${G.user.username}`,'approvals',approvalId);
+    await logAction('EDIT','Approvals',`${decision.toUpperCase()} approval: ${a.type} from ${a.requested_by}`);
+    toast(`Request ${decision}!`,decision==='approved'?'success':'error');
+    loadApprovals();
+  }catch(e){toast('Decision failed: '+e.message,'error');}
+}
+
+function openRejectModal(approvalId){
+  const html=`
+    <div class="field"><label>Rejection Reason</label><textarea id="reject-note" placeholder="Explain why this request is rejected..." style="min-height:80px;"></textarea></div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-danger" onclick="submitRejection('${approvalId}')">❌ Reject Request</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal('❌ Reject Request',html);
+}
+
+async function submitRejection(approvalId){
+  const note=document.getElementById('reject-note')?.value.trim();
+  try{
+    const snap=await db.collection('approvals').doc(approvalId).get();
+    const a=snap.data();
+    await db.collection('approvals').doc(approvalId).update({status:'rejected',decided_by:G.user.username,decided_at:Date.now(),admin_note:note||''});
+    if(a.type==='task_appeal'&&a.linked_ref)await db.collection('tasks').doc(a.linked_ref).update({status:'pending',appeal_status:'rejected'});
+    if(a.requested_by)createNotification(a.requested_by,'general',`Your ${(a.type||'').replace(/_/g,' ')} request was rejected. ${note?'Reason: '+note:''}`,'approvals',approvalId);
+    await logAction('EDIT','Approvals',`REJECTED: ${a.type} from ${a.requested_by}. Note: ${note}`);
+    toast('Request rejected','error');closeModal();loadApprovals();
+  }catch(e){toast('Rejection failed: '+e.message,'error');}
+}
+
+/* ============================================================
+   CRM HUB
+   ============================================================ */
+async function loadCRM(){
+  const el=document.getElementById('page-crm');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>👥 CRM Hub</h2><p>Customer database — search, view, add, edit</p></div>
+      <button class="btn btn-primary btn-sm" onclick="openAddCustomerModal()">➕ Add Customer</button>
+    </div>
+    <!-- Search -->
+    <div class="panel" style="margin-bottom:14px;">
+      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">🔍 SEARCH CUSTOMERS</div>
+          <input type="text" id="crm-search" placeholder="Name, passport, phone, email, nationality..."
+                 style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+                 oninput="filterCRM()"/>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="filterCRM()">Search</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('crm-search').value='';filterCRM()">✕ Clear</button>
+      </div>
+    </div>
+    <!-- Table -->
+    <div class="panel">
+      <div id="crm-table-wrap" class="table-wrap">
+        <div class="empty-state"><div class="spinner lg"></div></div>
+      </div>
+    </div>`;
+  filterCRM();
+}
+
+function filterCRM(){
+  const q=(document.getElementById('crm-search')?.value||'').toLowerCase();
+  const wrap=document.getElementById('crm-table-wrap');if(!wrap)return;
+  let customers=G.customers;
+  if(q){customers=customers.filter(c=>[c['الاسم الأول'],c['الاسم الأخير'],c['رقم جواز السفر'],c['الرقم القومي'],c['رقم التليفون'],c['عنوان البريد الإلكتروني'],c['رمز الدولة'],c['No.']].join(' ').toLowerCase().includes(q));}
+  if(!customers.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">👥</div><p>No customers found</p></div>`;return;}
+  wrap.innerHTML=`<table class="data-table">
+    <thead><tr><th>ID</th><th>Name</th><th>Passport / National ID</th><th>Phone</th><th>Email</th><th>Nationality</th><th>Registered</th><th>Actions</th></tr></thead>
+    <tbody>
+      ${customers.slice(0,200).map(c=>{
+        const name=(c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'');
+        return`<tr>
+          <td><span style="color:var(--accent);font-weight:700;">#${c['No.']||c.id}</span></td>
+          <td><div style="font-weight:600;">${name.trim()||'-'}</div></td>
+          <td style="font-size:11px;">${c['رقم جواز السفر']||c['الرقم القومي']||'-'}</td>
+          <td style="font-size:11px;">${c['رقم التليفون']||'-'}</td>
+          <td style="font-size:11px;">${c['عنوان البريد الإلكتروني']||'-'}</td>
+          <td style="font-size:11px;">${c['رمز الدولة']||'-'}</td>
+          <td style="font-size:10px;color:var(--text3);">${c['تاريخ التسجيل']||'-'}</td>
+          <td>
+            <div style="display:flex;gap:3px;">
+              <button class="btn btn-ghost btn-xs" onclick="openEditCustomerModal('${c.id}')">✏️</button>
+              <button class="btn btn-primary btn-xs" onclick="viewCustomerOrders('${c['No.']||c.id}','${name.trim()}')">📋</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>
+    <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${Math.min(200,customers.length)} of ${customers.length} customers</div>`;
+}
+
+function openAddCustomerModal(){
+  const html=`
+    <p style="font-size:11px;color:var(--text3);margin-bottom:13px;">Required: Full name + Phone + (National ID or Passport)</p>
+    <div class="form-grid">
+      <div class="field"><label>First Name *</label><input type="text" id="nc-fname" placeholder="First Name"/></div>
+      <div class="field"><label>Last Name *</label><input type="text" id="nc-lname" placeholder="Last Name"/></div>
+      <div class="field"><label>Phone *</label><input type="text" id="nc-phone" placeholder="+20..."/></div>
+      <div class="field"><label>Nationality / Country Code</label><input type="text" id="nc-nat" placeholder="EG / UK etc."/></div>
+      <div class="field"><label>National ID</label><input type="text" id="nc-natid" placeholder="National ID"/></div>
+      <div class="field"><label>Passport No.</label><input type="text" id="nc-passport" placeholder="Passport Number"/></div>
+      <div class="field"><label>Driver License</label><input type="text" id="nc-license" placeholder="License Number"/></div>
+      <div class="field"><label>Email</label><input type="text" id="nc-email" placeholder="Email"/></div>
+      <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="nc-address" placeholder="Full Address"/></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-success" onclick="saveNewCustomer()">💾 Save Customer</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal('👤 Add New Customer',html);
+}
+
+async function saveNewCustomer(){
+  const fname=document.getElementById('nc-fname')?.value.trim();
+  const lname=document.getElementById('nc-lname')?.value.trim();
+  const phone=document.getElementById('nc-phone')?.value.trim();
+  const natid=document.getElementById('nc-natid')?.value.trim();
+  const passport=document.getElementById('nc-passport')?.value.trim();
+  if(!fname||!lname||!phone){toast('First name, last name, and phone are required','error');return;}
+  if(!natid&&!passport){toast('At least one ID (National ID or Passport) is required','error');return;}
+  try{
+    const snap=await db.collection('customers').orderBy('_sys_updated','desc').limit(1).get();
+    const lastNo=snap.empty?0:parseInt(snap.docs[0].data()['No.']||0);
+    const nextNo=lastNo+1;
+    const now=Date.now();
+    const newCust={'No.':String(nextNo),'الاسم الأول':fname,'الاسم الأخير':lname,'رقم التليفون':phone,'رمز الدولة':document.getElementById('nc-nat')?.value.trim()||'','الرقم القومي':natid,'رقم جواز السفر':passport,'رقم رخصة القيادة':document.getElementById('nc-license')?.value.trim()||'','عنوان البريد الإلكتروني':document.getElementById('nc-email')?.value.trim()||'','العنوان':document.getElementById('nc-address')?.value.trim()||'','تاريخ التسجيل':new Date().toLocaleDateString('en-GB',{month:'2-digit',year:'numeric'}),'_sys_updated':now};
+    const ref=await db.collection('customers').add(newCust);
+    newCust.id=ref.id;G.customers.unshift(newCust);
+    await logAction('ADD','CRM Hub',`New customer: ${fname} ${lname} | ID: ${passport||natid}`);
+    toast(`Customer ${fname} ${lname} added!`,'success');closeModal();filterCRM();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+function openEditCustomerModal(customerId){
+  const c=G.customers.find(x=>x.id===customerId);if(!c)return;
+  const html=`
+    <div style="font-size:10px;color:var(--success);margin-bottom:11px;font-weight:700;">CRM ID: #${c['No.']||c.id}</div>
+    <div class="form-grid">
+      <div class="field"><label>First Name</label><input type="text" id="ec-fname" value="${c['الاسم الأول']||''}"/></div>
+      <div class="field"><label>Last Name</label><input type="text" id="ec-lname" value="${c['الاسم الأخير']||''}"/></div>
+      <div class="field"><label>Phone</label><input type="text" id="ec-phone" value="${c['رقم التليفون']||''}"/></div>
+      <div class="field"><label>Nationality</label><input type="text" id="ec-nat" value="${c['رمز الدولة']||''}"/></div>
+      <div class="field"><label>National ID</label><input type="text" id="ec-natid" value="${c['الرقم القومي']||''}"/></div>
+      <div class="field"><label>Passport No.</label><input type="text" id="ec-passport" value="${c['رقم جواز السفر']||''}"/></div>
+      <div class="field"><label>Driver License</label><input type="text" id="ec-license" value="${c['رقم رخصة القيادة']||''}"/></div>
+      <div class="field"><label>Email</label><input type="text" id="ec-email" value="${c['عنوان البريد الإلكتروني']||''}"/></div>
+      <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="ec-address" value="${c['العنوان']||''}"/></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-success" onclick="updateCustomer('${customerId}')">💾 Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(`✏️ Edit Customer — ${(c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')}`,html);
+}
+
+async function updateCustomer(customerId){
+  try{
+    const upd={'الاسم الأول':document.getElementById('ec-fname')?.value.trim(),'الاسم الأخير':document.getElementById('ec-lname')?.value.trim(),'رقم التليفون':document.getElementById('ec-phone')?.value.trim(),'رمز الدولة':document.getElementById('ec-nat')?.value.trim(),'الرقم القومي':document.getElementById('ec-natid')?.value.trim(),'رقم جواز السفر':document.getElementById('ec-passport')?.value.trim(),'رقم رخصة القيادة':document.getElementById('ec-license')?.value.trim(),'عنوان البريد الإلكتروني':document.getElementById('ec-email')?.value.trim(),'العنوان':document.getElementById('ec-address')?.value.trim(),'_sys_updated':Date.now()};
+    await db.collection('customers').doc(customerId).update(upd);
+    const idx=G.customers.findIndex(c=>c.id===customerId);
+    if(idx>-1)G.customers[idx]={...G.customers[idx],...upd};
+    await logAction('EDIT','CRM Hub',`Updated customer: ${customerId}`);
+    toast('Customer updated!','success');closeModal();filterCRM();
+  }catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+async function viewCustomerOrders(clientNo,clientName){
+  const orders=allOrders.filter(o=>String(o['كود العميل'])===String(clientNo));
+  if(!orders.length){
+    const snap=await db.collection('bookings').where('كود العميل','==',String(clientNo)).get();
+    const found=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!found.length){toast(`No orders found for ${clientName}`,'info');return;}
+    openOrdersListModal(found,clientName);return;
+  }
+  openOrdersListModal(orders,clientName);
+}
+
+function openOrdersListModal(orders,clientName){
+  const today=new Date();
+  const html=`
+    <div style="margin-bottom:11px;font-size:12px;color:var(--text3);">${orders.length} order${orders.length!==1?'s':''} found</div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Order #</th><th>Car</th><th>Start</th><th>End</th><th>Total</th><th>Paid</th><th>Status</th></tr></thead>
+        <tbody>
+          ${orders.map(o=>{
+            const{start,end}=getOrderDates(o);
+            const st=getOrderStatus(o);
+            const isOD=!o.closed&&end&&today>end&&(st==='Active'||st==='Overdue_Legacy');
+            const statusKey=st==='Accident'?'accident':isOD?'overdue':st==='Closed'||o.closed?'closed':(st||'active').toLowerCase();
+            const statusLabel=st==='Accident'?'ACCIDENT':isOD?'OVERDUE':st==='Closed'||o.closed?'Closed':(st||'Active');
+            const carCode=o['كود السيارة'];
+            const carInFleet=G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
+            const carLabel=carInFleet?getCarLabel(carInFleet,'en'):(o['اسم السيارة']||'-');
+            return`<tr style="cursor:pointer;" onclick="closeModal();openOrderDetail('${o.id}')">
+              <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
+              <td style="font-size:11px;">${carLabel}</td>
+              <td style="font-size:11px;">${start?fmtDateShort(start):'-'}</td>
+              <td style="font-size:11px;">${end?fmtDateShort(end):'-'}</td>
+              <td>${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}</td>
+              <td>${fmtMoney(parseAmount(o['المدفوع EGP']))}</td>
+              <td><span class="pill pill-${statusKey}">${statusLabel}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  openModal(`📋 Orders — ${clientName}`,html,true);
+}
+
+/* ============================================================
+   INCOME & EXPENSES
+   ============================================================ */
+async function loadIncomeExpenses(){
+  const el=document.getElementById('page-income-expenses');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>💰 Income & Expenses</h2><p>Full financial ledger across all branches</p></div>
+    </div>
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;" id="ie-kpi-row"></div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" style="border-color:var(--accent);color:var(--accent);" id="ie-tab-income" onclick="showIETab('income',this)">📥 Income</button>
+      <button class="btn btn-ghost btn-sm" id="ie-tab-car" onclick="showIETab('car',this)">🚗 Car Expenses</button>
+      <button class="btn btn-ghost btn-sm" id="ie-tab-gen" onclick="showIETab('gen',this)">🏢 General Expenses</button>
+      <button class="btn btn-ghost btn-sm" id="ie-tab-add" onclick="showIETab('add',this)">➕ Add Entry</button>
+    </div>
+    <div id="ie-income-pane"></div>
+    <div id="ie-car-pane" style="display:none;"></div>
+    <div id="ie-gen-pane" style="display:none;"></div>
+    <div id="ie-add-pane" style="display:none;"></div>`;
+  await computeIEKPIs();
+  showIETab('income',document.getElementById('ie-tab-income'));
+}
+
+async function computeIEKPIs(){
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  const now=new Date();const month=String(now.getMonth()+1);const year=String(now.getFullYear());
+  try{
+    const[cSnap,ceSnap,geSnap]=await Promise.all([db.collection('collections').get(),db.collection('car_expenses').get(),db.collection('gen_expenses').get()]);
+    let income=0,carExp=0,genExp=0;
+    cSnap.docs.forEach(d=>{const data=d.data();if(!isPriv){const b=data['موقع الفرع']||data.Branch||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()))return;}income+=parseAmount(data['قيمة التحصيل']);});
+    ceSnap.docs.forEach(d=>{const data=d.data();if(!isPriv){const b=data['موقع الفرع']||'';if(!b.includes(BRANCH_AR[G.user.branch]||G.user.branch))return;}carExp+=parseAmount(data['قيمة المصروف']);});
+    geSnap.docs.forEach(d=>{const data=d.data();if(!isPriv){const b=data.Branch||data['موقع الفرع']||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()))return;}genExp+=parseAmount(data['قيمة المصروف']);});
+    const net=income-carExp-genExp;
+    const kpiRow=document.getElementById('ie-kpi-row');
+    if(kpiRow)kpiRow.innerHTML=`
+      <div class="kpi-card"><div class="kpi-label">Total Income</div><div class="kpi-value text-success">${fmtMoney(income)}</div><div class="kpi-sub">All time</div></div>
+      <div class="kpi-card"><div class="kpi-label">Car Expenses</div><div class="kpi-value text-danger">${fmtMoney(carExp)}</div><div class="kpi-sub">All time</div></div>
+      <div class="kpi-card"><div class="kpi-label">General Expenses</div><div class="kpi-value text-danger">${fmtMoney(genExp)}</div><div class="kpi-sub">All time</div></div>
+      <div class="kpi-card"><div class="kpi-label">Net Balance</div><div class="kpi-value" style="color:${net>=0?'var(--success)':'var(--danger)'};">${fmtMoney(net)}</div><div class="kpi-sub">Income - Expenses</div></div>`;
+  }catch(e){console.warn('IE KPI error:',e.message);}
+}
+
+function showIETab(tab,btn){
+  ['income','car','gen','add'].forEach(t=>{const p=document.getElementById(`ie-${t}-pane`);if(p)p.style.display='none';});
+  document.querySelectorAll('#page-income-expenses .btn-ghost').forEach(b=>{b.style.borderColor='var(--border)';b.style.color='var(--text2)';});
+  if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
+  const pane=document.getElementById(`ie-${tab}-pane`);if(pane)pane.style.display='block';
+  if(tab==='income')loadIEIncome();
+  else if(tab==='car')loadIECarExp();
+  else if(tab==='gen')loadIEGenExp();
+  else if(tab==='add')renderIEAddForm();
+}
+
+async function loadIEIncome(){
+  const pane=document.getElementById('ie-income-pane');if(!pane)return;
+  pane.innerHTML='<div class="panel"><div class="empty-state"><div class="spinner"></div></div></div>';
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  try{
+    const snap=await db.collection('collections').orderBy('_sys_updated','desc').limit(300).get();
+    let rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!isPriv)rows=rows.filter(r=>(r['موقع الفرع']||r.Branch||'').toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()));
+    pane.innerHTML=`<div class="panel"><div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>No.</th><th>Date</th><th>Statement</th><th>Order</th><th>Branch</th><th>Type</th><th>Collected By</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>{
+            const day=r['يوم']||'-',month=r['شهر']||'-',year=r['سنة']||'-';
+            return`<tr>
+              <td><span style="color:var(--accent);font-weight:700;">${r['No.']||r.id}</span></td>
+              <td style="font-size:10px;white-space:nowrap;">${day!=='-'?`${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`:'-'}</td>
+              <td>${r['بيان التحصيل']||r['Expense Statement']||'-'}</td>
+              <td style="color:var(--accent);">${r['كود الاوردر']||'-'}</td>
+              <td style="font-size:11px;">${r['موقع الفرع']||r.Branch||'-'}</td>
+              <td><span class="pill pill-active">${r['نوع التحصيل']||'-'}</span></td>
+              <td>${r['تم تحصيل من طرف']||'-'}</td>
+              <td><strong style="color:var(--success);">${r['قيمة التحصيل']||'£0.00'}</strong></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${rows.length} income records</div>
+    </div></div>`;
+  }catch(e){pane.innerHTML=`<div class="empty-state"><p>Could not load income: ${e.message}</p></div>`;}
+}
+
+async function loadIECarExp(){
+  const pane=document.getElementById('ie-car-pane');if(!pane)return;
+  pane.innerHTML='<div class="panel"><div class="empty-state"><div class="spinner"></div></div></div>';
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  try{
+    const snap=await db.collection('car_expenses').orderBy('_sys_updated','desc').limit(300).get();
+    let rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!isPriv)rows=rows.filter(r=>(r['موقع الفرع']||'').includes(BRANCH_AR[G.user.branch]||G.user.branch));
+    pane.innerHTML=`<div class="panel"><div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>No.</th><th>Date</th><th>Statement</th><th>Order</th><th>Branch</th><th>Type</th><th>Paid By</th><th>Due From</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>{
+            const day=r['يوم']||'-',month=r['شهر']||'-',year=r['paid_year']||r['سنة']||'-';
+            return`<tr>
+              <td><span style="color:var(--accent);font-weight:700;">${r['No.']||r.id}</span></td>
+              <td style="font-size:10px;white-space:nowrap;">${day!=='-'?`${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`:'-'}</td>
+              <td>${r['بيان النثريات']||r['بيان الصيانة']||'-'}</td>
+              <td style="color:var(--accent);">${r['كود الاوردر']||'-'}</td>
+              <td style="font-size:11px;">${r['موقع الفرع']||r.Branch||'-'}</td>
+              <td><span class="pill pill-draft">${r['نوع المصروف']||'-'}</span></td>
+              <td>${r['تم دفع من طرف']||'-'}</td>
+              <td style="font-size:11px;">${r['مستحق من']||'-'}</td>
+              <td><strong style="color:var(--danger);">${r['قيمة المصروف']||'£0.00'}</strong></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${rows.length} car expense records</div>
+    </div></div>`;
+  }catch(e){pane.innerHTML=`<div class="empty-state"><p>Could not load: ${e.message}</p></div>`;}
+}
+
+async function loadIEGenExp(){
+  const pane=document.getElementById('ie-gen-pane');if(!pane)return;
+  pane.innerHTML='<div class="panel"><div class="empty-state"><div class="spinner"></div></div></div>';
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  try{
+    const snap=await db.collection('gen_expenses').orderBy('_sys_updated','desc').limit(300).get();
+    let rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!isPriv)rows=rows.filter(r=>(r.Branch||r['موقع الفرع']||'').toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()));
+    pane.innerHTML=`<div class="panel"><div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>No.</th><th>Date</th><th>Statement</th><th>Branch</th><th>Type</th><th>Employee</th><th>Month/Year</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>{
+            const day=r['يوم']||'-',month=r['شهر']||'-',year=r['سنة']||'-';
+            return`<tr>
+              <td><span style="color:var(--accent);font-weight:700;">${r['No.']||r.id}</span></td>
+              <td style="font-size:10px;white-space:nowrap;">${day!=='-'?`${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`:'-'}</td>
+              <td>${r['بيان المصروف']||r['Expense Statement']||'-'}</td>
+              <td style="font-size:11px;">${r.Branch||r['موقع الفرع']||'-'}</td>
+              <td><span class="pill pill-draft">${r['نوع المصروف']||'-'}</span></td>
+              <td>${r['اسم الموظف']||'-'}</td>
+              <td style="font-size:10px;">${r['شهر']||'-'}/${r['سنة']||'-'}</td>
+              <td><strong style="color:var(--danger);">${r['قيمة المصروف']||'£0.00'}</strong></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${rows.length} general expense records</div>
+    </div></div>`;
+  }catch(e){pane.innerHTML=`<div class="empty-state"><p>Could not load: ${e.message}</p></div>`;}
+}
+
+function renderIEAddForm(){
+  const pane=document.getElementById('ie-add-pane');if(!pane)return;
+  const now=new Date();
+  const dd=String(now.getDate()).padStart(2,'0');
+  const mm=String(now.getMonth()+1);
+  const yyyy=String(now.getFullYear());
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  pane.innerHTML=`
+    <div class="panel" style="max-width:640px;">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">➕ Add New Entry</h3>
+      <!-- Entry type selector -->
+      <div style="display:flex;gap:9px;margin-bottom:16px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 14px;flex:1;justify-content:center;">
+          <input type="radio" name="ie-entry-type" value="income" onchange="ieTypeChange()" style="width:14px;height:14px;"/>
+          <span style="font-weight:700;">📥 Income</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 14px;flex:1;justify-content:center;">
+          <input type="radio" name="ie-entry-type" value="car_expense" onchange="ieTypeChange()" style="width:14px;height:14px;"/>
+          <span style="font-weight:700;">🚗 Car Expense</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 14px;flex:1;justify-content:center;">
+          <input type="radio" name="ie-entry-type" value="gen_expense" onchange="ieTypeChange()" style="width:14px;height:14px;"/>
+          <span style="font-weight:700;">🏢 General</span>
+        </label>
+      </div>
+      <div id="ie-income-fields" style="display:none;">
+        <div class="form-grid">
+          <div class="field"><label>Order No. (Required)</label><input type="text" id="ie-inc-order" placeholder="Contract / Order No."/></div>
+          <div class="field"><label>Income Type</label>
+            <select id="ie-inc-type">
+              <option value="مستحق">Due Payment</option><option value="تأمين">Deposit</option>
+              <option value="تحصيل مخالفات">Fine Collection</option><option value="أخرى">Other</option>
+            </select></div>
+          <div class="field"><label>Statement</label><input type="text" id="ie-inc-statement" placeholder="What is this income for?"/></div>
+          <div class="field"><label>Amount (EGP)</label><input type="number" id="ie-inc-amount" placeholder="0"/></div>
+          <div class="field"><label>Branch</label>
+            <select id="ie-inc-branch">
+              <option value="الغردقة">Hurghada</option><option value="الاسكندرية">Alexandria</option>
+              <option value="القاهرة">Cairo</option><option value="رشيد">Rashid</option>
+            </select></div>
+          <div class="field"><label>Collected By</label><input type="text" id="ie-inc-by" placeholder="Employee name"/></div>
+          <div class="field"><label>Day</label><input type="number" id="ie-inc-day" value="${dd}"/></div>
+          <div class="field"><label>Month</label><input type="number" id="ie-inc-month" value="${mm}"/></div>
+          <div class="field" style="grid-column:1/-1;"><label>Year</label><input type="number" id="ie-inc-year" value="${yyyy}"/></div>
+        </div>
+      </div>
+      <div id="ie-car-fields" style="display:none;">
+        <div class="form-grid">
+          <div class="field" style="grid-column:1/-1;"><label>Order No. (Required)</label><input type="text" id="ie-car-order" placeholder="Contract No."/></div>
+          <div class="field"><label>Expense Category (Required)</label>
+            <select id="ie-car-category">
+              <option value="">-- Select --</option>
+              <option value="نثريات تشغيل">Operating / Petty Cash</option>
+              <option value="صيانة">Maintenance</option><option value="إصلاح">Repair</option>
+              <option value="مخالفة مرورية">Traffic Fine</option><option value="تكلفة حادث">Accident Cost</option>
+              <option value="ترخيص">Registration / License</option><option value="وقود">Fuel</option>
+              <option value="أخرى">Other</option>
+            </select></div>
+          <div class="field"><label>Amount (EGP)</label><input type="number" id="ie-car-amount" placeholder="0"/></div>
+          <div class="field"><label>Statement</label><input type="text" id="ie-car-statement" placeholder="Describe the expense"/></div>
+          <div class="field"><label>Paid By</label><input type="text" id="ie-car-by" placeholder="Employee name"/></div>
+          <div class="field"><label>Charged To</label>
+            <select id="ie-car-due-from">
+              <option value="الشركة">Company</option><option value="العميل">Client</option><option value="صاحب السيارة">Car Owner</option>
+            </select></div>
+          <div class="field"><label>Branch</label>
+            <select id="ie-car-branch-sel">
+              <option value="الغردقة">Hurghada</option><option value="الاسكندرية">Alexandria</option>
+              <option value="القاهرة">Cairo</option><option value="رشيد">Rashid</option>
+            </select></div>
+          <div class="field"><label>Day</label><input type="number" id="ie-car-day" value="${dd}"/></div>
+          <div class="field"><label>Month</label><input type="number" id="ie-car-month" value="${mm}"/></div>
+          <div class="field"><label>Year</label><input type="number" id="ie-car-year" value="${yyyy}"/></div>
+        </div>
+      </div>
+      <div id="ie-gen-fields" style="display:none;">
+        <div class="form-grid">
+          <div class="field"><label>Category (Required)</label>
+            <select id="ie-gen-category" onchange="ieCheckOtherDesc()">
+              <option value="">-- Select --</option>
+              <option value="مرتبات">Salary / Payroll</option><option value="إيجار مكتب">Office Rent</option>
+              <option value="مرافق">Utilities</option><option value="تسويق">Marketing</option>
+              <option value="مستلزمات">Supplies</option><option value="حيني">Occasional</option>
+              <option value="مصاريف عامة">General Expenses</option><option value="أخرى">Other (describe)</option>
+            </select></div>
+          <div class="field"><label>Amount (EGP)</label><input type="number" id="ie-gen-amount" placeholder="0"/></div>
+          <div class="field"><label>Statement</label><input type="text" id="ie-gen-statement" placeholder="What is this expense for?"/></div>
+          <div class="field" id="ie-gen-other-wrap" style="display:none;"><label>Other Description (Required)</label><input type="text" id="ie-gen-other-desc" placeholder="Describe Other category"/></div>
+          <div class="field"><label>Branch</label>
+            <select id="ie-gen-branch-sel">
+              <option value="Alexandria">Alexandria</option><option value="Hurghada">Hurghada</option>
+              <option value="Cairo">Cairo</option><option value="Rashid">Rashid</option>
+            </select></div>
+          <div class="field"><label>Entity Type</label>
+            <select id="ie-gen-entity">
+              <option value="Company branch">Company Branch</option>
+              <option value="Employee">Employee</option><option value="Vendor">Vendor</option>
+            </select></div>
+          <div class="field"><label>Employee Name (if applicable)</label><input type="text" id="ie-gen-emp-name" placeholder="Optional"/></div>
+          <div class="field"><label>Employee Code</label><input type="text" id="ie-gen-emp-code" placeholder="Optional"/></div>
+          <div class="field"><label>Day</label><input type="number" id="ie-gen-day" value="${dd}"/></div>
+          <div class="field"><label>Month</label><input type="number" id="ie-gen-month" value="${mm}"/></div>
+          <div class="field"><label>Year</label><input type="number" id="ie-gen-year" value="${yyyy}"/></div>
+        </div>
+      </div>
+      <button class="btn btn-success btn-full mt-12" id="ie-save-btn" onclick="saveIEEntry()" style="display:none;">💾 Save Entry to Database</button>
+    </div>`;
+}
+
+function ieTypeChange(){
+  const sel=document.querySelector('input[name="ie-entry-type"]:checked')?.value;
+  ['ie-income-fields','ie-car-fields','ie-gen-fields'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  const saveBtn=document.getElementById('ie-save-btn');
+  if(sel){
+    const pane=document.getElementById(`ie-${sel==='income'?'income':sel==='car_expense'?'car':'gen'}-fields`);
+    if(pane)pane.style.display='block';
+    if(saveBtn)saveBtn.style.display='flex';
+  }else{if(saveBtn)saveBtn.style.display='none';}
+}
+function ieCheckOtherDesc(){
+  const cat=document.getElementById('ie-gen-category')?.value;
+  const wrap=document.getElementById('ie-gen-other-wrap');
+  if(wrap)wrap.style.display=cat==='أخرى'?'flex':'none';
+}
+
+async function saveIEEntry(){
+  const sel=document.querySelector('input[name="ie-entry-type"]:checked')?.value;
+  if(!sel){toast('Please select an entry type','error');return;}
+  if(sel==='income')await saveIEIncome();
+  else if(sel==='car_expense')await saveIECarExp();
+  else await saveIEGenExp();
+}
+
+async function saveIEIncome(){
+  const orderNo=document.getElementById('ie-inc-order')?.value.trim();
+  const statement=document.getElementById('ie-inc-statement')?.value.trim();
+  const amount=parseFloat(document.getElementById('ie-inc-amount')?.value)||0;
+  const branch=document.getElementById('ie-inc-branch')?.value;
+  const collBy=document.getElementById('ie-inc-by')?.value.trim();
+  const day=document.getElementById('ie-inc-day')?.value;
+  const month=document.getElementById('ie-inc-month')?.value;
+  const year=document.getElementById('ie-inc-year')?.value;
+  if(!orderNo){toast('Order number is required for income entries','error');return;}
+  if(!statement){toast('Statement is required','error');return;}
+  if(amount<=0){toast('Amount must be greater than 0','error');return;}
+  try{
+    const snap=await db.collection('collections').orderBy('_sys_updated','desc').limit(1).get();
+    const lastNo=snap.empty?0:parseInt(snap.docs[0].data()['No.']||0);
+    const data={'No.':String(lastNo+1),'كود الاوردر':orderNo,'نوع التحصيل':document.getElementById('ie-inc-type')?.value,'بيان التحصيل':statement,'Expense Statement':statement,'قيمة التحصيل':`£${amount.toFixed(2)}`,'موقع الفرع':branch,'Branch':BRANCH_MAP[Object.keys(BRANCH_AR).find(k=>BRANCH_AR[k]===branch)||'']||branch,'تم تحصيل من طرف':collBy||G.user.username,'يوم':String(parseInt(day)),'شهر':String(parseInt(month)),'سنة':String(year),'_sys_updated':Date.now()};
+    await db.collection('collections').add(data);
+    await logAction('ADD','Income & Expenses',`Income: ${statement} | Order: ${orderNo} | £${amount} | ${branch}`);
+    toast('Income entry saved!','success');renderIEAddForm();loadIEIncome();computeIEKPIs();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+async function saveIECarExp(){
+  const orderNo=document.getElementById('ie-car-order')?.value.trim();
+  const category=document.getElementById('ie-car-category')?.value;
+  const amount=parseFloat(document.getElementById('ie-car-amount')?.value)||0;
+  const statement=document.getElementById('ie-car-statement')?.value.trim();
+  const paidBy=document.getElementById('ie-car-by')?.value.trim();
+  const dueFrom=document.getElementById('ie-car-due-from')?.value;
+  const branch=document.getElementById('ie-car-branch-sel')?.value;
+  const day=document.getElementById('ie-car-day')?.value;
+  const month=document.getElementById('ie-car-month')?.value;
+  const year=document.getElementById('ie-car-year')?.value;
+  if(!orderNo){toast('Order number is required','error');return;}
+  if(!category){toast('Category is required','error');return;}
+  if(amount<=0){toast('Amount must be greater than 0','error');return;}
+  if(!statement){toast('Statement is required','error');return;}
+  try{
+    const snap=await db.collection('car_expenses').orderBy('_sys_updated','desc').limit(1).get();
+    const lastNo=snap.empty?0:parseInt(snap.docs[0].data()['No.']||0);
+    const data={'No.':String(lastNo+1),'كود الاوردر':orderNo,'نوع المصروف':category,'بيان النثريات':statement,'بيان الصيانة':category==='صيانة'||category==='إصلاح'?statement:'','قيمة المصروف':`£${amount.toFixed(2)}`,'موقع الفرع':branch,'Branch':BRANCH_MAP[Object.keys(BRANCH_AR).find(k=>BRANCH_AR[k]===branch)||'']||branch,'تم دفع من طرف':paidBy||G.user.username,'مستحق من':dueFrom,'شهر':String(month).padStart(2,'0'),'يوم':String(parseInt(day)),'paid_year':String(year),'_sys_updated':Date.now()};
+    await db.collection('car_expenses').add(data);
+    await logAction('ADD','Income & Expenses',`Car expense: ${category} | Order: ${orderNo} | £${amount}`);
+    toast('Car expense saved!','success');renderIEAddForm();loadIECarExp();computeIEKPIs();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+async function saveIEGenExp(){
+  const category=document.getElementById('ie-gen-category')?.value;
+  const amount=parseFloat(document.getElementById('ie-gen-amount')?.value)||0;
+  const statement=document.getElementById('ie-gen-statement')?.value.trim();
+  const otherDesc=document.getElementById('ie-gen-other-desc')?.value.trim();
+  const branch=document.getElementById('ie-gen-branch-sel')?.value;
+  const entity=document.getElementById('ie-gen-entity')?.value;
+  const empName=document.getElementById('ie-gen-emp-name')?.value.trim();
+  const empCode=document.getElementById('ie-gen-emp-code')?.value.trim();
+  const day=document.getElementById('ie-gen-day')?.value;
+  const month=document.getElementById('ie-gen-month')?.value;
+  const year=document.getElementById('ie-gen-year')?.value;
+  if(!category){toast('Category is required','error');return;}
+  if(category==='أخرى'&&!otherDesc){toast('"Other" category requires a description','error');return;}
+  if(amount<=0){toast('Amount must be greater than 0','error');return;}
+  if(!statement){toast('Statement is required','error');return;}
+  const finalStatement=category==='أخرى'?otherDesc:statement;
+  const branchAR=BRANCH_AR[Object.keys(BRANCH_MAP).find(k=>BRANCH_MAP[k]===branch)||'']||branch;
+  try{
+    const snap=await db.collection('gen_expenses').orderBy('_sys_updated','desc').limit(1).get();
+    const lastNo=snap.empty?0:parseInt(snap.docs[0].data()['No.']||0);
+    const data={'No.':String(lastNo+1),'ID':String(lastNo+1),'نوع المصروف':category,'بيان المصروف':finalStatement,'Expense Statement':finalStatement,'قيمة المصروف':`£${amount.toFixed(2)}`,'Branch':branch,'موقع الفرع':branchAR,'نوع الكيان':entity==='Company branch'?'فرع شركة':entity,'Entity Type':entity,'اسم الموظف':empName,'رمز الموظف':empCode,'متعلق بالموظفين':empName?'نعم':'لا','يوم':String(parseInt(day)),'شهر':String(parseInt(month)),'سنة':String(year),'مستحق عن سنة':String(year),'مستحق عن شهر':String(parseInt(month)),'_sys_updated':Date.now()};
+    await db.collection('gen_expenses').add(data);
+    await logAction('ADD','Income & Expenses',`General expense: ${category} | ${finalStatement} | £${amount} | ${branch}`);
+    toast('General expense saved!','success');renderIEAddForm();loadIEGenExp();computeIEKPIs();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+/* ============================================================
+   VEHICLE 360
+   ============================================================ */
+async function renderVehicle360(){
+  const el=document.getElementById('page-vehicle-360');if(!el)return;
+  el.innerHTML=`
+    <div class="section-header">
+      <div><h2>🔭 Vehicle 360</h2><p>Complete financial and operational view per vehicle</p></div>
+    </div>
+    <div class="panel" style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:700;">SELECT VEHICLE</div>
+      <select id="v360-car-select" onchange="loadVehicle360Details()" style="width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);max-width:500px;">
+        <option value="">-- Select a vehicle to view details --</option>
+        ${G.fleet.map(c=>`<option value="${c.ID||c.id}">${getCarLabel(c,'en')}</option>`).join('')}
+      </select>
+    </div>
+    <div id="v360-content">
+      <div class="empty-state"><div class="es-icon">🔭</div><p>Select a vehicle above to view its complete 360° profile</p></div>
+    </div>`;
+}
+
+async function loadVehicle360Details(){
+  const carId=document.getElementById('v360-car-select')?.value;
+  const content=document.getElementById('v360-content');if(!content)return;
+  if(!carId){content.innerHTML='<div class="empty-state"><div class="es-icon">🔭</div><p>Select a vehicle to view details</p></div>';return;}
+  content.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
+  const car=getCarById(carId);if(!car){content.innerHTML='<div class="empty-state"><p>Car not found</p></div>';return;}
+  try{
+    const[ordersSnap,carExpSnap]=await Promise.all([
+      db.collection('bookings').get(),
+      db.collection('car_expenses').get()
+    ]);
+    const orders=ordersSnap.docs.map(d=>({id:d.id,...d.data()})).filter(o=>String(o['كود السيارة'])===String(carId));
+    const carExps=carExpSnap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>String(e['كود السيارة'])===String(carId)||orders.some(o=>String(o['No.'])===String(e['كود الاوردر'])));
+    const totalRevenue=orders.reduce((s,o)=>s+parseAmount(o['إجمالي المستحق (Total)']),0);
+    const totalPaid=orders.reduce((s,o)=>s+parseAmount(o['المدفوع EGP']),0);
+    const totalDeposit=orders.reduce((s,o)=>s+parseAmount(o['الوديعة المعلقة لدينا']),0);
+    const totalExpenses=carExps.reduce((s,e)=>s+parseAmount(e['قيمة المصروف']),0);
+    const netROI=totalPaid-totalExpenses;
+    const today=new Date();
+    const pending=orders.reduce((s,o)=>{
+      const{end}=getOrderDates(o);const st=getOrderStatus(o);if(st==='Closed')return s;
+      const t=parseAmount(o['إجمالي المستحق (Total)']);const p=parseAmount(o['المدفوع EGP']);
+      const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(t/Math.max(1,parseFloat(o.rental_days||1)));
+      let debt=t-p;if(end&&today>end&&!o.closed)debt+=Math.max(0,Math.ceil((today-end)/86400000))*d;
+      return s+Math.max(0,debt);
+    },0);
+    content.innerHTML=`
+      <!-- Car Header -->
+      <div class="panel" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h3 style="font-size:16px;font-weight:800;margin-bottom:6px;">${getCarLabel(car,'en')}</h3>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px;">
+              <span class="pill pill-${getCarStatusCategory(car)}">${getCarStatusCategory(car)}</span>
+              <span class="pill pill-active">Plate: ${car.plate||formatPlate(car)}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px;font-size:11px;">
+              <div><span style="color:var(--text3);">Owner:</span> <strong>${((car['الاسم الأول']||'')+' '+(car['الاسم الأخير']||'')).trim()||'-'}</strong></div>
+              <div><span style="color:var(--text3);">Contract Start:</span> <strong>${fmtDateShort(parseDBDate(car['بداية التعاقد']||''))||'-'}</strong></div>
+              <div><span style="color:var(--text3);">Contract End:</span> <strong>${fmtDateShort(parseDBDate(car['نهاية التعاقد']||''))||'-'}</strong></div>
+              <div><span style="color:var(--text3);">Handover:</span> <strong>${fmtDateShort(parseDBDate(car['تاريخ التسليم']||''))||'-'}</strong></div>
+              <div><span style="color:var(--text3);">License Until:</span> <strong>${fmtDateShort(parseDBDate(car['نهاية الترخيص']||''))||'-'}</strong></div>
+              <div><span style="color:var(--text3);">Insurance Until:</span> <strong>${fmtDateShort(parseDBDate(car['نهاية التأمين']||''))||'-'}</strong></div>
+              <div><span style="color:var(--text3);">KM at Contract:</span> <strong>${car['كيلومتر تعاقد']||'-'}</strong></div>
+              <div><span style="color:var(--text3);">Monthly Fee:</span> <strong>${fmtMoney(parseAmount(car['monthly_fee']||car['القيمة المالية']||0))}</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Financial KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
+        <div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value text-success">${fmtMoney(totalRevenue)}</div><div class="kpi-sub">${orders.length} orders</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Collected</div><div class="kpi-value text-success">${fmtMoney(totalPaid)}</div><div class="kpi-sub">Cash received</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pending Debt</div><div class="kpi-value text-danger">${fmtMoney(pending)}</div><div class="kpi-sub">Outstanding</div></div>
+        <div class="kpi-card"><div class="kpi-label">Held Deposits</div><div class="kpi-value text-warning">${fmtMoney(totalDeposit)}</div><div class="kpi-sub">Not refunded</div></div>
+        <div class="kpi-card"><div class="kpi-label">Car Expenses</div><div class="kpi-value text-danger">${fmtMoney(totalExpenses)}</div><div class="kpi-sub">${carExps.length} records</div></div>
+        <div class="kpi-card"><div class="kpi-label">Net ROI</div><div class="kpi-value" style="color:${netROI>=0?'var(--success)':'var(--danger)'};">${fmtMoney(netROI)}</div><div class="kpi-sub">Paid - Expenses</div></div>
+      </div>
+      <!-- Orders History -->
+      <div class="panel" style="margin-bottom:14px;">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:11px;">📋 Rental History (${orders.length} orders)</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Order #</th><th>Client</th><th>Start</th><th>End</th><th>Total</th><th>Paid</th><th>Debt</th><th>Status</th></tr></thead>
+            <tbody>
+              ${orders.sort((a,b)=>{const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);return(bs||0)-(as||0);}).map(o=>{
+                const{start,end}=getOrderDates(o);
+                const t=parseAmount(o['إجمالي المستحق (Total)']);
+                const p=parseAmount(o['المدفوع EGP']);
+                const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(t/Math.max(1,parseFloat(o.rental_days||1)));
+                const st=getOrderStatus(o);const isCl=st==='Closed'||o.closed;
+                const isAc=st==='Accident';const isOD=!isCl&&end&&today>end&&(st==='Active'||st==='Overdue_Legacy');
+                let ldays=0,lpen=0;if((isOD||isAc)&&end&&!o.closed){ldays=Math.max(0,Math.ceil((today-end)/86400000));lpen=ldays*d;}
+                const debt=isCl?0:Math.max(0,t+lpen-p);
+                const sk=isAc?'accident':isOD?'overdue':isCl?'closed':(st||'active').toLowerCase();
+                return`<tr style="cursor:pointer;" onclick="openOrderDetail('${o.id}')">
+                  <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
+                  <td>${o['اسم العميل']||'-'}</td>
+                  <td style="font-size:10px;">${start?fmtDateShort(start):'-'}</td>
+                  <td style="font-size:10px;">${end?fmtDateShort(end):'-'}</td>
+                  <td>${fmtMoney(t)}</td>
+                  <td>${fmtMoney(p)}</td>
+                  <td style="color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?fmtMoney(debt):'✅'}</td>
+                  <td><span class="pill pill-${sk}">${isAc?'ACCIDENT':isOD?'OVERDUE':isCl?'Closed':(st||'Active')}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Car Expenses -->
+      <div class="panel">
+        <h3 style="font-size:13px;font-weight:800;margin-bottom:11px;">🔧 Car Expenses (${carExps.length} records)</h3>
+        ${carExps.length===0?'<div class="empty-state" style="padding:20px;"><p>No expenses recorded for this vehicle</p></div>':`
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>No.</th><th>Date</th><th>Type</th><th>Statement</th><th>Paid By</th><th>Due From</th><th>Amount</th></tr></thead>
+            <tbody>
+              ${carExps.map(e=>`<tr>
+                <td>${e['No.']||'-'}</td>
+                <td style="font-size:10px;">${e['يوم']?String(e['يوم']).padStart(2,'0')+'/'+String(e['شهر']).padStart(2,'0')+'/'+e['paid_year']:'-'}</td>
+                <td><span class="pill pill-draft">${e['نوع المصروف']||'-'}</span></td>
+                <td>${e['بيان النثريات']||e['بيان الصيانة']||'-'}</td>
+                <td>${e['تم دفع من طرف']||'-'}</td>
+                <td style="font-size:11px;">${e['مستحق من']||'-'}</td>
+                <td><strong style="color:var(--danger);">${e['قيمة المصروف']||'£0.00'}</strong></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`}
+      </div>`;
+  }catch(e){content.innerHTML=`<div class="empty-state"><p>Failed to load vehicle data: ${e.message}</p></div>`;}
+}
+ 
 
 </script>
 </body>
