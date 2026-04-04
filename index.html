@@ -1655,8 +1655,8 @@ async function loadDashboard(){
       </div>
     </div>`;
 
-  // Load everything in parallel, chart last with a deliberate delay
-  await Promise.all([
+  // Use allSettled so one failure never blocks others
+  await Promise.allSettled([
     loadDashKPIs(),
     loadActivityFeed(),
     loadDashFinance(),
@@ -1665,9 +1665,8 @@ async function loadDashboard(){
     loadDashRecentOrders(),
     loadDashExpiries()
   ]);
-
-  // Chart renders after everything else to guarantee canvas is painted
-  setTimeout(()=>loadDashFleetChart(),200);
+  // Chart renders after all others complete
+  setTimeout(()=>loadDashFleetChart(),300);
 }
 
 /* ---- Period selector builder ---- */
@@ -1756,11 +1755,11 @@ async function loadDashKPIs(){
       document.getElementById('kpi-revenue').textContent=fmtMoney(revenue);
     }catch(e){document.getElementById('kpi-revenue').textContent=fmtMoney(0);}
 
-    const period2=getPeriodFilter();
-    const subLabel=period2.label==='All Time'?'All time':period2.label;
-    const subEl=document.getElementById('kpi-revenue-sub');if(subEl)subEl.textContent=subLabel;
+    const periodFinal=getPeriodFilter();
+    const subEl=document.getElementById('kpi-revenue-sub');
+    if(subEl)subEl.textContent=periodFinal.label==='All Time'?'All time':periodFinal.label;
     const labelEl=document.getElementById('kpi-revenue-label');
-    if(labelEl)labelEl.textContent=period2.label==='All Time'?'Total Revenue':`Revenue — ${period2.label}`;
+    if(labelEl)labelEl.textContent=periodFinal.label==='All Time'?'Total Revenue':'Revenue';
 
   }catch(e){console.warn('KPI error:',e.message);}
 }
@@ -1921,6 +1920,102 @@ async function updateSidebarBadges(){
   }catch(e){console.warn('Badge update failed:',e.message);}
 }
 
+async function loadDashTasks(){
+  const el=document.getElementById('dash-tasks');if(!el)return;
+  try{
+    // Removed orderBy to avoid index requirement
+    const snap=await db.collection('tasks')
+      .where('assigned_to','==',G.user.username)
+      .where('status','in',['pending','inprogress'])
+      .limit(10).get();
+    if(snap.empty){
+      el.innerHTML=`<div class="empty-state" style="padding:18px;">
+        <div style="font-size:22px;">✅</div><p>No pending tasks</p></div>`;
+      return;
+    }
+    const pColors={urgent:'var(--danger)',high:'var(--orange)',medium:'var(--warning)',low:'var(--success)'};
+    const today=new Date();
+    // Sort client-side instead of Firestore orderBy
+    const tasks=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>(a.due_date||0)-(b.due_date||0));
+    el.innerHTML=tasks.map(t=>{
+      const due=t.due_date?new Date(t.due_date):null;
+      const isOD=due&&today>due;
+      return`<div style="padding:7px;border-radius:8px;margin-bottom:5px;
+                  background:var(--surface2);border:1px solid var(--border);
+                  cursor:pointer;transition:all 0.2s;"
+           onclick="showPage('tasks')"
+           onmouseover="this.style.borderColor='var(--accent)'"
+           onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+          <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;
+                       background:${pColors[t.priority]||'var(--text3)'};"></span>
+          <span style="font-size:11px;font-weight:700;flex:1;white-space:nowrap;
+                       overflow:hidden;text-overflow:ellipsis;">${t.title||'Task'}</span>
+          <span class="pill pill-${t.status}">${t.status}</span>
+        </div>
+        <div style="font-size:10px;color:${isOD?'var(--danger)':'var(--text3)'};">
+          ${due?(isOD?'⚠️ Overdue: ':'Due: ')+fmtDate(due):'No due date'}
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<div class="empty-state" style="padding:18px;"><p>No tasks yet</p></div>';
+    console.warn('Tasks load:',e.message);
+  }
+}  
+
+async function loadDashApprovals(){
+  const el=document.getElementById('dash-approvals');if(!el)return;
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  try{
+    let snap;
+    if(isPriv){
+      // Use simple query without orderBy to avoid index requirement
+      snap=await db.collection('approvals')
+        .where('status','==','pending').limit(10).get();
+    }else{
+      snap=await db.collection('approvals')
+        .where('requested_by','==',G.user.username).limit(10).get();
+    }
+    if(snap.empty){
+      el.innerHTML=`<div class="empty-state" style="padding:18px;">
+        <div style="font-size:22px;">🔔</div>
+        <p>${isPriv?'No pending approvals':'No approval requests'}</p></div>`;
+      return;
+    }
+    const icons={rate_change:'💲',cancellation:'❌',task_appeal:'📝',
+                 expense:'💰',blacklist:'🚫',deposit_waiver:'🔓'};
+    // Sort client-side by created_at descending
+    const items=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>(b.created_at||0)-(a.created_at||0));
+    el.innerHTML=items.map(a=>`
+      <div style="padding:7px;border-radius:8px;margin-bottom:5px;
+                  background:var(--surface2);border:1px solid var(--border);
+                  cursor:pointer;transition:all 0.2s;"
+           onclick="showPage('approvals')"
+           onmouseover="this.style.borderColor='var(--warning)'"
+           onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+          <span style="font-size:13px;">${icons[a.type]||'🔔'}</span>
+          <span style="font-size:11px;font-weight:700;flex:1;">
+            ${(a.type||'').replace(/_/g,' ').toUpperCase()}
+          </span>
+          <span class="pill pill-${a.status}">${a.status}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text2);">
+          ${a.requested_by||'-'} • ${a.subject||a.details||''}
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px;">
+          ${a.created_at?getTimeAgo(a.created_at):''}
+        </div>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML='<div class="empty-state" style="padding:18px;"><p>No approvals yet</p></div>';
+    console.warn('Approvals load:',e.message);
+  }
+}
+  
 /* ============================================================
    PART 2: ORDER BOOK
    ============================================================ */
