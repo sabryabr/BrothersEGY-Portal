@@ -1492,10 +1492,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 /* ============================================================
-   PART 2: DASHBOARD
+   DASHBOARD FIXES - Replace existing loadDashboard,
+   loadDashKPIs, loadDashFinance, loadDashFleetChart,
+   updateSidebarBadges with these versions
    ============================================================ */
-let dashCharts={};
-let allLogs=[];
 
 async function loadDashboard(){
   const el=document.getElementById('page-dashboard');if(!el)return;
@@ -1504,6 +1504,10 @@ async function loadDashboard(){
     s.textContent='@keyframes dashPulse{0%,100%{opacity:1;}50%{opacity:0.3;}}';
     document.head.appendChild(s);
   }
+
+  // Build period options - last 12 months + All Time
+  const periodOptions=buildPeriodOptions();
+
   el.innerHTML=`
     <div class="section-header">
       <div>
@@ -1511,6 +1515,12 @@ async function loadDashboard(){
         <p>Welcome back, <strong>${G.user?.username}</strong> — ${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
       </div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+        <!-- Period Filter -->
+        <select id="dash-period" onchange="onDashPeriodChange()"
+                style="padding:5px 11px;background:var(--surface2);border:1px solid var(--border2);
+                       border-radius:8px;color:var(--text);font-size:11px;font-weight:700;">
+          ${periodOptions}
+        </select>
         <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">🔄 Refresh</button>
         <span class="pill pill-${(G.user?.role||'user').toLowerCase()}">${G.user?.role}</span>
         <span class="pill pill-active">${BRANCH_MAP[G.user?.branch]||G.user?.branch||'All Branches'}</span>
@@ -1538,7 +1548,7 @@ async function loadDashboard(){
         <div class="kpi-icon">🚗</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Monthly Revenue</div>
+        <div class="kpi-label" id="kpi-revenue-label">Monthly Revenue</div>
         <div class="kpi-value text-success" id="kpi-revenue">--</div>
         <div class="kpi-sub" id="kpi-revenue-sub">This month</div>
         <div class="kpi-icon">💰</div>
@@ -1581,14 +1591,19 @@ async function loadDashboard(){
           <div class="empty-state"><div class="spinner"></div></div>
         </div>
       </div>
+
       <div class="panel">
         <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">🚗 Fleet Status</h3>
-        <div style="position:relative;height:170px;margin-bottom:11px;">
-          <canvas id="fleet-chart"></canvas>
+        <!-- Chart wrapper with fixed height to prevent render issues -->
+        <div style="position:relative;height:170px;margin-bottom:11px;" id="fleet-chart-container">
+          <canvas id="fleet-chart" style="display:block;"></canvas>
         </div>
         <div id="fleet-chart-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;"></div>
         <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:11px;">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:7px;">This Month Finance</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Finance Summary</div>
+            <span id="dash-finance-period-label" style="font-size:9px;color:var(--accent);font-weight:700;"></span>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
             <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:8px;">
               <div style="font-size:9px;color:var(--text3);">Income</div>
@@ -1607,7 +1622,7 @@ async function loadDashboard(){
       </div>
     </div>
 
-    <!-- ROW 3: Tasks + Approvals + Recent Orders -->
+    <!-- ROW 3 -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px;">
       <div class="panel">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;">
@@ -1640,25 +1655,67 @@ async function loadDashboard(){
       </div>
     </div>`;
 
+  // Load everything in parallel, chart last with a deliberate delay
   await Promise.all([
     loadDashKPIs(),
     loadActivityFeed(),
-    loadDashFleetChart(),
     loadDashFinance(),
     loadDashTasks(),
     loadDashApprovals(),
     loadDashRecentOrders(),
     loadDashExpiries()
   ]);
+
+  // Chart renders after everything else to guarantee canvas is painted
+  setTimeout(()=>loadDashFleetChart(),200);
 }
 
-/* ---- KPIs ---- */
+/* ---- Period selector builder ---- */
+function buildPeriodOptions(){
+  const now=new Date();
+  const opts=['<option value="all">📅 All Time</option>'];
+  // Last 18 months
+  for(let i=0;i<18;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label=d.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    const selected=i===0?'selected':'';
+    opts.push(`<option value="${val}" ${selected}>${label}</option>`);
+  }
+  return opts.join('');
+}
+
+function getPeriodFilter(){
+  const val=document.getElementById('dash-period')?.value||'all';
+  if(val==='all')return{month:null,year:null,label:'All Time'};
+  const[year,month]=val.split('-');
+  const d=new Date(parseInt(year),parseInt(month)-1,1);
+  return{
+    month:String(parseInt(month)),
+    year:String(year),
+    label:d.toLocaleString('en-GB',{month:'long',year:'numeric'})
+  };
+}
+
+function onDashPeriodChange(){
+  const period=getPeriodFilter();
+  // Update revenue label
+  const rl=document.getElementById('kpi-revenue-label');
+  if(rl)rl.textContent=period.label==='All Time'?'Total Revenue':`Revenue — ${period.label}`;
+  // Update finance label
+  const fl=document.getElementById('dash-finance-period-label');
+  if(fl)fl.textContent=period.label;
+  // Reload KPIs and finance
+  loadDashKPIs();
+  loadDashFinance();
+}
+
+/* ---- FIXED KPIs with period filter ---- */
 async function loadDashKPIs(){
   try{
     const isPriv=['Admin','Executive'].includes(G.user?.role);
+    const period=getPeriodFilter();
     const now=new Date();
-    const month=String(now.getMonth()+1);
-    const year=String(now.getFullYear());
 
     const snap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(500).get();
     let bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1680,84 +1737,125 @@ async function loadDashKPIs(){
 
     document.getElementById('kpi-proposals').textContent=G.proposals.filter(p=>p.status==='Draft').length;
 
+    // Revenue with period filter
     try{
       const colSnap=await db.collection('collections').get();
       let revenue=0;
       colSnap.docs.forEach(d=>{
         const data=d.data();
-        if(!isPriv){const b=data['موقع الفرع']||data.Branch||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase())&&!b.includes(BRANCH_AR[G.user.branch]||''))return;}
+        if(!isPriv){
+          const b=data['موقع الفرع']||data.Branch||'';
+          if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase())&&!b.includes(BRANCH_AR[G.user.branch]||''))return;
+        }
         const recMonth=String(data['شهر']||'').replace(/^0+/,'');
         const recYear=String(data['سنة']||'');
-        if(recMonth===month&&recYear===year)revenue+=parseAmount(data['قيمة التحصيل']);
+        if(period.month===null||(recMonth===period.month&&recYear===period.year)){
+          revenue+=parseAmount(data['قيمة التحصيل']);
+        }
       });
       document.getElementById('kpi-revenue').textContent=fmtMoney(revenue);
     }catch(e){document.getElementById('kpi-revenue').textContent=fmtMoney(0);}
 
-    document.getElementById('kpi-revenue-sub').textContent=`${now.toLocaleString('en-GB',{month:'long'})} ${year}`;
+    const period2=getPeriodFilter();
+    const subLabel=period2.label==='All Time'?'All time':period2.label;
+    const subEl=document.getElementById('kpi-revenue-sub');if(subEl)subEl.textContent=subLabel;
+    const labelEl=document.getElementById('kpi-revenue-label');
+    if(labelEl)labelEl.textContent=period2.label==='All Time'?'Total Revenue':`Revenue — ${period2.label}`;
+
   }catch(e){console.warn('KPI error:',e.message);}
 }
 
-/* ---- Activity Feed ---- */
-function loadActivityFeed(){
+/* ---- FIXED Finance with period filter ---- */
+async function loadDashFinance(){
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  const period=getPeriodFilter();
+  const fl=document.getElementById('dash-finance-period-label');
+  if(fl)fl.textContent=period.label;
   try{
-    const unsub=db.collection('logs').orderBy('timestamp','desc').limit(60)
-      .onSnapshot(snap=>{allLogs=snap.docs.map(d=>d.data());renderActivityFeed();});
-    G.unsubscribers.push(unsub);
-  }catch(e){
-    const f=document.getElementById('activity-feed');
-    if(f)f.innerHTML='<div class="empty-state"><p>Could not load logs</p></div>';
-  }
-}
-function renderActivityFeed(){
-  const filter=document.getElementById('dash-log-filter')?.value||'all';
-  const feed=document.getElementById('activity-feed');if(!feed)return;
-  let logs=filter==='all'?allLogs:allLogs.filter(l=>l.action===filter);
-  if(!logs.length){feed.innerHTML='<div class="empty-state" style="padding:20px;"><p>No activity found</p></div>';return;}
-  const AC={
-    LOGIN:{bg:'rgba(34,197,94,0.1)',color:'var(--success)',icon:'🔐'},
-    LOGOUT:{bg:'rgba(100,116,139,0.1)',color:'var(--text3)',icon:'🚪'},
-    GENERATE:{bg:'rgba(59,130,246,0.1)',color:'var(--accent)',icon:'📄'},
-    EDIT:{bg:'rgba(245,158,11,0.1)',color:'var(--warning)',icon:'✏️'},
-    ADD:{bg:'rgba(168,85,247,0.1)',color:'var(--purple)',icon:'➕'},
-    PRINT:{bg:'rgba(14,165,233,0.1)',color:'var(--accent3)',icon:'🖨️'},
-    VIEW:{bg:'rgba(100,116,139,0.04)',color:'var(--text3)',icon:'👁'},
-    DELETE:{bg:'rgba(239,68,68,0.1)',color:'var(--danger)',icon:'🗑️'}
-  };
-  feed.innerHTML=logs.slice(0,30).map(l=>{
-    const ac=AC[l.action]||AC.VIEW;
-    return`<div style="display:flex;align-items:flex-start;gap:9px;padding:7px;border-radius:8px;margin-bottom:4px;background:${ac.bg};border:1px solid transparent;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='transparent'">
-      <div style="width:26px;height:26px;border-radius:7px;flex-shrink:0;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;">${initials(l.user||'?').toUpperCase()}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-          <span style="font-size:11px;font-weight:700;">${l.user||'-'}</span>
-          <span style="padding:1px 6px;border-radius:99px;font-size:9px;font-weight:800;background:${ac.bg};color:${ac.color};">${ac.icon} ${l.action}</span>
-          <span style="font-size:10px;color:var(--text3);">${l.module||''}</span>
-        </div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.details||''}</div>
-      </div>
-      <div style="font-size:9px;color:var(--text3);white-space:nowrap;flex-shrink:0;">${getTimeAgo(l.timestamp)}</div>
-    </div>`;
-  }).join('');
+    let income=0,expenses=0;
+    const[cSnap,ceSnap,geSnap]=await Promise.all([
+      db.collection('collections').get(),
+      db.collection('car_expenses').get(),
+      db.collection('gen_expenses').get()
+    ]);
+    cSnap.docs.forEach(d=>{
+      const data=d.data();
+      if(!isPriv){const b=data['موقع الفرع']||data.Branch||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()))return;}
+      const recMonth=String(data['شهر']||'').replace(/^0+/,'');
+      const recYear=String(data['سنة']||'');
+      if(period.month===null||(recMonth===period.month&&recYear===period.year))
+        income+=parseAmount(data['قيمة التحصيل']);
+    });
+    ceSnap.docs.forEach(d=>{
+      const data=d.data();
+      if(!isPriv){const b=data['موقع الفرع']||'';if(!b.includes(BRANCH_AR[G.user.branch]||G.user.branch))return;}
+      const recMonth=String(data['شهر']||'').replace(/^0+/,'');
+      const recYear=String(data['paid_year']||data['سنة']||'');
+      if(period.month===null||(recMonth===period.month&&recYear===period.year))
+        expenses+=parseAmount(data['قيمة المصروف']);
+    });
+    geSnap.docs.forEach(d=>{
+      const data=d.data();
+      if(!isPriv){const b=data.Branch||data['موقع الفرع']||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()))return;}
+      const recMonth=String(data['شهر']||'').replace(/^0+/,'');
+      const recYear=String(data['سنة']||'');
+      if(period.month===null||(recMonth===period.month&&recYear===period.year))
+        expenses+=parseAmount(data['قيمة المصروف']);
+    });
+    const net=income-expenses;
+    document.getElementById('dash-income').textContent=fmtMoney(income);
+    document.getElementById('dash-expenses').textContent=fmtMoney(expenses);
+    const netEl=document.getElementById('dash-net');
+    if(netEl){netEl.textContent=fmtMoney(net);netEl.style.color=net>=0?'var(--success)':'var(--danger)';}
+  }catch(e){console.warn('Finance error:',e.message);}
 }
 
-/* ---- Fleet Chart ---- */
+/* ---- FIXED Fleet Chart - guaranteed render ---- */
 async function loadDashFleetChart(){
-  await new Promise(r=>setTimeout(r,120));
   try{
     const{counts}=getCarCounts();
-    const canvas=document.getElementById('fleet-chart');if(!canvas)return;
+    const canvas=document.getElementById('fleet-chart');
+    if(!canvas)return;
+
+    // Force canvas to have explicit dimensions before Chart.js touches it
+    const container=document.getElementById('fleet-chart-container');
+    if(container){
+      canvas.style.width='100%';
+      canvas.style.height='170px';
+      canvas.width=container.offsetWidth||300;
+      canvas.height=170;
+    }
+
+    // Destroy any existing instance
     if(dashCharts.fleet){dashCharts.fleet.destroy();dashCharts.fleet=null;}
+
     const total=G.fleet.length;
     const cData=[counts.active,counts.rented,counts.accident,counts.maintenance];
     const cLabels=['Available','Rented','Accident','Maintenance'];
     const cColors=['rgba(34,197,94,0.85)','rgba(59,130,246,0.85)','rgba(239,68,68,0.85)','rgba(245,158,11,0.85)'];
     const cHex=['#22c55e','#3b82f6','#ef4444','#f59e0b'];
+
     dashCharts.fleet=new Chart(canvas,{
       type:'doughnut',
-      data:{labels:cLabels,datasets:[{data:cData,backgroundColor:cColors,borderColor:'rgba(13,19,33,0.8)',borderWidth:2,hoverOffset:6}]},
-      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',animation:{duration:600},
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} (${total?Math.round(ctx.parsed/total*100):0}%)`}}}}
+      data:{
+        labels:cLabels,
+        datasets:[{
+          data:cData,backgroundColor:cColors,
+          borderColor:'rgba(13,19,33,0.8)',borderWidth:2,hoverOffset:8
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        cutout:'65%',
+        animation:{duration:800,easing:'easeOutQuart'},
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} car${ctx.parsed!==1?'s':''} (${total?Math.round(ctx.parsed/total*100):0}%)`}}
+        }
+      }
     });
+
     const legendEl=document.getElementById('fleet-chart-legend');
     if(legendEl){
       legendEl.innerHTML=cLabels.map((l,i)=>`
@@ -1773,166 +1871,54 @@ async function loadDashFleetChart(){
   }catch(e){console.warn('Fleet chart error:',e.message);}
 }
 
-/* ---- Finance ---- */
-async function loadDashFinance(){
+/* ---- FIXED sidebar badges - compute all upfront on login ---- */
+async function updateSidebarBadges(){
   const isPriv=['Admin','Executive'].includes(G.user?.role);
   try{
-    const now=new Date();
-    const month=String(now.getMonth()+1);
-    const year=String(now.getFullYear());
-    let income=0,expenses=0;
-    const[cSnap,ceSnap,geSnap]=await Promise.all([
-      db.collection('collections').get(),
-      db.collection('car_expenses').get(),
-      db.collection('gen_expenses').get()
-    ]);
-    cSnap.docs.forEach(d=>{
-      const data=d.data();
-      if(!isPriv){const b=data['موقع الفرع']||data.Branch||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()))return;}
-      if(String(data['شهر']||'').replace(/^0+/,'')=== month&&String(data['سنة']||'')===year)income+=parseAmount(data['قيمة التحصيل']);
-    });
-    ceSnap.docs.forEach(d=>{
-      const data=d.data();
-      if(!isPriv){const b=data['موقع الفرع']||'';if(!b.includes(BRANCH_AR[G.user.branch]||G.user.branch))return;}
-      if(String(data['شهر']||'').replace(/^0+/,'')=== month&&String(data['paid_year']||data['سنة']||'')===year)expenses+=parseAmount(data['قيمة المصروف']);
-    });
-    geSnap.docs.forEach(d=>{
-      const data=d.data();
-      if(!isPriv){const b=data.Branch||data['موقع الفرع']||'';if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase()))return;}
-      if(String(data['شهر']||'').replace(/^0+/,'')=== month&&String(data['سنة']||'')===year)expenses+=parseAmount(data['قيمة المصروف']);
-    });
-    const net=income-expenses;
-    document.getElementById('dash-income').textContent=fmtMoney(income);
-    document.getElementById('dash-expenses').textContent=fmtMoney(expenses);
-    const netEl=document.getElementById('dash-net');
-    netEl.textContent=fmtMoney(net);netEl.style.color=net>=0?'var(--success)':'var(--danger)';
-  }catch(e){console.warn('Finance error:',e.message);}
-}
-
-/* ---- Tasks ---- */
-async function loadDashTasks(){
-  const el=document.getElementById('dash-tasks');if(!el)return;
-  try{
-    const snap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).orderBy('due_date','asc').limit(5).get();
-    if(snap.empty){el.innerHTML=`<div class="empty-state" style="padding:18px;"><div style="font-size:22px;">✅</div><p>No pending tasks</p></div>`;return;}
-    const pColors={urgent:'var(--danger)',high:'var(--orange)',medium:'var(--warning)',low:'var(--success)'};
-    el.innerHTML=snap.docs.map(d=>{
-      const t=d.data();const due=t.due_date?new Date(t.due_date):null;const isOD=due&&new Date()>due;
-      return`<div style="padding:7px;border-radius:8px;margin-bottom:5px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all 0.2s;" onclick="showPage('tasks')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-          <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${pColors[t.priority]||'var(--text3)'};"></span>
-          <span style="font-size:11px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.title||'Task'}</span>
-          <span class="pill pill-${t.status}">${t.status}</span>
-        </div>
-        <div style="font-size:10px;color:${isOD?'var(--danger)':'var(--text3)'};">${due?(isOD?'⚠️ Overdue: ':'Due: ')+fmtDate(due):'No due date'}</div>
-      </div>`;
-    }).join('');
-  }catch(e){el.innerHTML='<div class="empty-state" style="padding:18px;"><p>Could not load tasks</p></div>';}
-}
-
-/* ---- Approvals ---- */
-async function loadDashApprovals(){
-  const el=document.getElementById('dash-approvals');if(!el)return;
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  try{
-    let snap;
-    if(isPriv)snap=await db.collection('approvals').where('status','==','pending').orderBy('created_at','desc').limit(5).get();
-    else snap=await db.collection('approvals').where('requested_by','==',G.user.username).orderBy('created_at','desc').limit(5).get();
-    if(snap.empty){el.innerHTML=`<div class="empty-state" style="padding:18px;"><div style="font-size:22px;">🔔</div><p>${isPriv?'No pending approvals':'No approval requests'}</p></div>`;return;}
-    const icons={rate_change:'💲',cancellation:'❌',task_appeal:'📝',expense:'💰',blacklist:'🚫',deposit_waiver:'🔓'};
-    el.innerHTML=snap.docs.map(d=>{
-      const a=d.data();
-      return`<div style="padding:7px;border-radius:8px;margin-bottom:5px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all 0.2s;" onclick="showPage('approvals')" onmouseover="this.style.borderColor='var(--warning)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-          <span style="font-size:13px;">${icons[a.type]||'🔔'}</span>
-          <span style="font-size:11px;font-weight:700;flex:1;">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span>
-          <span class="pill pill-${a.status}">${a.status}</span>
-        </div>
-        <div style="font-size:10px;color:var(--text2);">${a.requested_by||'-'} • ${a.subject||a.details||''}</div>
-        <div style="font-size:9px;color:var(--text3);margin-top:2px;">${a.created_at?getTimeAgo(a.created_at):''}</div>
-      </div>`;
-    }).join('');
-  }catch(e){el.innerHTML='<div class="empty-state" style="padding:18px;"><p>Could not load</p></div>';}
-}
-
-/* ---- Recent Orders ---- */
-async function loadDashRecentOrders(){
-  const el=document.getElementById('dash-orders');if(!el)return;
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  try{
-    const snap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(20).get();
-    let orders=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Orders badge - compute from already-loaded data or fetch
+    const ordSnap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(300).get();
+    let orders=ordSnap.docs.map(d=>({id:d.id,...d.data()}));
     if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
-    orders=orders.slice(0,5);
-    if(!orders.length){el.innerHTML=`<div class="empty-state" style="padding:18px;"><div style="font-size:22px;">📋</div><p>No recent orders</p></div>`;return;}
-    const today=new Date();
-    el.innerHTML=orders.map(o=>{
-      const{start,end}=getOrderDates(o);
-      const total=parseAmount(o['إجمالي المستحق (Total)']);
-      const paid=parseAmount(o['المدفوع EGP']);
-      const daily=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(o.rental_days||1)));
-      const statusRaw=getOrderStatus(o);
-      const isAccident=statusRaw==='Accident';
-      const isClosed=statusRaw==='Closed'||o.closed===true;
-      const isOverdue=!isClosed&&end&&today>end&&!o.closed&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
-      let lateDays=0,latePenalty=0;
-      if((isOverdue||isAccident)&&end&&!o.closed){lateDays=Math.max(0,Math.ceil((today-end)/86400000));latePenalty=lateDays*daily;}
-      const totalDue=total+latePenalty;
-      const debt=isClosed?0:Math.max(0,totalDue-paid);
-      const pct=totalDue>0?Math.min(100,Math.round(paid/totalDue*100)):100;
-      const statusKey=isAccident?'accident':isOverdue?'overdue':isClosed?'closed':(statusRaw||'active').toLowerCase();
-      const statusLabel=isAccident?'ACCIDENT':isOverdue?'OVERDUE':isClosed?'Closed':(statusRaw||'Active');
-      const carCode=o['كود السيارة'];
-      const carInFleet=G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
-      const carLabel=carInFleet?getCarLabel(carInFleet,'en'):(o['اسم السيارة']||'-');
-      return`<div style="padding:7px;border-radius:8px;margin-bottom:5px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all 0.2s;" onclick="openOrderDetail('${o.id}')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-          <span style="font-size:10px;color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span>
-          <span style="font-size:11px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${o['اسم العميل']||'-'}</span>
-          <span class="pill pill-${statusKey}">${statusLabel}</span>
-        </div>
-        <div style="font-size:10px;color:var(--text2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${carLabel}</div>
-        ${latePenalty>0?`<div style="font-size:9px;color:var(--danger);margin-bottom:3px;">⚠️ ${lateDays}d ${isAccident?'accident':'overdue'} +${fmtMoney(latePenalty)}</div>`:''}
-        <div style="background:var(--surface3);border-radius:99px;height:3px;overflow:hidden;">
-          <div style="height:100%;width:${pct}%;border-radius:99px;background:${pct>=100?'var(--success)':pct>50?'var(--accent)':'var(--warning)'};transition:width 0.5s;"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:3px;">
-          <span>Paid: ${fmtMoney(paid)}</span>
-          <span style="color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?'Debt: '+fmtMoney(debt):'✅ Clear'}</span>
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){el.innerHTML='<div class="empty-state" style="padding:18px;"><p>Could not load</p></div>';console.warn('Recent orders error:',e.message);}
-}
+    const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue_Legacy';}).length;
+    const ob=document.getElementById('badge-orders');
+    if(ob&&activeCount>0){ob.textContent=activeCount;ob.classList.remove('hidden');}
 
-/* ---- Expiries ---- */
-async function loadDashExpiries(){
-  const el=document.getElementById('dash-expiries');if(!el)return;
-  try{
-    const today=new Date();
-    const risks=[];
+    // Risk badge - compute from fleet immediately (no fetch needed)
+    const today=new Date();const in7=new Date(today.getTime()+7*86400000);
+    let riskCount=0;
     G.fleet.forEach(car=>{
       if(getCarStatusCategory(car)==='archived')return;
-      [{field:'نهاية الترخيص',label:'License',icon:'📋'},{field:'نهاية التأمين',label:'Insurance',icon:'🛡'},{field:'نهاية التعاقد',label:'Contract',icon:'📄'}].forEach(({field,label,icon})=>{
+      ['نهاية الترخيص','نهاية التأمين','نهاية التعاقد'].forEach(field=>{
         const d=parseDBDate(car[field]);if(!d)return;
         const daysLeft=Math.ceil((d-today)/86400000);
-        if(daysLeft<-7||daysLeft>30)return;
-        risks.push({car,label,icon,date:d,daysLeft,carLabel:getCarLabel(car,'en')});
+        if(daysLeft<=7)riskCount++;
       });
     });
-    const seen=new Set();const deduped=[];
-    risks.sort((a,b)=>a.daysLeft-b.daysLeft);
-    risks.forEach(r=>{const key=`${r.car.ID||r.car.id}_${r.label}`;if(!seen.has(key)){seen.add(key);deduped.push(r);}});
-    if(!deduped.length){el.innerHTML=`<div style="text-align:center;padding:18px;color:var(--success);">✅ No expiries in the next 30 days</div>`;return;}
-    el.innerHTML=`<table class="data-table"><thead><tr><th>Car</th><th>Type</th><th>Expires</th><th>Days Left</th><th>Risk</th></tr></thead><tbody>
-      ${deduped.map(r=>{
-        const risk=r.daysLeft<=0?'high':r.daysLeft<=7?'high':r.daysLeft<=14?'medium':'low';
-        return`<tr><td style="font-size:11px;">${r.carLabel}</td><td>${r.icon} ${r.label}</td><td>${fmtDateShort(r.date)}</td>
-          <td><strong style="color:${risk==='high'?'var(--danger)':risk==='medium'?'var(--warning)':'var(--success)'};">${r.daysLeft<=0?`EXPIRED ${Math.abs(r.daysLeft)}d ago`:r.daysLeft+' days'}</strong></td>
-          <td><span class="pill pill-${risk}">${risk.toUpperCase()}</span></td></tr>`;
-      }).join('')}
-    </tbody></table>`;
-  }catch(e){console.warn('Expiries error:',e.message);}
+    const rb=document.getElementById('badge-risk');
+    if(rb&&riskCount>0){rb.textContent=riskCount;rb.classList.remove('hidden');}
+
+    // Tasks badge
+    try{
+      const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
+      const tb=document.getElementById('badge-tasks');
+      if(tb&&!taskSnap.empty){tb.textContent=taskSnap.size;tb.classList.remove('hidden');}
+    }catch(e){}
+
+    // Approvals badge (admin/exec only)
+    if(isPriv){
+      try{
+        const apSnap=await db.collection('approvals').where('status','==','pending').get();
+        const ab=document.getElementById('badge-approvals');
+        if(ab&&!apSnap.empty){ab.textContent=apSnap.size;ab.classList.remove('hidden');}
+      }catch(e){}
+    }
+
+    // Proposals badge
+    const draftCount=G.proposals.filter(p=>p.status==='Draft').length;
+    const pb=document.getElementById('badge-proposals');
+    if(pb&&draftCount>0){pb.textContent=draftCount;pb.classList.remove('hidden');}
+
+  }catch(e){console.warn('Badge update failed:',e.message);}
 }
 
 /* ============================================================
