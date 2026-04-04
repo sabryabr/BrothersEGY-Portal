@@ -1299,6 +1299,11 @@ async function loadFleet(){
   try{const snap=await db.collection('fleet').get();G.fleet=snap.docs.map(d=>({id:d.id,...d.data()}));populateFleetDropdowns();}
   catch(e){console.warn('Fleet load failed:',e.message);}
 }
+  
+console.log('Fleet sample:',G.fleet.slice(0,3).map(c=>({
+  docId:c.id, ID:c.ID, No:c['No.'], plate:c.plate
+})));
+  
 async function loadCustomers(){
   try{const snap=await db.collection('customers').orderBy('_sys_updated','desc').limit(500).get();G.customers=snap.docs.map(d=>({id:d.id,...d.data()}));}
   catch(e){console.warn('Customers load failed:',e.message);}
@@ -3057,16 +3062,27 @@ async function renderGantt(){
     };
 
     cars.forEach((car,ci)=>{
-      // Try multiple ways to match car ID
-      const carIdRaw=car.ID||car.id||'';
-      const carIdStr=String(carIdRaw).trim();
-
-      // Find bookings for this car - try multiple matching strategies
+      // Build all possible IDs for this car
+      const possibleIds=new Set([
+        String(car.ID||'').trim(),
+        String(car.id||'').trim(),
+        String(car['No.']||'').trim(),
+        String(car['ID']||'').trim(),
+        String(parseInt(car.ID||0)||'').trim(),
+        String(parseInt(car.id||0)||'').trim()
+      ].filter(Boolean));
+      
       const carOrders=bookings.filter(b=>{
         const bCarId=String(b['كود السيارة']||'').trim();
-        return bCarId===carIdStr||
-               bCarId===String(parseInt(carIdStr)||carIdStr)||
-               carIdStr===String(parseInt(bCarId)||bCarId);
+        if(!bCarId)return false;
+        // Direct match
+        if(possibleIds.has(bCarId))return true;
+        // Numeric match - strip leading zeros
+        const bNum=String(parseInt(bCarId)||0);
+        for(const pid of possibleIds){
+          if(String(parseInt(pid)||0)===bNum)return true;
+        }
+        return false;
       });
 
       carOrders.sort((a,b)=>{
@@ -3095,7 +3111,7 @@ async function renderGantt(){
       const dotColor=statusColors[catStatus]||'var(--text3)';
       const carLabel=getCarLabel(car,'en');
       // Show car ID + plate for easy identification
-      const carIdDisplay=car.ID||car.id||'-';
+      const carIdDisplay=car['No.']||car.ID||car.id||'-';
       const plateDisplay=car.plate||formatPlate(car);
 
       rowsHTML+=`
