@@ -3118,10 +3118,6 @@ async function renderGantt(){
       const rowBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.015)';
       const catStatus=getCarStatusCategory(car);
       const dotColor=statusColors[catStatus]||'var(--text3)';
-      const carLabel=getCarLabel(car,'en');
-      // Show car ID + plate for easy identification
-      const carIdDisplay=car['No.']||car.ID||car.id||'-';
-      const plateDisplay=car.plate||formatPlate(car);
 
       rowsHTML+=`
         <div style="display:flex;background:${rowBg};border-bottom:1px solid var(--border);">
