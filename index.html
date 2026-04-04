@@ -1260,6 +1260,19 @@ function onLoginSuccess(){
   showPage('dashboard');
 }
 
+async function diagnoseGantt(){
+  const snap=await db.collection('bookings').limit(5).get();
+  console.log('=== GANTT DIAGNOSTIC ===');
+  snap.docs.forEach(d=>{
+    const data=d.data();
+    console.log('Booking car code:',JSON.stringify(data['كود السيارة']),
+                '| Type:',typeof data['كود السيارة']);
+  });
+  console.log('Fleet IDs sample:',G.fleet.slice(0,5).map(c=>({
+    id:c.id, ID:c.ID, type:typeof(c.ID||c.id)
+  })));
+}
+  
 /* ============================================================
    PERMISSIONS
    ============================================================ */
@@ -2828,59 +2841,18 @@ function openPhotoLightbox(url){
     </div></div>`);
 }
 
- /* ============================================================
-   PART 3: FLEET RADAR (GANTT CHART)
+/* ============================================================
+   FLEET RADAR - COMPLETE REWRITE WITH DRAG + ALL FIXES
    ============================================================ */
-function carMatchesFilter(car){
-  const cEN=(car.Contract||'').toLowerCase().trim();
-  const cAR=(car['حاله التعاقد']||'').toLowerCase().trim();
-  const st=(car.status||'available').toLowerCase().trim();
-  const handover=parseDBDate(car['تاريخ التسليم']||'');
-  const isPast=handover&&new Date()>handover;
-  const isArchived=cEN==='finished'||cAR==='منتهى'||isPast;
-  const isAccident=st==='accident'||cEN==='accident';
-  const isMaint=st==='maintenance'||cEN==='maintenance';
-  const isActive=!isArchived&&!isAccident&&!isMaint;
-
-  const statusPass=
-    (isArchived&&FLEET_FILTER.status.archived)||
-    (isAccident&&FLEET_FILTER.status.accident)||
-    (isMaint&&FLEET_FILTER.status.maintenance)||
-    (isActive&&FLEET_FILTER.status.active);
-  if(!statusPass)return false;
-
-  const allOff=!Object.values(FLEET_FILTER.branches).some(v=>v);
-  const branchPass=allOff||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
-    if(!on)return false;
-    const bn=(BRANCH_MAP[code]||code).toLowerCase();
-    const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
-    return b.includes(bn)||
-           (car.Branch||'').toLowerCase().includes(bn)||
-           (car.City||'').toLowerCase().includes(bn)||
-           (car['المحافظة']||'').toLowerCase().includes(bn);
-  });
-  if(!branchPass)return false;
-
-  if(FLEET_FILTER.search){
-    const q=FLEET_FILTER.search.toLowerCase();
-    const hay=[
-      car.plate,car.model,car.Color,car.year,car.Type,
-      car['اللون'],car['الطراز'],car['رقم اللوحة'],
-      car['سنة الصنع'],car.ID,car.id
-    ].join(' ').toLowerCase();
-    if(!hay.includes(q))return false;
-  }
-  return true;
-}
 
 async function loadFleetRadar(){
   const el=document.getElementById('page-fleet-radar');if(!el)return;
   el.innerHTML=`
     <div class="section-header">
-      <div><h2>📡 Fleet Radar</h2><p>Real-time Gantt timeline — all cars and bookings</p></div>
+      <div><h2>📡 Fleet Radar</h2><p>Real-time Gantt — all cars and bookings. Drag to scroll.</p></div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-ghost btn-sm" onclick="loadFleetRadar()">🔄 Refresh</button>
-        <button class="btn btn-ghost btn-sm" onclick="ganttScrollToToday()" title="Scroll to today">📅 Today</button>
+        <button class="btn btn-primary btn-sm" onclick="ganttScrollToToday()">📅 Today</button>
         <div style="display:flex;align-items:center;gap:6px;padding:5px 11px;
                     background:var(--glass);border:1px solid var(--border);border-radius:8px;font-size:11px;">
           <span style="color:var(--text3);">Timeline:</span>
@@ -2890,71 +2862,112 @@ async function loadFleetRadar(){
             <option value="60">60 Days</option>
             <option value="90" selected>90 Days</option>
             <option value="180">180 Days</option>
+            <option value="365">1 Year</option>
           </select>
         </div>
       </div>
     </div>
-    <!-- Filter Bar -->
     <div id="fleet-filter-bar-gantt"></div>
     <!-- Legend -->
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:9px 13px;
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 13px;
                 background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);">
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;background:#3b82f6;"></div>Active
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;background:#ef4444;"></div>Overdue
-        <div style="width:20px;height:10px;background:repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 3px,rgba(0,0,0,0.6) 3px,rgba(0,0,0,0.6) 6px);border-radius:3px;"></div>Tail
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;background:#ef4444;"></div>Accident
-        <div style="width:20px;height:10px;background:repeating-linear-gradient(45deg,#f59e0b,#f59e0b 3px,#111 3px,#111 6px);border-radius:3px;"></div>Tail
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;background:#475569;"></div>Closed
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;border:2px dashed #3b82f6;"></div>Future
-      </div>
+      ${[
+        {color:'#3b82f6',label:'Active'},
+        {color:'#ef4444',label:'Overdue'},
+        {grad:'repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 3px,rgba(0,0,0,0.6) 3px,rgba(0,0,0,0.6) 6px)',label:'Overdue tail'},
+        {color:'#ef4444',label:'Accident'},
+        {grad:'repeating-linear-gradient(45deg,#f59e0b,#f59e0b 3px,#111 3px,#111 6px)',label:'Accident tail'},
+        {color:'#475569',label:'Closed'},
+        {dashed:true,label:'Future'}
+      ].map(l=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
+        <div style="width:26px;height:10px;border-radius:3px;
+          ${l.dashed?'border:2px dashed #3b82f6;':
+            l.grad?`background:${l.grad};`:`background:${l.color};`}"></div>
+        ${l.label}
+      </div>`).join('')}
     </div>
-    <!-- Gantt Wrap - horizontal scroll -->
+    <!-- Gantt container - drag enabled -->
     <div id="gantt-wrap"
-         style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 310px);
+         style="overflow:hidden;max-height:calc(100vh - 320px);
                 border:1px solid var(--border);border-radius:var(--radius);
-                background:var(--surface);">
+                background:var(--surface);cursor:grab;user-select:none;"
+         onmousedown="ganttDragStart(event)"
+         onmousemove="ganttDragMove(event)"
+         onmouseup="ganttDragEnd(event)"
+         onmouseleave="ganttDragEnd(event)">
       <div class="empty-state"><div class="spinner lg"></div></div>
     </div>
-    <!-- Hover Tooltip -->
-    <div id="gantt-tooltip"
-         style="display:none;position:fixed;z-index:9000;width:310px;
-                background:var(--surface);border:1px solid var(--border2);
-                border-radius:var(--radius);padding:13px;
-                box-shadow:0 12px 40px rgba(0,0,0,0.7);pointer-events:none;
-                transition:opacity 0.15s;">
-    </div>`;
+    <div id="gantt-tooltip" style="display:none;position:fixed;z-index:9000;width:310px;
+         background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
+         padding:13px;box-shadow:0 12px 40px rgba(0,0,0,0.7);pointer-events:none;"></div>`;
 
   buildFleetFilterBar('fleet-filter-bar-gantt','renderGantt');
   await renderGantt();
+  initGanttDrag();
 }
 
+/* ---- Drag to scroll ---- */
+let _ganttDrag={active:false,startX:0,startY:0,scrollLeft:0,scrollTop:0};
+function initGanttDrag(){
+  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
+  // Enable overflow for actual scrolling but hide scrollbar visually
+  wrap.style.overflowX='auto';wrap.style.overflowY='auto';
+  wrap.style.scrollbarWidth='thin';
+}
+function ganttDragStart(e){
+  if(e.button!==0)return;
+  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
+  _ganttDrag={active:true,startX:e.clientX,startY:e.clientY,
+    scrollLeft:wrap.scrollLeft,scrollTop:wrap.scrollTop};
+  wrap.style.cursor='grabbing';
+  e.preventDefault();
+}
+function ganttDragMove(e){
+  if(!_ganttDrag.active)return;
+  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
+  const dx=e.clientX-_ganttDrag.startX;
+  const dy=e.clientY-_ganttDrag.startY;
+  wrap.scrollLeft=_ganttDrag.scrollLeft-dx;
+  wrap.scrollTop=_ganttDrag.scrollTop-dy;
+}
+function ganttDragEnd(e){
+  _ganttDrag.active=false;
+  const wrap=document.getElementById('gantt-wrap');
+  if(wrap)wrap.style.cursor='grab';
+}
 function ganttScrollToToday(){
   const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
   const DAY_PX=14;
   const rangeEl=document.getElementById('gantt-range');
   const totalDays=parseInt(rangeEl?.value||90);
   const pastDays=Math.floor(totalDays*0.33);
-  const CAR_COL=220;
-  const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2);
+  const CAR_COL=230;
+  const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2)+100;
   wrap.scrollTo({left:Math.max(0,todayPx),behavior:'smooth'});
 }
 
 async function renderGantt(){
   const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
   wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
+  window._ganttData={};
+
   try{
-    // Fetch bookings
-    const snap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(600).get();
+    const snap=await db.collection('bookings').limit(600).get();
     const bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    // Build a lookup of all car IDs from bookings to understand what format they use
+    const bookingCarIds=new Set(bookings.map(b=>String(b['كود السيارة']||'').trim()).filter(Boolean));
+
+    // Build fleet lookup - try to match by both ID field and document id
+    const fleetById={};
+    G.fleet.forEach(car=>{
+      const id1=String(car.ID||'').trim();
+      const id2=String(car.id||'').trim();
+      if(id1)fleetById[id1]=car;
+      if(id2)fleetById[id2]=car;
+      // Also try numeric versions
+      if(id1)fleetById[parseInt(id1)||id1]=car;
+    });
 
     const today=new Date();today.setHours(0,0,0,0);
     const rangeEl=document.getElementById('gantt-range');
@@ -2964,41 +2977,37 @@ async function renderGantt(){
     ganttStart.setDate(ganttStart.getDate()-pastDays);
 
     const DAY_PX=14;
-    const CAR_COL=220;
-    const ASSIGN_COL=220;
+    const CAR_COL=230;
+    const ASSIGN_COL=230;
     const ROW_H=38;
     const HEADER_H=46;
     const totalPx=totalDays*DAY_PX;
 
-    // Filter cars
+    // ALL fleet cars that match filter - no limit
     const cars=G.fleet.filter(c=>carMatchesFilter(c));
 
-    // ---- BUILD DATE HEADER HTML ----
-    let headerDayHTML='';
-    let headerMonthHTML='';
+    // Build date header
+    let headerMonthHTML='',headerDayHTML='';
     let prevMonth=-1;
     for(let i=0;i<totalDays;i++){
       const d=new Date(ganttStart);d.setDate(d.getDate()+i);
       const isToday=d.toDateString()===today.toDateString();
-      const isWeekend=d.getDay()===0||d.getDay()===6;
-      // Month label
       if(d.getMonth()!==prevMonth){
         prevMonth=d.getMonth();
         const mLabel=d.toLocaleString('en-GB',{month:'short',year:'2-digit'});
-        headerMonthHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;height:20px;
-          padding:2px 5px;font-size:10px;font-weight:800;color:var(--accent);
-          white-space:nowrap;border-left:2px solid rgba(59,130,246,0.4);
-          line-height:16px;">${mLabel}</div>`;
+        headerMonthHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
+          height:20px;padding:2px 5px;font-size:10px;font-weight:800;color:var(--accent);
+          white-space:nowrap;border-left:2px solid rgba(59,130,246,0.5);line-height:16px;">
+          ${mLabel}</div>`;
       }
-      // Day label every 7 days
-      if(d.getDate()===1||d.getDate()===7||d.getDate()===14||d.getDate()===21||d.getDate()===28){
-        headerDayHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:20px;height:26px;
-          padding:4px 3px;font-size:9px;color:${isToday?'var(--accent)':'var(--text3)'};
-          font-weight:${isToday?'800':'400'};border-left:1px solid var(--border);">
-          ${d.getDate()}
-        </div>`;
+      if(d.getDate()===1||d.getDate()===7||d.getDate()===14||
+         d.getDate()===21||d.getDate()===28){
+        headerDayHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:20px;
+          height:26px;padding:4px 2px;font-size:9px;
+          color:${isToday?'var(--accent)':'var(--text3)'};
+          font-weight:${isToday?'800':'400'};
+          border-left:1px solid var(--border);">${d.getDate()}</div>`;
       }
-      // Today highlight
       if(isToday){
         headerDayHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
           width:${DAY_PX}px;height:${HEADER_H}px;
@@ -3007,23 +3016,36 @@ async function renderGantt(){
       }
     }
 
-    // ---- BUILD CAR ROWS HTML ----
+    // Build car rows
     let rowsHTML='';
+    const statusColors={
+      available:'#22c55e',rented:'#3b82f6',
+      accident:'#ef4444',maintenance:'#f59e0b',archived:'#64748b'
+    };
+
     cars.forEach((car,ci)=>{
-      const carId=String(car.ID||car.id);
-      const carLabel=getCarLabel(car,'en');
-      const carOrders=bookings.filter(b=>String(b['كود السيارة'])===carId);
+      // Try multiple ways to match car ID
+      const carIdRaw=car.ID||car.id||'';
+      const carIdStr=String(carIdRaw).trim();
+
+      // Find bookings for this car - try multiple matching strategies
+      const carOrders=bookings.filter(b=>{
+        const bCarId=String(b['كود السيارة']||'').trim();
+        return bCarId===carIdStr||
+               bCarId===String(parseInt(carIdStr)||carIdStr)||
+               carIdStr===String(parseInt(bCarId)||bCarId);
+      });
+
       carOrders.sort((a,b)=>{
         const{start:as}=getOrderDates(a);
         const{start:bs}=getOrderDates(b);
         return(as||new Date(0))-(bs||new Date(0));
       });
 
-      // Chain orders into rows - non-overlapping same row
+      // Chain into rows
       const rows=[];
       carOrders.forEach(order=>{
-        const{start,end}=getOrderDates(order);
-        if(!start)return;
+        const{start,end}=getOrderDates(order);if(!start)return;
         const effectiveEnd=end?new Date(Math.max(end.getTime(),today.getTime())):today;
         let placed=false;
         for(let r=0;r<rows.length;r++){
@@ -3036,65 +3058,66 @@ async function renderGantt(){
 
       const numRows=Math.max(1,rows.length);
       const rowBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.015)';
+      const catStatus=getCarStatusCategory(car);
+      const dotColor=statusColors[catStatus]||'var(--text3)';
+      const carLabel=getCarLabel(car,'en');
+      // Show car ID + plate for easy identification
+      const carIdDisplay=car.ID||car.id||'-';
+      const plateDisplay=car.plate||formatPlate(car);
 
-      // Car label cell
-      const carStatusCat=getCarStatusCategory(car);
-      const carStatusColors={available:'var(--success)',rented:'var(--accent)',
-        accident:'var(--danger)',maintenance:'var(--warning)',archived:'var(--text3)'};
-
-      rowsHTML+=`<div style="display:flex;background:${rowBg};border-bottom:1px solid var(--border);">
-        <!-- Car label - sticky left -->
-        <div style="position:sticky;left:0;z-index:15;background:${rowBg};
-                    width:${CAR_COL}px;min-width:${CAR_COL}px;
-                    height:${numRows*ROW_H}px;
-                    padding:0 10px;border-right:1px solid var(--border2);
-                    display:flex;align-items:center;
-                    border-bottom:1px solid var(--border);">
-          <div style="overflow:hidden;width:100%;">
-            <div style="font-size:11px;font-weight:700;white-space:nowrap;
-                        overflow:hidden;text-overflow:ellipsis;
-                        max-width:${CAR_COL-20}px;"
-                 title="${carLabel}">${carLabel}</div>
-            <div style="margin-top:2px;">
-              <span style="display:inline-flex;align-items:center;gap:3px;
-                           font-size:9px;font-weight:700;
-                           color:${carStatusColors[carStatusCat]||'var(--text3)'};">
+      rowsHTML+=`
+        <div style="display:flex;background:${rowBg};border-bottom:1px solid var(--border);">
+          <!-- Car label - sticky left - clickable -->
+          <div style="position:sticky;left:0;z-index:15;background:${rowBg};
+                      width:${CAR_COL}px;min-width:${CAR_COL}px;
+                      height:${numRows*ROW_H}px;padding:0 10px;
+                      border-right:1px solid var(--border2);
+                      display:flex;align-items:center;cursor:pointer;"
+               onclick="openCarDetailModal('${carIdStr}')"
+               onmouseover="this.style.background='var(--glass2)'"
+               onmouseout="this.style.background='${rowBg}'">
+            <div style="overflow:hidden;width:100%;">
+              <div style="font-size:11px;font-weight:700;white-space:nowrap;
+                          overflow:hidden;text-overflow:ellipsis;"
+                   title="${carLabel}">${carLabel}</div>
+              <div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap;">
                 <span style="width:6px;height:6px;border-radius:50%;
-                             background:${carStatusColors[carStatusCat]||'var(--text3)'};">
-                </span>
-                ${carStatusCat}
-              </span>
+                             background:${dotColor};flex-shrink:0;"></span>
+                <span style="font-size:9px;color:${dotColor};font-weight:700;">${catStatus}</span>
+                <span style="font-size:9px;color:var(--text3);">| #${carIdDisplay}</span>
+              </div>
+              <div style="font-size:9px;color:var(--text3);margin-top:1px;
+                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${plateDisplay}
+                ${carOrders.length>0?`<span style="color:var(--accent);margin-left:5px;">
+                  ${carOrders.length} order${carOrders.length!==1?'s':''}</span>`:''}
+              </div>
             </div>
           </div>
-        </div>
-        <!-- Timeline rows for this car -->
-        <div style="flex:1;display:flex;flex-direction:column;">`;
+          <!-- Timeline rows -->
+          <div style="flex:1;display:flex;flex-direction:column;">`;
+
+      const todayPxBase=Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX);
 
       if(rows.length===0){
-        // Car with no orders - just empty row with today line
-        const todayPx=Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX);
-        rowsHTML+=`<div style="position:relative;width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
-          <div style="position:absolute;left:${todayPx}px;top:0;bottom:0;width:2px;
-                      background:rgba(59,130,246,0.5);z-index:2;pointer-events:none;"></div>
-        </div>`;
+        rowsHTML+=`
+          <div style="position:relative;width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
+            <div style="position:absolute;left:${todayPxBase}px;top:0;bottom:0;
+                        width:2px;background:rgba(59,130,246,0.5);z-index:2;pointer-events:none;">
+            </div>
+          </div>`;
       }else{
         rows.forEach((row,ri)=>{
-          const todayPx=Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX);
-          let barsHTML=`<div style="position:absolute;left:${todayPx}px;top:0;bottom:0;width:2px;
-                            background:rgba(59,130,246,0.5);z-index:4;pointer-events:none;"></div>`;
+          let barsHTML=`
+            <div style="position:absolute;left:${todayPxBase}px;top:0;bottom:0;width:2px;
+                        background:rgba(59,130,246,0.5);z-index:4;pointer-events:none;"></div>`;
 
-          // Grid stripes
+          // Weekend stripes
           for(let i=0;i<totalDays;i++){
             const d=new Date(ganttStart);d.setDate(d.getDate()+i);
-            const isToday=d.toDateString()===today.toDateString();
-            const isWeekend=d.getDay()===0||d.getDay()===6;
-            if(isToday){
-              barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
-                bottom:0;width:${DAY_PX}px;background:rgba(59,130,246,0.07);
-                pointer-events:none;z-index:0;"></div>`;
-            }else if(isWeekend){
-              barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
-                bottom:0;width:${DAY_PX}px;background:rgba(255,255,255,0.012);
+            if(d.getDay()===0||d.getDay()===6){
+              barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;bottom:0;
+                width:${DAY_PX}px;background:rgba(255,255,255,0.012);
                 pointer-events:none;z-index:0;"></div>`;
             }
           }
@@ -3116,103 +3139,80 @@ async function renderGantt(){
             const latePenalty=lateDays*daily;
             const debt=isClosed?0:Math.max(0,total+latePenalty-paid);
 
-            // Pixel positions
             const startDay=Math.floor((start-ganttStart)/86400000);
-            const startPx=Math.max(0,startDay*DAY_PX);
-            const baseEndDate=end||start;
+            const startPx=Math.max(-DAY_PX,startDay*DAY_PX);
+            const baseEndDate=end||new Date(start.getTime()+86400000);
             const baseEndDay=Math.floor((baseEndDate-ganttStart)/86400000);
-            const baseEndPx=Math.min(totalPx,baseEndDay*DAY_PX);
-            const tailEndPx=Math.min(totalPx,todayPx+DAY_PX);
-            const barW=Math.max(4,baseEndPx-startPx);
+            const baseEndPx=Math.min(totalPx+DAY_PX,baseEndDay*DAY_PX);
+            const tailEndPx=Math.min(totalPx,todayPxBase+DAY_PX);
+            const barW=Math.max(4,baseEndPx-Math.max(0,startPx));
             const tailW=(isOverdue||isAccident)&&!isClosed?
                         Math.max(0,tailEndPx-baseEndPx):0;
-            const barTop=4;const barH=ROW_H-8;
 
-            // Determine if bar is visible in timeline
-            if(startPx>totalPx||baseEndPx<0)return;
+            // Skip if completely outside visible range
+            if(baseEndPx<0||startPx>totalPx)return;
 
-            // Bar colors
-            let barBg,tailBg=null;
+            let barBg='#3b82f6';
+            let tailBg=null;
             if(isClosed)barBg='#475569';
-            else if(isAccident)barBg='#ef4444';
-            else if(isOverdue)barBg='#ef4444';
+            else if(isAccident){barBg='#ef4444';tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';}
+            else if(isOverdue){barBg='#ef4444';tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 4px,rgba(0,0,0,0.6) 4px,rgba(0,0,0,0.6) 8px)';}
             else if(isFuture)barBg='transparent';
-            else barBg='#3b82f6';
 
-            if(isAccident&&!isClosed)
-              tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';
-            else if(isOverdue&&!isClosed)
-              tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.75),rgba(239,68,68,0.75) 4px,rgba(0,0,0,0.65) 4px,rgba(0,0,0,0.65) 8px)';
+            const barTop=4;const barH=ROW_H-8;
+            const clampedStartPx=Math.max(0,startPx);
 
-            // Build tooltip data as JSON safely embedded in data attribute
-            const tooltipData={
-              id:order.id,
-              no:order['No.']||order.id,
-              client:order['اسم العميل']||'-',
-              clientId:order['كود العميل']||'-',
-              car:carLabel,
-              start:start?fmtDate(start):'N/A',
-              end:end?fmtDate(end):'N/A',
+            // Store tooltip data
+            const tipKey='g_'+order.id.replace(/[^a-zA-Z0-9]/g,'_');
+            window._ganttData[tipKey]={
+              id:order.id,no:order['No.']||order.id,
+              client:order['اسم العميل']||'-',clientId:order['كود العميل']||'-',
+              car:carLabel,start:fmtDate(start),end:end?fmtDate(end):'N/A',
               total,paid,daily,debt,lateDays,latePenalty,
-              status:statusRaw,
-              isAccident,isOverdue,isClosed,isFuture,
+              status:statusRaw,isAccident,isOverdue,isClosed,isFuture,
               deposit:order['الوديعة المعلقة لدينا']||'£0.00',
               insurance:order['نوع التأمين']||'-',
               pickup:order['مكان الاستلام']||'-',
               dropoff:order['مكان التسليم']||'-',
               branch:order['فرع الإصدار']||'-'
             };
-            // Store data in a safe attribute - no quotes in JSON values that could break HTML
-            const safeId='tt-'+order.id.replace(/[^a-zA-Z0-9]/g,'');
-            window._ganttData=window._ganttData||{};
-            window._ganttData[safeId]=tooltipData;
 
-            const barStyle=`position:absolute;left:${startPx}px;top:${barTop}px;
-              width:${barW}px;height:${barH}px;z-index:3;cursor:pointer;
-              border-radius:${tailW>0?'4px 0 0 4px':'4px'};
-              box-shadow:0 2px 6px rgba(0,0,0,0.35);
-              transition:filter 0.15s,transform 0.15s;`;
+            const barEvents=`onmouseenter="showGanttTip(event,'${tipKey}')"
+              onmouseleave="hideGanttTip()"
+              onmouseover="this.style.filter='brightness(1.4)'"
+              onmouseout="this.style.filter=''"
+              onclick="event.stopPropagation();closeGanttTip();openOrderDetail('${order.id}')"`;
 
             if(isFuture&&barW>0){
-              barsHTML+=`<div style="${barStyle}border:2px dashed #3b82f6;
-                background:rgba(59,130,246,0.1);"
-                onmouseenter="showGanttTip(event,'${safeId}')"
-                onmouseleave="hideGanttTip()"
-                onmouseover="this.style.filter='brightness(1.3)';this.style.transform='scaleY(1.05)'"
-                onclick="closeGanttTip();openOrderDetail('${order.id}')">
-                <div style="padding:1px 4px;font-size:9px;font-weight:700;
-                            color:var(--accent);white-space:nowrap;overflow:hidden;
-                            text-overflow:ellipsis;line-height:${barH}px;">
-                  ${order['اسم العميل']||''}
-                </div>
+              barsHTML+=`<div style="position:absolute;left:${clampedStartPx}px;top:${barTop}px;
+                width:${barW}px;height:${barH}px;z-index:3;cursor:pointer;
+                border:2px dashed #3b82f6;border-radius:4px;
+                background:rgba(59,130,246,0.1);" ${barEvents}>
+                <div style="padding:1px 4px;font-size:9px;font-weight:700;color:var(--accent);
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                            line-height:${barH}px;">${order['اسم العميل']||''}</div>
               </div>`;
             }else if(barW>0){
-              barsHTML+=`<div style="${barStyle}background:${barBg};"
-                onmouseenter="showGanttTip(event,'${safeId}')"
-                onmouseleave="hideGanttTip()"
-                onmouseover="this.style.filter='brightness(1.3)';this.style.transform='scaleY(1.1)'"
-                onmouseout="this.style.filter='';this.style.transform=''"
-                onclick="closeGanttTip();openOrderDetail('${order.id}')">
+              barsHTML+=`<div style="position:absolute;left:${clampedStartPx}px;top:${barTop}px;
+                width:${barW}px;height:${barH}px;z-index:3;cursor:pointer;
+                background:${barBg};
+                border-radius:${tailW>0?'4px 0 0 4px':'4px'};
+                box-shadow:0 2px 6px rgba(0,0,0,0.35);
+                transition:filter 0.12s;" ${barEvents}>
                 <div style="padding:1px 4px;font-size:9px;font-weight:700;color:#fff;
                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                            line-height:${barH}px;">
-                  ${order['اسم العميل']||''}
-                </div>
+                            line-height:${barH}px;">${order['اسم العميل']||''}</div>
               </div>`;
               if(tailW>0&&tailBg){
                 barsHTML+=`<div style="position:absolute;left:${baseEndPx}px;top:${barTop}px;
                   width:${tailW}px;height:${barH}px;z-index:3;cursor:pointer;
-                  border-radius:0 4px 4px 0;background:${tailBg};
-                  box-shadow:0 2px 6px rgba(0,0,0,0.35);"
-                  onmouseenter="showGanttTip(event,'${safeId}')"
-                  onmouseleave="hideGanttTip()"
-                  onclick="closeGanttTip();openOrderDetail('${order.id}')">
-                </div>`;
+                  background:${tailBg};border-radius:0 4px 4px 0;
+                  box-shadow:0 2px 6px rgba(0,0,0,0.35);" ${barEvents}></div>`;
               }
             }
-          });// end row.orders
+          });// end orders
 
-          // Assignment info for this row
+          // Assignment info
           const lastOrd=row.orders[row.orders.length-1];
           let aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
           if(lastOrd){
@@ -3231,7 +3231,7 @@ async function renderGantt(){
               const ld=le?Math.max(0,Math.ceil((today-le)/86400000)):0;
               const ldbt=Math.max(0,lt+(ld*lday)-lp);
               aHTML=`<div style="font-size:10px;color:var(--orange);font-weight:700;">🚨 ACCIDENT</div>
-                     <div style="font-size:9px;color:var(--text3);">${lastOrd['اسم العميل']||'-'}</div>
+                     <div style="font-size:9px;color:var(--text2);">${lastOrd['اسم العميل']||'-'}</div>
                      <div style="font-size:9px;color:var(--danger);">Debt: ${fmtMoney(ldbt)}</div>`;
             }else if(lov){
               const ld=le?Math.max(0,Math.ceil((today-le)/86400000)):0;
@@ -3239,57 +3239,54 @@ async function renderGantt(){
               aHTML=`<div style="font-size:10px;color:var(--danger);font-weight:700;">
                        ⚠️ ${lastOrd['اسم العميل']||'-'}
                      </div>
-                     <div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div>
-                     <div style="font-size:9px;color:var(--danger);">OVERDUE ${ld}d • ${fmtMoney(ldbt)}</div>`;
+                     <div style="font-size:9px;color:var(--text3);">OVERDUE ${ld}d</div>
+                     <div style="font-size:9px;color:var(--danger);">${fmtMoney(ldbt)}</div>`;
             }else{
               aHTML=`<div style="font-size:10px;font-weight:700;">${lastOrd['اسم العميل']||'-'}</div>
-                     <div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div>
-                     <div style="font-size:9px;color:var(--success);">Ends: ${le?fmtDateShort(le):'N/A'}</div>`;
+                     <div style="font-size:9px;color:var(--text3);">
+                       Ends: ${le?fmtDateShort(le):'N/A'}
+                     </div>`;
             }
           }
 
-          rowsHTML+=`<div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.04);">
-            <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;
-                        height:${ROW_H}px;flex-shrink:0;overflow:hidden;">
-              ${barsHTML}
-            </div>
-            <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;
-                        height:${ROW_H}px;padding:4px 10px;
-                        background:var(--surface2);border-left:1px solid var(--border2);
-                        display:flex;flex-direction:column;justify-content:center;z-index:5;">
-              ${aHTML}
-            </div>
-          </div>`;
+          rowsHTML+=`
+            <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.03);">
+              <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;
+                          height:${ROW_H}px;flex-shrink:0;overflow:hidden;">
+                ${barsHTML}
+              </div>
+              <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;
+                          height:${ROW_H}px;padding:4px 10px;
+                          background:var(--surface2);border-left:1px solid var(--border2);
+                          display:flex;flex-direction:column;justify-content:center;z-index:5;">
+                ${aHTML}
+              </div>
+            </div>`;
         });// end rows forEach
       }
 
-      rowsHTML+=`</div></div>`; // close timeline div + flex div
+      rowsHTML+=`</div></div>`; // close inner divs
     });// end cars forEach
 
-    // ---- ASSEMBLE FULL GANTT ----
+    // Assemble
     wrap.innerHTML=`
-      <div style="min-width:${CAR_COL+totalPx+ASSIGN_COL}px;position:relative;">
-        <!-- Sticky header row -->
+      <div id="gantt-inner" style="min-width:${CAR_COL+totalPx+ASSIGN_COL}px;">
+        <!-- Header -->
         <div style="display:flex;position:sticky;top:0;z-index:20;
                     background:var(--surface3);border-bottom:2px solid var(--border2);">
-          <!-- Car column header -->
           <div style="position:sticky;left:0;z-index:22;background:var(--surface3);
                       width:${CAR_COL}px;min-width:${CAR_COL}px;height:${HEADER_H}px;
                       display:flex;align-items:center;padding:0 12px;
                       border-right:1px solid var(--border2);">
             <span style="font-size:10px;font-weight:800;color:var(--text3);
                          text-transform:uppercase;letter-spacing:0.1em;">
-              Vehicle (${cars.length})
+              Vehicle (${cars.length}) — Click for details
             </span>
           </div>
-          <!-- Date header -->
           <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;
-                      height:${HEADER_H}px;flex-shrink:0;overflow:hidden;
-                      background:var(--surface3);">
-            ${headerMonthHTML}
-            ${headerDayHTML}
+                      height:${HEADER_H}px;flex-shrink:0;overflow:hidden;">
+            ${headerMonthHTML}${headerDayHTML}
           </div>
-          <!-- Assignment header -->
           <div style="position:sticky;right:0;z-index:22;background:var(--surface3);
                       width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${HEADER_H}px;
                       display:flex;align-items:center;padding:0 12px;
@@ -3298,109 +3295,266 @@ async function renderGantt(){
                          text-transform:uppercase;letter-spacing:0.1em;">Assignment</span>
           </div>
         </div>
-        <!-- Car rows -->
-        ${rowsHTML}
-        ${cars.length===0?`<div class="empty-state" style="padding:40px;">
+        <!-- Rows -->
+        ${rowsHTML||`<div class="empty-state" style="padding:40px;">
           <div class="es-icon">🚗</div>
-          <p>No cars match your current filters</p>
-        </div>`:''}
+          <p>No cars match your current filters. Try enabling Archived or adjusting branch filter.</p>
+        </div>`}
       </div>`;
 
-    // Scroll to today after render
-    setTimeout(()=>ganttScrollToToday(),150);
+    // Scroll to today
+    setTimeout(()=>ganttScrollToToday(),200);
+
+    // If no order bars appeared, log diagnostic
+    if(bookings.length>0&&cars.length>0){
+      const matchCount=cars.reduce((sum,car)=>{
+        const cid=String(car.ID||car.id||'').trim();
+        return sum+bookings.filter(b=>String(b['كود السيارة']||'').trim()===cid).length;
+      },0);
+      if(matchCount===0){
+        console.warn('GANTT: 0 orders matched to cars. Booking car IDs sample:',
+          [...bookingCarIds].slice(0,5),
+          'Fleet IDs sample:',G.fleet.slice(0,5).map(c=>({ID:c.ID,id:c.id})));
+      }else{
+        console.log(`GANTT: ${matchCount} orders matched across ${cars.length} cars`);
+      }
+    }
 
   }catch(e){
     if(wrap)wrap.innerHTML=`<div class="empty-state">
       <div class="es-icon">⚠️</div>
-      <p>Failed to load Gantt: ${e.message}</p>
+      <p>Gantt error: ${e.message}</p>
     </div>`;
-    console.warn('Gantt error:',e.message,e);
+    console.warn('Gantt error:',e);
   }
 }
 
-/* ---- Tooltip functions ---- */
-function showGanttTip(e,safeId){
-  const d=window._ganttData?.[safeId];if(!d)return;
-  const tooltip=document.getElementById('gantt-tooltip');if(!tooltip)return;
-
-  let statusBadge='';
-  if(d.isAccident)
-    statusBadge=`<span style="background:var(--orange);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚨 ACCIDENT</span>`;
-  else if(d.isOverdue)
-    statusBadge=`<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">⚠️ OVERDUE</span>`;
-  else if(d.isClosed)
-    statusBadge=`<span style="background:var(--text3);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">✅ CLOSED</span>`;
-  else if(d.isFuture)
-    statusBadge=`<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">📅 UPCOMING</span>`;
-  else
-    statusBadge=`<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚗 ACTIVE</span>`;
-
-  tooltip.innerHTML=`
+/* ---- Tooltip ---- */
+function showGanttTip(e,tipKey){
+  const d=window._ganttData?.[tipKey];if(!d)return;
+  const t=document.getElementById('gantt-tooltip');if(!t)return;
+  let badge='';
+  if(d.isAccident)badge=`<span style="background:var(--orange);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚨 ACCIDENT</span>`;
+  else if(d.isOverdue)badge=`<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">⚠️ OVERDUE</span>`;
+  else if(d.isClosed)badge=`<span style="background:#475569;color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">✅ CLOSED</span>`;
+  else if(d.isFuture)badge=`<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">📅 UPCOMING</span>`;
+  else badge=`<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚗 ACTIVE</span>`;
+  t.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-      ${statusBadge}
+      ${badge}
       <span style="font-size:10px;font-weight:800;color:var(--accent);">Order #${d.no}</span>
     </div>
     <div style="font-size:13px;font-weight:800;margin-bottom:2px;">${d.client}</div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:9px;">(CRM ID: ${d.clientId})</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:9px;">CRM ID: ${d.clientId}</div>
     <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:9px;">
       <span style="color:var(--text3);">Branch:</span><span style="font-weight:600;">${d.branch}</span>
       <span style="color:var(--text3);">Pickup:</span><span>${d.pickup}</span>
       <span style="color:var(--text3);">Dropoff:</span><span>${d.dropoff}</span>
       <span style="color:var(--text3);">Start:</span><span>${d.start}</span>
       <span style="color:var(--text3);">End:</span><span>${d.end}</span>
-      <span style="color:var(--text3);">Insurance:</span><span>${d.insurance}</span>
     </div>
     <div style="background:${d.debt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)'};
                 border:1px solid ${d.debt>0?'rgba(239,68,68,0.3)':'rgba(34,197,94,0.3)'};
                 border-radius:8px;padding:9px;font-size:11px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-        <span style="color:var(--text3);">Base Value:</span>
+        <span style="color:var(--text3);">Base:</span>
         <span style="font-weight:700;">${fmtMoney(d.total)}</span>
       </div>
-      ${d.latePenalty>0?`
-      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-        <span style="color:var(--danger);">+ Penalty (${d.lateDays}d):</span>
-        <span style="font-weight:700;color:var(--danger);">${fmtMoney(d.latePenalty)}</span>
+      ${d.latePenalty>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="color:var(--danger);">+Penalty (${d.lateDays}d):</span>
+        <span style="color:var(--danger);font-weight:700;">${fmtMoney(d.latePenalty)}</span>
       </div>`:''}
       <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
         <span style="color:var(--text3);">Paid:</span>
-        <span style="font-weight:700;color:var(--success);">${fmtMoney(d.paid)}</span>
+        <span style="color:var(--success);font-weight:700;">${fmtMoney(d.paid)}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;
-                  border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;">
-        <span style="font-weight:800;">Current Debt:</span>
-        <span style="font-weight:900;font-size:13px;
-                     color:${d.debt>0?'var(--danger)':'var(--success)'};">
+      <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;">
+        <span style="font-weight:800;">Debt:</span>
+        <span style="font-weight:900;font-size:13px;color:${d.debt>0?'var(--danger)':'var(--success)'};">
           ${d.debt>0?fmtMoney(d.debt):'✅ CLEAR'}
         </span>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-top:3px;">
-        <span style="color:var(--text3);">Deposit:</span>
-        <span>${d.deposit}</span>
+    </div>
+    <div style="text-align:center;margin-top:7px;font-size:9px;color:var(--text3);">
+      Click bar to open order
+    </div>`;
+  t.style.display='block';
+  const tx=Math.min(e.clientX+14,window.innerWidth-325);
+  const ty=Math.min(e.clientY-10,window.innerHeight-460);
+  t.style.left=Math.max(5,tx)+'px';
+  t.style.top=Math.max(5,ty)+'px';
+}
+function hideGanttTip(){
+  const t=document.getElementById('gantt-tooltip');if(t)t.style.display='none';
+}
+function closeGanttTip(){hideGanttTip();}
+
+/* ---- Car Detail Modal ---- */
+async function openCarDetailModal(carId){
+  const car=G.fleet.find(c=>String(c.ID||c.id)===String(carId));
+  if(!car){toast('Car not found','error');return;}
+  const isPriv=['Admin','Executive'].includes(G.user?.role);
+  const catStatus=getCarStatusCategory(car);
+  const statusColors={available:'var(--success)',rented:'var(--accent)',
+    accident:'var(--danger)',maintenance:'var(--warning)',archived:'var(--text3)'};
+  const dotColor=statusColors[catStatus]||'var(--text3)';
+
+  const html=`
+    <!-- Car Status Banner -->
+    <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;
+                border-radius:9px;margin-bottom:14px;
+                background:${catStatus==='accident'?'rgba(239,68,68,0.1)':
+                             catStatus==='maintenance'?'rgba(245,158,11,0.1)':
+                             catStatus==='available'?'rgba(34,197,94,0.1)':
+                             'rgba(59,130,246,0.1)'};
+                border:1px solid ${dotColor}30;">
+      <div style="width:36px;height:36px;border-radius:50%;background:${dotColor}22;
+                  display:flex;align-items:center;justify-content:center;font-size:18px;">
+        ${catStatus==='accident'?'🚨':catStatus==='maintenance'?'🔧':
+          catStatus==='rented'?'🔵':catStatus==='archived'?'📦':'🟢'}
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:800;">${getCarLabel(car,'en')}</div>
+        <div style="font-size:11px;color:${dotColor};font-weight:700;margin-top:2px;">
+          ${catStatus.toUpperCase()} | ID: ${car.ID||car.id}
+        </div>
       </div>
     </div>
-    <div style="text-align:center;margin-top:8px;font-size:9px;color:var(--text3);">
-      Click bar to open order details
+    <!-- Car Details Grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px;">
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:9px;">🚗 Vehicle Info</div>
+        <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;">
+          <span style="color:var(--text3);">Model:</span><span style="font-weight:700;">${car.model||car.Type||'-'}</span>
+          <span style="color:var(--text3);">Year:</span><span>${car.year||car['سنة الصنع']||'-'}</span>
+          <span style="color:var(--text3);">Color:</span><span>${car.Color||car['اللون']||'-'}</span>
+          <span style="color:var(--text3);">Plate:</span><span style="font-weight:700;">${car.plate||formatPlate(car)}</span>
+          <span style="color:var(--text3);">Seats:</span><span>${car['Seat_No']||car['عدد المقاعد']||'-'}</span>
+          <span style="color:var(--text3);">Trans.:</span><span>${car['Transm. Type']||car['نوع ناقل الحركة']||'-'}</span>
+          <span style="color:var(--text3);">A/C:</span><span>${car.AC||car['مكيف هواء']||'-'}</span>
+          <span style="color:var(--text3);">KM:</span><span>${car['كيلومتر تعاقد']||'-'}</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:9px;">📋 Contract Info</div>
+        <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;">
+          <span style="color:var(--text3);">Status:</span>
+          <span style="font-weight:700;color:${dotColor};">${car.Contract||car['حاله التعاقد']||'-'}</span>
+          <span style="color:var(--text3);">Start:</span><span>${fmtDateShort(parseDBDate(car['بداية التعاقد']||''))||'-'}</span>
+          <span style="color:var(--text3);">End:</span><span>${fmtDateShort(parseDBDate(car['نهاية التعاقد']||''))||'-'}</span>
+          <span style="color:var(--text3);">Handover:</span><span>${fmtDateShort(parseDBDate(car['تاريخ التسليم']||''))||'-'}</span>
+          <span style="color:var(--text3);">License:</span><span>${fmtDateShort(parseDBDate(car['نهاية الترخيص']||''))||'-'}</span>
+          <span style="color:var(--text3);">Insurance:</span><span>${fmtDateShort(parseDBDate(car['نهاية التأمين']||''))||'-'}</span>
+          <span style="color:var(--text3);">Monthly Fee:</span><span style="font-weight:700;">${fmtMoney(parseAmount(car['monthly_fee']||car['القيمة المالية']||0))}</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:9px;">👤 Owner</div>
+        <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;">
+          <span style="color:var(--text3);">Name:</span>
+          <span style="font-weight:700;">${((car['الاسم الأول']||'')+' '+(car['الاسم الأخير']||'')).trim()||'-'}</span>
+          <span style="color:var(--text3);">Phone:</span><span>${car['رقم التليفون']||'-'}</span>
+          <span style="color:var(--text3);">National ID:</span><span>${car['الرقم القومي']||'-'}</span>
+          <span style="color:var(--text3);">Bank:</span><span style="font-size:10px;">${car['اسم البنك']||car.Bank||'-'}</span>
+          <span style="color:var(--text3);">Branch:</span><span>${car['اسم الفرع']||car.Branch||'-'}</span>
+          <span style="color:var(--text3);">City:</span><span>${car['المحافظة']||car.City||'-'}</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);
+                    text-transform:uppercase;margin-bottom:9px;">ℹ️ Additional</div>
+        <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;">
+          <span style="color:var(--text3);">GPS:</span><span>${car['GPS Stat.']||car.GPS||'-'}</span>
+          <span style="color:var(--text3);">Insurance Co.:</span><span>${car['Insurance Comp.']||car['شركة التأمين']||'-'}</span>
+          <span style="color:var(--text3);">Chassis:</span><span style="font-size:10px;">${car['رقم الشاسية']||'-'}</span>
+          <span style="color:var(--text3);">Engine:</span><span>${car['رقم الموتور']||'-'}</span>
+          <span style="color:var(--text3);">Region:</span><span>${car.Region||car['المنطقة']||'-'}</span>
+          <span style="color:var(--text3);">Notes:</span><span style="font-size:10px;">${car.Notes||'-'}</span>
+        </div>
+      </div>
+    </div>
+    <!-- Action Buttons -->
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="closeModal();showPage('vehicle-360');setTimeout(()=>{const s=document.getElementById('v360-car-select');if(s){s.value='${car.ID||car.id}';loadVehicle360Details();}},300)">
+        🔭 View Vehicle 360
+      </button>
+      ${isPriv?`
+      <button class="btn btn-warning" onclick="openCarEditModal('${car.ID||car.id}')">
+        ✏️ Edit Car Status
+      </button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal()">Close</button>
     </div>`;
 
-  tooltip.style.display='block';
-  tooltip.style.opacity='1';
-
-  // Smart position - avoid going off screen
-  const tx=Math.min(e.clientX+14,window.innerWidth-325);
-  const ty=Math.min(e.clientY-10,window.innerHeight-450);
-  tooltip.style.left=Math.max(5,tx)+'px';
-  tooltip.style.top=Math.max(5,ty)+'px';
+  openModal(`🚗 ${getCarLabel(car,'en')}`,html,true);
+  await logAction('VIEW','Fleet Radar',`Viewed car details: ${getCarLabel(car,'en')}`);
 }
 
-function hideGanttTip(){
-  const t=document.getElementById('gantt-tooltip');
-  if(t)t.style.display='none';
+/* ---- Car Edit Modal ---- */
+async function openCarEditModal(carId){
+  const car=G.fleet.find(c=>String(c.ID||c.id)===String(carId));if(!car)return;
+  closeModal();
+  const html=`
+    <p style="font-size:11px;color:var(--text3);margin-bottom:13px;">
+      Editing: <strong>${getCarLabel(car,'en')}</strong>
+    </p>
+    <div class="form-grid">
+      <div class="field"><label>Contract Status</label>
+        <select id="ce-contract">
+          <option value="Valid" ${(car.Contract||'')==='Valid'?'selected':''}>Valid</option>
+          <option value="Maintenance" ${(car.Contract||'')==='Maintenance'?'selected':''}>Maintenance</option>
+          <option value="Accident" ${(car.Contract||'')==='Accident'?'selected':''}>Accident</option>
+          <option value="Finished" ${(car.Contract||'')==='Finished'?'selected':''}>Finished</option>
+        </select></div>
+      <div class="field"><label>Availability Status</label>
+        <select id="ce-status">
+          <option value="available" ${(car.status||'')==='available'?'selected':''}>Available</option>
+          <option value="rented" ${(car.status||'')==='rented'?'selected':''}>Rented</option>
+          <option value="maintenance" ${(car.status||'')==='maintenance'?'selected':''}>Maintenance</option>
+          <option value="accident" ${(car.status||'')==='accident'?'selected':''}>Accident</option>
+          <option value="out_of_service" ${(car.status||'')==='out_of_service'?'selected':''}>Out of Service</option>
+        </select></div>
+      <div class="field"><label>Current KM</label>
+        <input type="number" id="ce-km" value="${car['كيلومتر تعاقد']||''}"/></div>
+      <div class="field"><label>GPS Status</label>
+        <select id="ce-gps">
+          <option value="لا يوجد" ${(car['GPS Stat.']||'')==='لا يوجد'?'selected':''}>No GPS</option>
+          <option value="يعمل" ${(car['GPS Stat.']||'')==='يعمل'?'selected':''}>Working</option>
+          <option value="لا يعمل" ${(car['GPS Stat.']||'')==='لا يعمل'?'selected':''}>Not Working</option>
+        </select></div>
+      <div class="field" style="grid-column:1/-1;"><label>Notes</label>
+        <input type="text" id="ce-notes" value="${car.Notes||car['ملاحظات']||''}"/></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-success" onclick="saveCarEdit('${car.id}')">💾 Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(`✏️ Edit Car — #${car.ID||car.id}`,html);
 }
 
-function closeGanttTip(){
-  hideGanttTip();
+async function saveCarEdit(docId){
+  try{
+    const upd={
+      Contract:document.getElementById('ce-contract')?.value||'Valid',
+      status:document.getElementById('ce-status')?.value||'available',
+      'كيلومتر تعاقد':document.getElementById('ce-km')?.value||'',
+      'GPS Stat.':document.getElementById('ce-gps')?.value||'',
+      Notes:document.getElementById('ce-notes')?.value||'',
+      _sys_updated:Date.now()
+    };
+    await db.collection('fleet').doc(docId).update(upd);
+    // Update local cache
+    const idx=G.fleet.findIndex(c=>c.id===docId);
+    if(idx>-1)G.fleet[idx]={...G.fleet[idx],...upd};
+    await logAction('EDIT','Fleet Radar',`Updated car: ${docId} → ${upd.Contract} / ${upd.status}`);
+    toast('Car updated successfully!','success');
+    closeModal();
+    renderGantt();
+  }catch(e){toast('Update failed: '+e.message,'error');}
 }
+
 
 /* ============================================================
    RISK RADAR
