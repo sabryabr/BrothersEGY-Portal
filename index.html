@@ -2836,11 +2836,15 @@ async function loadFleetRadar(){
   el.innerHTML=`
     <div class="section-header">
       <div><h2>📡 Fleet Radar</h2><p>Real-time Gantt timeline — all cars and bookings</p></div>
-      <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-ghost btn-sm" onclick="loadFleetRadar()">🔄 Refresh</button>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 11px;background:var(--glass);border:1px solid var(--border);border-radius:8px;font-size:11px;">
+        <button class="btn btn-ghost btn-sm" onclick="ganttScrollToToday()" title="Scroll to today">📅 Today</button>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 11px;
+                    background:var(--glass);border:1px solid var(--border);border-radius:8px;font-size:11px;">
           <span style="color:var(--text3);">Timeline:</span>
-          <select id="gantt-range" onchange="renderGantt()" style="background:transparent;border:none;color:var(--text);font-size:11px;font-weight:700;outline:none;cursor:pointer;">
+          <select id="gantt-range" onchange="renderGantt()"
+                  style="background:transparent;border:none;color:var(--text);
+                         font-size:11px;font-weight:700;outline:none;cursor:pointer;">
             <option value="60">60 Days</option>
             <option value="90" selected>90 Days</option>
             <option value="180">180 Days</option>
@@ -2848,17 +2852,21 @@ async function loadFleetRadar(){
         </div>
       </div>
     </div>
+    <!-- Filter Bar -->
     <div id="fleet-filter-bar-gantt"></div>
     <!-- Legend -->
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:9px 13px;
+                background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);">
       <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
         <div style="width:28px;height:10px;border-radius:3px;background:#3b82f6;"></div>Active
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;background:linear-gradient(90deg,#ef4444 60%,rgba(0,0,0,0.5) 60%);background-size:6px 10px;"></div>Overdue
+        <div style="width:28px;height:10px;border-radius:3px;background:#ef4444;"></div>Overdue
+        <div style="width:20px;height:10px;background:repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 3px,rgba(0,0,0,0.6) 3px,rgba(0,0,0,0.6) 6px);border-radius:3px;"></div>Tail
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
-        <div style="width:28px;height:10px;border-radius:3px;background:repeating-linear-gradient(45deg,#f59e0b,#f59e0b 3px,#111 3px,#111 6px);"></div>Accident
+        <div style="width:28px;height:10px;border-radius:3px;background:#ef4444;"></div>Accident
+        <div style="width:20px;height:10px;background:repeating-linear-gradient(45deg,#f59e0b,#f59e0b 3px,#111 3px,#111 6px);border-radius:3px;"></div>Tail
       </div>
       <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;">
         <div style="width:28px;height:10px;border-radius:3px;background:#475569;"></div>Closed
@@ -2867,77 +2875,109 @@ async function loadFleetRadar(){
         <div style="width:28px;height:10px;border-radius:3px;border:2px dashed #3b82f6;"></div>Future
       </div>
     </div>
-    <div id="gantt-wrap" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);">
+    <!-- Gantt Wrap - horizontal scroll -->
+    <div id="gantt-wrap"
+         style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 310px);
+                border:1px solid var(--border);border-radius:var(--radius);
+                background:var(--surface);">
       <div class="empty-state"><div class="spinner lg"></div></div>
     </div>
     <!-- Hover Tooltip -->
-    <div id="gantt-tooltip" style="display:none;position:fixed;z-index:3000;width:300px;
-         background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
-         padding:13px;box-shadow:0 12px 40px rgba(0,0,0,0.6);pointer-events:none;"></div>`;
+    <div id="gantt-tooltip"
+         style="display:none;position:fixed;z-index:9000;width:310px;
+                background:var(--surface);border:1px solid var(--border2);
+                border-radius:var(--radius);padding:13px;
+                box-shadow:0 12px 40px rgba(0,0,0,0.7);pointer-events:none;
+                transition:opacity 0.15s;">
+    </div>`;
 
   buildFleetFilterBar('fleet-filter-bar-gantt','renderGantt');
   await renderGantt();
 }
 
+function ganttScrollToToday(){
+  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
+  const DAY_PX=14;
+  const rangeEl=document.getElementById('gantt-range');
+  const totalDays=parseInt(rangeEl?.value||90);
+  const pastDays=Math.floor(totalDays*0.33);
+  const CAR_COL=220;
+  const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2);
+  wrap.scrollTo({left:Math.max(0,todayPx),behavior:'smooth'});
+}
+
 async function renderGantt(){
   const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
   wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
-
   try{
-    // Load all bookings
-    const snap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(500).get();
+    // Fetch bookings
+    const snap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(600).get();
     const bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
 
     const today=new Date();today.setHours(0,0,0,0);
     const rangeEl=document.getElementById('gantt-range');
     const totalDays=parseInt(rangeEl?.value||90);
     const pastDays=Math.floor(totalDays*0.33);
-    const ganttStart=new Date(today);ganttStart.setDate(ganttStart.getDate()-pastDays);
-    const ganttEnd=new Date(ganttStart);ganttEnd.setDate(ganttEnd.getDate()+totalDays);
+    const ganttStart=new Date(today);
+    ganttStart.setDate(ganttStart.getDate()-pastDays);
 
     const DAY_PX=14;
-    const CAR_COL=200;
-    const ASSIGN_COL=200;
-    const ROW_H=36;
-    const HEADER_H=44;
-
-    // Filter fleet based on current filter state
-    let cars=G.fleet.filter(c=>carMatchesFilter(c));
-
-    // Build date headers
+    const CAR_COL=220;
+    const ASSIGN_COL=220;
+    const ROW_H=38;
+    const HEADER_H=46;
     const totalPx=totalDays*DAY_PX;
-    let headerHTML='';
-    let monthMark=null;
+
+    // Filter cars
+    const cars=G.fleet.filter(c=>carMatchesFilter(c));
+
+    // ---- BUILD DATE HEADER HTML ----
+    let headerDayHTML='';
+    let headerMonthHTML='';
+    let prevMonth=-1;
     for(let i=0;i<totalDays;i++){
       const d=new Date(ganttStart);d.setDate(d.getDate()+i);
       const isToday=d.toDateString()===today.toDateString();
-      if(d.getDate()===1||i===0){
+      const isWeekend=d.getDay()===0||d.getDay()===6;
+      // Month label
+      if(d.getMonth()!==prevMonth){
+        prevMonth=d.getMonth();
         const mLabel=d.toLocaleString('en-GB',{month:'short',year:'2-digit'});
-        headerHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;height:${HEADER_H}px;padding:4px 5px;font-size:10px;font-weight:800;color:var(--accent);white-space:nowrap;border-left:1px solid rgba(59,130,246,0.3);">${mLabel}</div>`;
+        headerMonthHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;height:20px;
+          padding:2px 5px;font-size:10px;font-weight:800;color:var(--accent);
+          white-space:nowrap;border-left:2px solid rgba(59,130,246,0.4);
+          line-height:16px;">${mLabel}</div>`;
       }
-      if(d.getDate()%7===0){
-        headerHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;bottom:0;height:16px;padding:2px 4px;font-size:9px;color:var(--text3);border-left:1px solid var(--border);">${d.getDate()}</div>`;
+      // Day label every 7 days
+      if(d.getDate()===1||d.getDate()===7||d.getDate()===14||d.getDate()===21||d.getDate()===28){
+        headerDayHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:20px;height:26px;
+          padding:4px 3px;font-size:9px;color:${isToday?'var(--accent)':'var(--text3)'};
+          font-weight:${isToday?'800':'400'};border-left:1px solid var(--border);">
+          ${d.getDate()}
+        </div>`;
       }
+      // Today highlight
       if(isToday){
-        headerHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;height:${HEADER_H}px;width:${DAY_PX}px;background:rgba(59,130,246,0.08);border-left:2px solid var(--accent);"></div>`;
+        headerDayHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
+          width:${DAY_PX}px;height:${HEADER_H}px;
+          background:rgba(59,130,246,0.1);
+          border-left:2px solid var(--accent);pointer-events:none;"></div>`;
       }
     }
 
-    // Build car rows
+    // ---- BUILD CAR ROWS HTML ----
     let rowsHTML='';
-    let gridHTML='';
-    let totalRows=0;
-
-    cars.forEach(car=>{
+    cars.forEach((car,ci)=>{
       const carId=String(car.ID||car.id);
       const carLabel=getCarLabel(car,'en');
       const carOrders=bookings.filter(b=>String(b['كود السيارة'])===carId);
       carOrders.sort((a,b)=>{
-        const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);
+        const{start:as}=getOrderDates(a);
+        const{start:bs}=getOrderDates(b);
         return(as||new Date(0))-(bs||new Date(0));
       });
 
-      // Chain orders into rows - non-overlapping on same row
+      // Chain orders into rows - non-overlapping same row
       const rows=[];
       carOrders.forEach(order=>{
         const{start,end}=getOrderDates(order);
@@ -2945,8 +2985,7 @@ async function renderGantt(){
         const effectiveEnd=end?new Date(Math.max(end.getTime(),today.getTime())):today;
         let placed=false;
         for(let r=0;r<rows.length;r++){
-          const rowEnd=rows[r].end;
-          if(!rowEnd||start>=rowEnd){
+          if(!rows[r].end||start>=rows[r].end){
             rows[r].orders.push(order);rows[r].end=effectiveEnd;placed=true;break;
           }
         }
@@ -2954,429 +2993,371 @@ async function renderGantt(){
       });
 
       const numRows=Math.max(1,rows.length);
+      const rowBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.015)';
 
-      // Car label cell (spans all rows for this car)
-      rowsHTML+=`<div style="position:sticky;left:0;z-index:10;background:var(--surface);
-        display:flex;align-items:center;height:${numRows*ROW_H}px;
-        padding:0 10px;border-bottom:1px solid var(--border);
-        border-right:1px solid var(--border2);min-width:${CAR_COL}px;width:${CAR_COL}px;">
-        <div style="overflow:hidden;">
-          <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-20}px;">${carLabel}</div>
-          <div style="font-size:9px;color:var(--text3);margin-top:1px;">
-            <span class="pill pill-${getCarStatusCategory(car)}" style="font-size:8px;padding:1px 5px;">${getCarStatusCategory(car)}</span>
+      // Car label cell
+      const carStatusCat=getCarStatusCategory(car);
+      const carStatusColors={available:'var(--success)',rented:'var(--accent)',
+        accident:'var(--danger)',maintenance:'var(--warning)',archived:'var(--text3)'};
+
+      rowsHTML+=`<div style="display:flex;background:${rowBg};border-bottom:1px solid var(--border);">
+        <!-- Car label - sticky left -->
+        <div style="position:sticky;left:0;z-index:15;background:${rowBg};
+                    width:${CAR_COL}px;min-width:${CAR_COL}px;
+                    height:${numRows*ROW_H}px;
+                    padding:0 10px;border-right:1px solid var(--border2);
+                    display:flex;align-items:center;
+                    border-bottom:1px solid var(--border);">
+          <div style="overflow:hidden;width:100%;">
+            <div style="font-size:11px;font-weight:700;white-space:nowrap;
+                        overflow:hidden;text-overflow:ellipsis;
+                        max-width:${CAR_COL-20}px;"
+                 title="${carLabel}">${carLabel}</div>
+            <div style="margin-top:2px;">
+              <span style="display:inline-flex;align-items:center;gap:3px;
+                           font-size:9px;font-weight:700;
+                           color:${carStatusColors[carStatusCat]||'var(--text3)'};">
+                <span style="width:6px;height:6px;border-radius:50%;
+                             background:${carStatusColors[carStatusCat]||'var(--text3)'};">
+                </span>
+                ${carStatusCat}
+              </span>
+            </div>
           </div>
         </div>
-      </div>`;
-
-      // Gantt bars for each row
-      rows.forEach((row,ri)=>{
-        let barsHTML='';
-
-        // Today line
-        const todayPx=Math.floor((today-ganttStart)/86400000)*DAY_PX;
-        barsHTML+=`<div style="position:absolute;left:${todayPx}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.5);z-index:2;pointer-events:none;"></div>`;
-
-        // Grid background
-        for(let i=0;i<totalDays;i++){
-          const d=new Date(ganttStart);d.setDate(d.getDate()+i);
-          const isToday=d.toDateString()===today.toDateString();
-          const isWeekend=d.getDay()===0||d.getDay()===6;
-          if(isToday){barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;bottom:0;width:${DAY_PX}px;background:rgba(59,130,246,0.06);pointer-events:none;z-index:0;"></div>`;}
-          else if(isWeekend){barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;bottom:0;width:${DAY_PX}px;background:rgba(255,255,255,0.01);pointer-events:none;z-index:0;"></div>`;}
-        }
-
-        row.orders.forEach(order=>{
-          const{start,end}=getOrderDates(order);if(!start)return;
-          const statusRaw=getOrderStatus(order);
-          const isAccident=statusRaw==='Accident';
-          const isClosed=statusRaw==='Closed'||order.closed===true;
-          const isOverdue=!isClosed&&end&&today>end&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
-          const total=parseAmount(order['إجمالي المستحق (Total)']);
-          const paid=parseAmount(order['المدفوع EGP']);
-          const daily=parseAmount(order['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(order.rental_days||1)));
-
-          // Bar start pixel
-          const startPx=Math.max(0,Math.floor((start-ganttStart)/86400000)*DAY_PX);
-          // Bar base end pixel (contract period)
-          const baseEndDate=end||start;
-          const baseEndPx=Math.min(totalPx,Math.floor((baseEndDate-ganttStart)/86400000)*DAY_PX);
-          // Tail end pixel (overdue/accident continues to today)
-          const tailEndPx=Math.min(totalPx,Math.floor((today-ganttStart)/86400000)*DAY_PX+DAY_PX);
-
-          const barW=Math.max(4,baseEndPx-startPx);
-          const tailW=(isOverdue||isAccident)&&!isClosed?Math.max(0,tailEndPx-baseEndPx):0;
-          const barTop=4;const barH=ROW_H-8;
-
-          // Choose bar color
-          let barBg,tailBg;
-          if(isClosed){barBg='#475569';tailBg=null;}
-          else if(isAccident){
-            barBg='#ef4444';
-            tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';
-          }
-          else if(isOverdue){
-            barBg='#ef4444';
-            tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 4px,rgba(0,0,0,0.6) 4px,rgba(0,0,0,0.6) 8px)';
-          }
-          else if(start>today){barBg='transparent';tailBg=null;} // future - dashed handled separately
-          else{barBg='#3b82f6';tailBg=null;}
-
-          const isFuture=start>today&&!isClosed;
-          const orderDataStr=JSON.stringify({
-            id:order.id,no:order['No.']||order.id,
-            client:order['اسم العميل']||'-',
-            clientId:order['كود العميل']||'-',
-            car:carLabel,
-            start:start?fmtDate(start):'N/A',
-            end:end?fmtDate(end):'N/A',
-            total,paid,daily,
-            status:statusRaw,
-            isAccident,isOverdue,isClosed,isFuture,
-            deposit:order['الوديعة المعلقة لدينا']||'£0.00',
-            insurance:order['نوع التأمين']||'-',
-            pickup:order['مكان الاستلام']||'-',
-            dropoff:order['مكان التسليم']||'-',
-            branch:order['فرع الإصدار']||'-'
-          }).replace(/"/g,'&quot;');
-
-          // Main bar
-          if(barW>0&&!isFuture){
-            barsHTML+=`<div 
-              style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;
-                     background:${barBg};border-radius:${tailW>0?'4px 0 0 4px':'4px'};
-                     cursor:pointer;z-index:3;transition:filter 0.15s;overflow:hidden;
-                     box-shadow:0 2px 6px rgba(0,0,0,0.3);"
-              onmouseenter="showGanttTooltip(event,'${orderDataStr}')"
-              onmouseleave="hideGanttTooltip()"
-              onclick="openOrderDetail('${order.id}')">
-              <div style="padding:2px 5px;font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                ${order['اسم العميل']||''}
-              </div>
-            </div>`;
-          }
-          // Future dashed bar
-          if(isFuture&&barW>0){
-            barsHTML+=`<div
-              style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;
-                     border:2px dashed #3b82f6;border-radius:4px;cursor:pointer;z-index:3;
-                     background:rgba(59,130,246,0.08);"
-              onmouseenter="showGanttTooltip(event,'${orderDataStr}')"
-              onmouseleave="hideGanttTooltip()"
-              onclick="openOrderDetail('${order.id}')">
-              <div style="padding:2px 5px;font-size:9px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                ${order['اسم العميل']||''}
-              </div>
-            </div>`;
-          }
-          // Tail bar (overdue/accident)
-          if(tailW>0&&tailBg){
-            barsHTML+=`<div
-              style="position:absolute;left:${baseEndPx}px;top:${barTop}px;width:${tailW}px;height:${barH}px;
-                     background:${tailBg};border-radius:0 4px 4px 0;cursor:pointer;z-index:3;
-                     box-shadow:0 2px 6px rgba(0,0,0,0.3);"
-              onmouseenter="showGanttTooltip(event,'${orderDataStr}')"
-              onmouseleave="hideGanttTooltip()"
-              onclick="openOrderDetail('${order.id}')">
-            </div>`;
-          }
-        });
-
-        // Find latest relevant assignment info
-        const lastOrder=row.orders[row.orders.length-1];
-        let assignHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
-        if(lastOrder){
-          const{end}=getOrderDates(lastOrder);
-          const st=getOrderStatus(lastOrder);
-          const total=parseAmount(lastOrder['إجمالي المستحق (Total)']);
-          const paid=parseAmount(lastOrder['المدفوع EGP']);
-          const isAccident=st==='Accident';
-          const isClosed=st==='Closed'||lastOrder.closed===true;
-          const isOverdue=!isClosed&&end&&today>end&&(st==='Active'||st==='Overdue_Legacy');
-          if(isClosed||(paid>=total&&total>0&&!isAccident)){
-            assignHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
-          }else if(isAccident){
-            const daily=parseAmount(lastOrder['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(lastOrder.rental_days||1)));
-            const lateDays=end?Math.max(0,Math.ceil((today-end)/86400000)):0;
-            const debt=Math.max(0,total+(lateDays*daily)-paid);
-            assignHTML=`<div style="font-size:10px;color:var(--orange);font-weight:700;">🚨 ACCIDENT</div>
-              <div style="font-size:9px;color:var(--text3);">${lastOrder['اسم العميل']||'-'}</div>
-              <div style="font-size:9px;color:var(--danger);">Debt: ${fmtMoney(debt)}</div>`;
-          }else if(isOverdue){
-            const daily=parseAmount(lastOrder['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(lastOrder.rental_days||1)));
-            const lateDays=end?Math.max(0,Math.ceil((today-end)/86400000)):0;
-            const debt=Math.max(0,total+(lateDays*daily)-paid);
-            assignHTML=`<div style="font-size:10px;color:var(--danger);font-weight:700;">⚠️ ${lastOrder['اسم العميل']||'-'}</div>
-              <div style="font-size:9px;color:var(--text3);">ID: ${lastOrder['كود العميل']||'-'}</div>
-              <div style="font-size:9px;color:var(--danger);">OVERDUE ${lateDays}d • ${fmtMoney(debt)}</div>`;
-          }else{
-            assignHTML=`<div style="font-size:10px;font-weight:700;">${lastOrder['اسم العميل']||'-'}</div>
-              <div style="font-size:9px;color:var(--text3);">ID: ${lastOrder['كود العميل']||'-'}</div>
-              <div style="font-size:9px;color:var(--success);">Ends: ${end?fmtDateShort(end):'N/A'}</div>`;
-          }
-        }
-
-        rowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
-          <!-- Timeline row -->
-          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
-            ${barsHTML}
-          </div>
-          <!-- Assignment info -->
-          <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;
-               padding:4px 10px;background:var(--surface2);border-left:1px solid var(--border2);
-               display:flex;align-items:center;z-index:5;">
-            ${assignHTML}
-          </div>
-        </div>`;
-        totalRows++;
-      });
+        <!-- Timeline rows for this car -->
+        <div style="flex:1;display:flex;flex-direction:column;">`;
 
       if(rows.length===0){
-        // Car with no orders
-        rowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
-          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
-            <div style="position:absolute;left:${Math.max(0,(today-ganttStart)/86400000*DAY_PX)}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.4);"></div>
-          </div>
-          <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;padding:4px 10px;background:var(--surface2);border-left:1px solid var(--border2);display:flex;align-items:center;z-index:5;">
-            <span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>
-          </div>
+        // Car with no orders - just empty row with today line
+        const todayPx=Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX);
+        rowsHTML+=`<div style="position:relative;width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">
+          <div style="position:absolute;left:${todayPx}px;top:0;bottom:0;width:2px;
+                      background:rgba(59,130,246,0.5);z-index:2;pointer-events:none;"></div>
         </div>`;
-        totalRows++;
+      }else{
+        rows.forEach((row,ri)=>{
+          const todayPx=Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX);
+          let barsHTML=`<div style="position:absolute;left:${todayPx}px;top:0;bottom:0;width:2px;
+                            background:rgba(59,130,246,0.5);z-index:4;pointer-events:none;"></div>`;
+
+          // Grid stripes
+          for(let i=0;i<totalDays;i++){
+            const d=new Date(ganttStart);d.setDate(d.getDate()+i);
+            const isToday=d.toDateString()===today.toDateString();
+            const isWeekend=d.getDay()===0||d.getDay()===6;
+            if(isToday){
+              barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
+                bottom:0;width:${DAY_PX}px;background:rgba(59,130,246,0.07);
+                pointer-events:none;z-index:0;"></div>`;
+            }else if(isWeekend){
+              barsHTML+=`<div style="position:absolute;left:${i*DAY_PX}px;top:0;
+                bottom:0;width:${DAY_PX}px;background:rgba(255,255,255,0.012);
+                pointer-events:none;z-index:0;"></div>`;
+            }
+          }
+
+          row.orders.forEach(order=>{
+            const{start,end}=getOrderDates(order);if(!start)return;
+            const statusRaw=getOrderStatus(order);
+            const isAccident=statusRaw==='Accident';
+            const isClosed=statusRaw==='Closed'||order.closed===true;
+            const isOverdue=!isClosed&&end&&today>end&&
+                            (statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+            const isFuture=start>today&&!isClosed;
+            const total=parseAmount(order['إجمالي المستحق (Total)']);
+            const paid=parseAmount(order['المدفوع EGP']);
+            const daily=parseAmount(order['سعر السيارة اليومي بالجنيه المصري'])||
+                        (total/Math.max(1,parseFloat(order.rental_days||1)));
+            const lateDays=(isOverdue||isAccident)&&end?
+                           Math.max(0,Math.ceil((today-end)/86400000)):0;
+            const latePenalty=lateDays*daily;
+            const debt=isClosed?0:Math.max(0,total+latePenalty-paid);
+
+            // Pixel positions
+            const startDay=Math.floor((start-ganttStart)/86400000);
+            const startPx=Math.max(0,startDay*DAY_PX);
+            const baseEndDate=end||start;
+            const baseEndDay=Math.floor((baseEndDate-ganttStart)/86400000);
+            const baseEndPx=Math.min(totalPx,baseEndDay*DAY_PX);
+            const tailEndPx=Math.min(totalPx,todayPx+DAY_PX);
+            const barW=Math.max(4,baseEndPx-startPx);
+            const tailW=(isOverdue||isAccident)&&!isClosed?
+                        Math.max(0,tailEndPx-baseEndPx):0;
+            const barTop=4;const barH=ROW_H-8;
+
+            // Determine if bar is visible in timeline
+            if(startPx>totalPx||baseEndPx<0)return;
+
+            // Bar colors
+            let barBg,tailBg=null;
+            if(isClosed)barBg='#475569';
+            else if(isAccident)barBg='#ef4444';
+            else if(isOverdue)barBg='#ef4444';
+            else if(isFuture)barBg='transparent';
+            else barBg='#3b82f6';
+
+            if(isAccident&&!isClosed)
+              tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';
+            else if(isOverdue&&!isClosed)
+              tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.75),rgba(239,68,68,0.75) 4px,rgba(0,0,0,0.65) 4px,rgba(0,0,0,0.65) 8px)';
+
+            // Build tooltip data as JSON safely embedded in data attribute
+            const tooltipData={
+              id:order.id,
+              no:order['No.']||order.id,
+              client:order['اسم العميل']||'-',
+              clientId:order['كود العميل']||'-',
+              car:carLabel,
+              start:start?fmtDate(start):'N/A',
+              end:end?fmtDate(end):'N/A',
+              total,paid,daily,debt,lateDays,latePenalty,
+              status:statusRaw,
+              isAccident,isOverdue,isClosed,isFuture,
+              deposit:order['الوديعة المعلقة لدينا']||'£0.00',
+              insurance:order['نوع التأمين']||'-',
+              pickup:order['مكان الاستلام']||'-',
+              dropoff:order['مكان التسليم']||'-',
+              branch:order['فرع الإصدار']||'-'
+            };
+            // Store data in a safe attribute - no quotes in JSON values that could break HTML
+            const safeId='tt-'+order.id.replace(/[^a-zA-Z0-9]/g,'');
+            window._ganttData=window._ganttData||{};
+            window._ganttData[safeId]=tooltipData;
+
+            const barStyle=`position:absolute;left:${startPx}px;top:${barTop}px;
+              width:${barW}px;height:${barH}px;z-index:3;cursor:pointer;
+              border-radius:${tailW>0?'4px 0 0 4px':'4px'};
+              box-shadow:0 2px 6px rgba(0,0,0,0.35);
+              transition:filter 0.15s,transform 0.15s;`;
+
+            if(isFuture&&barW>0){
+              barsHTML+=`<div style="${barStyle}border:2px dashed #3b82f6;
+                background:rgba(59,130,246,0.1);"
+                onmouseenter="showGanttTip(event,'${safeId}')"
+                onmouseleave="hideGanttTip()"
+                onmouseover="this.style.filter='brightness(1.3)';this.style.transform='scaleY(1.05)'"
+                onclick="closeGanttTip();openOrderDetail('${order.id}')">
+                <div style="padding:1px 4px;font-size:9px;font-weight:700;
+                            color:var(--accent);white-space:nowrap;overflow:hidden;
+                            text-overflow:ellipsis;line-height:${barH}px;">
+                  ${order['اسم العميل']||''}
+                </div>
+              </div>`;
+            }else if(barW>0){
+              barsHTML+=`<div style="${barStyle}background:${barBg};"
+                onmouseenter="showGanttTip(event,'${safeId}')"
+                onmouseleave="hideGanttTip()"
+                onmouseover="this.style.filter='brightness(1.3)';this.style.transform='scaleY(1.1)'"
+                onmouseout="this.style.filter='';this.style.transform=''"
+                onclick="closeGanttTip();openOrderDetail('${order.id}')">
+                <div style="padding:1px 4px;font-size:9px;font-weight:700;color:#fff;
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                            line-height:${barH}px;">
+                  ${order['اسم العميل']||''}
+                </div>
+              </div>`;
+              if(tailW>0&&tailBg){
+                barsHTML+=`<div style="position:absolute;left:${baseEndPx}px;top:${barTop}px;
+                  width:${tailW}px;height:${barH}px;z-index:3;cursor:pointer;
+                  border-radius:0 4px 4px 0;background:${tailBg};
+                  box-shadow:0 2px 6px rgba(0,0,0,0.35);"
+                  onmouseenter="showGanttTip(event,'${safeId}')"
+                  onmouseleave="hideGanttTip()"
+                  onclick="closeGanttTip();openOrderDetail('${order.id}')">
+                </div>`;
+              }
+            }
+          });// end row.orders
+
+          // Assignment info for this row
+          const lastOrd=row.orders[row.orders.length-1];
+          let aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
+          if(lastOrd){
+            const{end:le}=getOrderDates(lastOrd);
+            const lst=getOrderStatus(lastOrd);
+            const lt=parseAmount(lastOrd['إجمالي المستحق (Total)']);
+            const lp=parseAmount(lastOrd['المدفوع EGP']);
+            const lday=parseAmount(lastOrd['سعر السيارة اليومي بالجنيه المصري'])||
+                       (lt/Math.max(1,parseFloat(lastOrd.rental_days||1)));
+            const lac=lst==='Accident';
+            const lcl=lst==='Closed'||lastOrd.closed===true;
+            const lov=!lcl&&le&&today>le&&(lst==='Active'||lst==='Overdue_Legacy');
+            if(lcl||(lp>=lt&&lt>0&&!lac)){
+              aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
+            }else if(lac){
+              const ld=le?Math.max(0,Math.ceil((today-le)/86400000)):0;
+              const ldbt=Math.max(0,lt+(ld*lday)-lp);
+              aHTML=`<div style="font-size:10px;color:var(--orange);font-weight:700;">🚨 ACCIDENT</div>
+                     <div style="font-size:9px;color:var(--text3);">${lastOrd['اسم العميل']||'-'}</div>
+                     <div style="font-size:9px;color:var(--danger);">Debt: ${fmtMoney(ldbt)}</div>`;
+            }else if(lov){
+              const ld=le?Math.max(0,Math.ceil((today-le)/86400000)):0;
+              const ldbt=Math.max(0,lt+(ld*lday)-lp);
+              aHTML=`<div style="font-size:10px;color:var(--danger);font-weight:700;">
+                       ⚠️ ${lastOrd['اسم العميل']||'-'}
+                     </div>
+                     <div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div>
+                     <div style="font-size:9px;color:var(--danger);">OVERDUE ${ld}d • ${fmtMoney(ldbt)}</div>`;
+            }else{
+              aHTML=`<div style="font-size:10px;font-weight:700;">${lastOrd['اسم العميل']||'-'}</div>
+                     <div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div>
+                     <div style="font-size:9px;color:var(--success);">Ends: ${le?fmtDateShort(le):'N/A'}</div>`;
+            }
+          }
+
+          rowsHTML+=`<div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.04);">
+            <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;
+                        height:${ROW_H}px;flex-shrink:0;overflow:hidden;">
+              ${barsHTML}
+            </div>
+            <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;
+                        height:${ROW_H}px;padding:4px 10px;
+                        background:var(--surface2);border-left:1px solid var(--border2);
+                        display:flex;flex-direction:column;justify-content:center;z-index:5;">
+              ${aHTML}
+            </div>
+          </div>`;
+        });// end rows forEach
       }
-    });
 
-    const containerH=Math.max(200,totalRows*ROW_H+HEADER_H);
+      rowsHTML+=`</div></div>`; // close timeline div + flex div
+    });// end cars forEach
 
+    // ---- ASSEMBLE FULL GANTT ----
     wrap.innerHTML=`
-      <div style="min-width:${CAR_COL+totalPx+ASSIGN_COL}px;">
-        <!-- Header row -->
-        <div style="display:flex;position:sticky;top:0;z-index:20;background:var(--surface3);border-bottom:1px solid var(--border2);">
-          <div style="position:sticky;left:0;z-index:21;background:var(--surface3);width:${CAR_COL}px;min-width:${CAR_COL}px;height:${HEADER_H}px;display:flex;align-items:center;padding:0 10px;border-right:1px solid var(--border2);">
-            <span style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;">Vehicle</span>
+      <div style="min-width:${CAR_COL+totalPx+ASSIGN_COL}px;position:relative;">
+        <!-- Sticky header row -->
+        <div style="display:flex;position:sticky;top:0;z-index:20;
+                    background:var(--surface3);border-bottom:2px solid var(--border2);">
+          <!-- Car column header -->
+          <div style="position:sticky;left:0;z-index:22;background:var(--surface3);
+                      width:${CAR_COL}px;min-width:${CAR_COL}px;height:${HEADER_H}px;
+                      display:flex;align-items:center;padding:0 12px;
+                      border-right:1px solid var(--border2);">
+            <span style="font-size:10px;font-weight:800;color:var(--text3);
+                         text-transform:uppercase;letter-spacing:0.1em;">
+              Vehicle (${cars.length})
+            </span>
           </div>
-          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${HEADER_H}px;overflow:hidden;flex-shrink:0;">
-            ${headerHTML}
+          <!-- Date header -->
+          <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;
+                      height:${HEADER_H}px;flex-shrink:0;overflow:hidden;
+                      background:var(--surface3);">
+            ${headerMonthHTML}
+            ${headerDayHTML}
           </div>
-          <div style="position:sticky;right:0;z-index:21;background:var(--surface3);width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${HEADER_H}px;display:flex;align-items:center;padding:0 10px;border-left:1px solid var(--border2);">
-            <span style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;">Assignment</span>
+          <!-- Assignment header -->
+          <div style="position:sticky;right:0;z-index:22;background:var(--surface3);
+                      width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${HEADER_H}px;
+                      display:flex;align-items:center;padding:0 12px;
+                      border-left:1px solid var(--border2);">
+            <span style="font-size:10px;font-weight:800;color:var(--text3);
+                         text-transform:uppercase;letter-spacing:0.1em;">Assignment</span>
           </div>
         </div>
         <!-- Car rows -->
-        <div>
-          ${cars.map((car,ci)=>{
-            const carId=String(car.ID||car.id);
-            const carOrders=bookings.filter(b=>String(b['كود السيارة'])===carId);
-            carOrders.sort((a,b)=>{const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);return(as||new Date(0))-(bs||new Date(0));});
-            const rows2=[];
-            carOrders.forEach(order=>{
-              const{start,end}=getOrderDates(order);if(!start)return;
-              const effectiveEnd=end?new Date(Math.max(end.getTime(),today.getTime())):today;
-              let placed=false;
-              for(let r=0;r<rows2.length;r++){if(!rows2[r].end||start>=rows2[r].end){rows2[r].orders.push(order);rows2[r].end=effectiveEnd;placed=true;break;}}
-              if(!placed)rows2.push({orders:[order],end:effectiveEnd});
-            });
-            const numRows2=Math.max(1,rows2.length);
-            const carLabel2=getCarLabel(car,'en');
-            const rowsBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.01)';
-
-            let carRowsHTML=`<div style="display:flex;background:${rowsBg};">
-              <div style="position:sticky;left:0;z-index:10;background:${rowsBg};width:${CAR_COL}px;min-width:${CAR_COL}px;height:${numRows2*ROW_H}px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--border);border-right:1px solid var(--border2);">
-                <div style="overflow:hidden;width:100%;">
-                  <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${carLabel2}</div>
-                  <div style="margin-top:2px;"><span class="pill pill-${getCarStatusCategory(car)}" style="font-size:8px;padding:1px 5px;">${getCarStatusCategory(car)}</span></div>
-                </div>
-              </div>
-              <div style="flex:1;display:flex;flex-direction:column;">`;
-
-            if(rows2.length===0){
-              carRowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
-                <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;">
-                  <div style="position:absolute;left:${Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX)}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.4);pointer-events:none;"></div>
-                </div>
-                <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;padding:4px 10px;background:${rowsBg};border-left:1px solid var(--border2);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:5;">
-                  <span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>
-                </div>
-              </div>`;
-            }else{
-              rows2.forEach((row,ri)=>{
-                let barsHTML2='';
-                // Today line
-                barsHTML2+=`<div style="position:absolute;left:${Math.max(0,Math.floor((today-ganttStart)/86400000)*DAY_PX)}px;top:0;bottom:0;width:2px;background:rgba(59,130,246,0.4);z-index:2;pointer-events:none;"></div>`;
-
-                row.orders.forEach(order=>{
-                  const{start,end}=getOrderDates(order);if(!start)return;
-                  const statusRaw=getOrderStatus(order);
-                  const isAccident=statusRaw==='Accident';
-                  const isClosed=statusRaw==='Closed'||order.closed===true;
-                  const isOverdue=!isClosed&&end&&today>end&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
-                  const isFuture=start>today&&!isClosed;
-                  const total=parseAmount(order['إجمالي المستحق (Total)']);
-                  const paid=parseAmount(order['المدفوع EGP']);
-                  const daily=parseAmount(order['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(order.rental_days||1)));
-                  const startPx=Math.max(0,Math.floor((start-ganttStart)/86400000)*DAY_PX);
-                  const baseEndDate=end||start;
-                  const baseEndPx=Math.min(totalPx,Math.floor((baseEndDate-ganttStart)/86400000)*DAY_PX);
-                  const tailEndPx=Math.min(totalPx,Math.floor((today-ganttStart)/86400000)*DAY_PX+DAY_PX);
-                  const barW=Math.max(4,baseEndPx-startPx);
-                  const tailW=(isOverdue||isAccident)&&!isClosed?Math.max(0,tailEndPx-baseEndPx):0;
-                  const barTop=4;const barH=ROW_H-8;
-                  let barBg;
-                  if(isClosed)barBg='#475569';
-                  else if(isAccident)barBg='#ef4444';
-                  else if(isOverdue)barBg='#ef4444';
-                  else if(isFuture)barBg='transparent';
-                  else barBg='#3b82f6';
-                  let tailBg=null;
-                  if(isAccident&&!isClosed)tailBg='repeating-linear-gradient(45deg,#f59e0b,#f59e0b 4px,#111827 4px,#111827 8px)';
-                  else if(isOverdue)tailBg='repeating-linear-gradient(45deg,rgba(239,68,68,0.7),rgba(239,68,68,0.7) 4px,rgba(0,0,0,0.6) 4px,rgba(0,0,0,0.6) 8px)';
-                  const lateDays=end&&(isOverdue||isAccident)?Math.max(0,Math.ceil((today-end)/86400000)):0;
-                  const latePenalty=lateDays*daily;
-                  const debt=isClosed?0:Math.max(0,total+latePenalty-paid);
-                  const od=JSON.stringify({
-                    id:order.id,no:order['No.']||order.id,
-                    client:order['اسم العميل']||'-',clientId:order['كود العميل']||'-',
-                    car:carLabel2,start:start?fmtDate(start):'N/A',end:end?fmtDate(end):'N/A',
-                    total,paid,daily,debt,lateDays,latePenalty,
-                    status:statusRaw,isAccident,isOverdue,isClosed,isFuture,
-                    deposit:order['الوديعة المعلقة لدينا']||'£0.00',
-                    insurance:order['نوع التأمين']||'-',
-                    pickup:order['مكان الاستلام']||'-',dropoff:order['مكان التسليم']||'-',
-                    branch:order['فرع الإصدار']||'-'
-                  }).replace(/"/g,'&quot;');
-
-                  if(barW>0){
-                    if(isFuture){
-                      barsHTML2+=`<div style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;border:2px dashed #3b82f6;border-radius:4px;background:rgba(59,130,246,0.08);cursor:pointer;z-index:3;" onmouseenter="showGanttTooltip(event,'${od}')" onmouseleave="hideGanttTooltip()" onclick="openOrderDetail('${order.id}')"><div style="padding:2px 5px;font-size:9px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${order['اسم العميل']||''}</div></div>`;
-                    }else{
-                      barsHTML2+=`<div style="position:absolute;left:${startPx}px;top:${barTop}px;width:${barW}px;height:${barH}px;background:${barBg};border-radius:${tailW>0?'4px 0 0 4px':'4px'};cursor:pointer;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,0.3);" onmouseenter="showGanttTooltip(event,'${od}')" onmouseleave="hideGanttTooltip()" onclick="openOrderDetail('${order.id}')"><div style="padding:2px 5px;font-size:9px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${order['اسم العميل']||''}</div></div>`;
-                      if(tailW>0&&tailBg){barsHTML2+=`<div style="position:absolute;left:${baseEndPx}px;top:${barTop}px;width:${tailW}px;height:${barH}px;background:${tailBg};border-radius:0 4px 4px 0;cursor:pointer;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,0.3);" onmouseenter="showGanttTooltip(event,'${od}')" onmouseleave="hideGanttTooltip()" onclick="openOrderDetail('${order.id}')"></div>`;}
-                    }
-                  }
-                });
-
-                // Assignment info for this row
-                const lastOrd=row.orders[row.orders.length-1];
-                let aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
-                if(lastOrd){
-                  const{end:le}=getOrderDates(lastOrd);
-                  const lst=getOrderStatus(lastOrd);
-                  const lt=parseAmount(lastOrd['إجمالي المستحق (Total)']);
-                  const lp=parseAmount(lastOrd['المدفوع EGP']);
-                  const lday=parseAmount(lastOrd['سعر السيارة اليومي بالجنيه المصري'])||(lt/Math.max(1,parseFloat(lastOrd.rental_days||1)));
-                  const lac=lst==='Accident';
-                  const lcl=lst==='Closed'||lastOrd.closed===true;
-                  const lov=!lcl&&le&&today>le&&(lst==='Active'||lst==='Overdue_Legacy');
-                  if(lcl||(lp>=lt&&lt>0&&!lac)){aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';}
-                  else if(lac){const ldays=le?Math.max(0,Math.ceil((today-le)/86400000)):0;const ldebt=Math.max(0,lt+(ldays*lday)-lp);aHTML=`<div style="font-size:10px;color:var(--orange);font-weight:700;">🚨 ACCIDENT</div><div style="font-size:9px;color:var(--text3);">${lastOrd['اسم العميل']||'-'}</div><div style="font-size:9px;color:var(--danger);">Debt: ${fmtMoney(ldebt)}</div>`;}
-                  else if(lov){const ldays=le?Math.max(0,Math.ceil((today-le)/86400000)):0;const ldebt=Math.max(0,lt+(ldays*lday)-lp);aHTML=`<div style="font-size:10px;color:var(--danger);font-weight:700;">⚠️ ${lastOrd['اسم العميل']||'-'}</div><div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div><div style="font-size:9px;color:var(--danger);">OVERDUE ${ldays}d • ${fmtMoney(ldebt)}</div>`;}
-                  else{aHTML=`<div style="font-size:10px;font-weight:700;">${lastOrd['اسم العميل']||'-'}</div><div style="font-size:9px;color:var(--text3);">ID: ${lastOrd['كود العميل']||'-'}</div><div style="font-size:9px;color:var(--success);">Ends: ${le?fmtDateShort(le):'N/A'}</div>`;}
-                }
-
-                carRowsHTML+=`<div style="display:flex;border-bottom:1px solid var(--border);">
-                  <div style="position:relative;width:${totalPx}px;min-width:${totalPx}px;height:${ROW_H}px;flex-shrink:0;">${barsHTML2}</div>
-                  <div style="position:sticky;right:0;width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${ROW_H}px;padding:4px 10px;background:${rowsBg};border-left:1px solid var(--border2);display:flex;align-items:center;z-index:5;">${aHTML}</div>
-                </div>`;
-              });
-            }
-
-            carRowsHTML+='</div></div>';
-            return carRowsHTML;
-          }).join('')}
-        </div>
+        ${rowsHTML}
+        ${cars.length===0?`<div class="empty-state" style="padding:40px;">
+          <div class="es-icon">🚗</div>
+          <p>No cars match your current filters</p>
+        </div>`:''}
       </div>`;
 
+    // Scroll to today after render
+    setTimeout(()=>ganttScrollToToday(),150);
+
   }catch(e){
-    wrap.innerHTML=`<div class="empty-state"><div class="es-icon">⚠️</div><p>Failed to load Gantt: ${e.message}</p></div>`;
-    console.warn('Gantt error:',e.message);
+    if(wrap)wrap.innerHTML=`<div class="empty-state">
+      <div class="es-icon">⚠️</div>
+      <p>Failed to load Gantt: ${e.message}</p>
+    </div>`;
+    console.warn('Gantt error:',e.message,e);
   }
 }
 
-function carMatchesFilter(car){
-  const cEN=(car.Contract||'').toLowerCase().trim();
-  const cAR=(car['حاله التعاقد']||'').toLowerCase().trim();
-  const st=(car.status||'available').toLowerCase().trim();
-  const handover=parseDBDate(car['تاريخ التسليم']||'');
-  const isPast=handover&&new Date()>handover;
-  const isArchived=cEN==='finished'||cAR==='منتهى'||isPast;
-  const isAccident=st==='accident'||cEN==='accident';
-  const isMaint=st==='maintenance'||cEN==='maintenance';
-  const isActive=!isArchived&&!isAccident&&!isMaint;
-  const statusPass=(isArchived&&FLEET_FILTER.status.archived)||(isAccident&&FLEET_FILTER.status.accident)||(isMaint&&FLEET_FILTER.status.maintenance)||(isActive&&FLEET_FILTER.status.active);
-  if(!statusPass)return false;
-  const allOff=!Object.values(FLEET_FILTER.branches).some(v=>v);
-  const branchPass=allOff||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
-    if(!on)return false;
-    const bn=(BRANCH_MAP[code]||code).toLowerCase();
-    const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
-    return b.includes(bn)||(car.Branch||'').toLowerCase().includes(bn)||(car.City||'').toLowerCase().includes(bn);
-  });
-  if(!branchPass)return false;
-  if(FLEET_FILTER.search){
-    const q=FLEET_FILTER.search.toLowerCase();
-    const hay=[car.plate,car.model,car.Color,car.year,car.Type,car['اللون'],car['الطراز'],car['رقم اللوحة'],car['سنة الصنع'],car.ID,car.id].join(' ').toLowerCase();
-    if(!hay.includes(q))return false;
-  }
-  return true;
-}
-
-function showGanttTooltip(e,dataStr){
+/* ---- Tooltip functions ---- */
+function showGanttTip(e,safeId){
+  const d=window._ganttData?.[safeId];if(!d)return;
   const tooltip=document.getElementById('gantt-tooltip');if(!tooltip)return;
-  let d;
-  try{d=JSON.parse(dataStr.replace(/&quot;/g,'"'));}catch(ex){return;}
-  const today=new Date();
-  const isOverdue=d.isOverdue||false;
-  const isAccident=d.isAccident||false;
-  const isClosed=d.isClosed||false;
-  const lateDays=d.lateDays||0;
-  const latePenalty=d.latePenalty||0;
-  const debt=d.debt||0;
+
   let statusBadge='';
-  if(isAccident)statusBadge=`<span style="background:var(--orange);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚨 ACCIDENT</span>`;
-  else if(isOverdue)statusBadge=`<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">⚠️ OVERDUE</span>`;
-  else if(isClosed)statusBadge=`<span style="background:var(--text3);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">✅ CLOSED</span>`;
-  else if(d.isFuture)statusBadge=`<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">📅 UPCOMING</span>`;
-  else statusBadge=`<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚗 ACTIVE</span>`;
+  if(d.isAccident)
+    statusBadge=`<span style="background:var(--orange);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚨 ACCIDENT</span>`;
+  else if(d.isOverdue)
+    statusBadge=`<span style="background:var(--danger);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">⚠️ OVERDUE</span>`;
+  else if(d.isClosed)
+    statusBadge=`<span style="background:var(--text3);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">✅ CLOSED</span>`;
+  else if(d.isFuture)
+    statusBadge=`<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">📅 UPCOMING</span>`;
+  else
+    statusBadge=`<span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;">🚗 ACTIVE</span>`;
+
   tooltip.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
       ${statusBadge}
       <span style="font-size:10px;font-weight:800;color:var(--accent);">Order #${d.no}</span>
     </div>
     <div style="font-size:13px;font-weight:800;margin-bottom:2px;">${d.client}</div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:9px;">(ID: ${d.clientId})</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;margin-bottom:9px;">
-      <span style="color:var(--text3);">Branch:</span><span style="font-weight:700;">${d.branch}</span>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:9px;">(CRM ID: ${d.clientId})</div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:9px;">
+      <span style="color:var(--text3);">Branch:</span><span style="font-weight:600;">${d.branch}</span>
       <span style="color:var(--text3);">Pickup:</span><span>${d.pickup}</span>
       <span style="color:var(--text3);">Dropoff:</span><span>${d.dropoff}</span>
       <span style="color:var(--text3);">Start:</span><span>${d.start}</span>
       <span style="color:var(--text3);">End:</span><span>${d.end}</span>
       <span style="color:var(--text3);">Insurance:</span><span>${d.insurance}</span>
     </div>
-    <div style="background:${debt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)'};border:1px solid ${debt>0?'rgba(239,68,68,0.3)':'rgba(34,197,94,0.3)'};border-radius:8px;padding:8px;font-size:11px;">
+    <div style="background:${d.debt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)'};
+                border:1px solid ${d.debt>0?'rgba(239,68,68,0.3)':'rgba(34,197,94,0.3)'};
+                border-radius:8px;padding:9px;font-size:11px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
         <span style="color:var(--text3);">Base Value:</span>
         <span style="font-weight:700;">${fmtMoney(d.total)}</span>
       </div>
-      ${latePenalty>0?`<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:var(--danger);">+ Late Penalty (${lateDays} days):</span><span style="font-weight:700;color:var(--danger);">${fmtMoney(latePenalty)}</span></div>`:''}
+      ${d.latePenalty>0?`
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="color:var(--danger);">+ Penalty (${d.lateDays}d):</span>
+        <span style="font-weight:700;color:var(--danger);">${fmtMoney(d.latePenalty)}</span>
+      </div>`:''}
       <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
         <span style="color:var(--text3);">Paid:</span>
         <span style="font-weight:700;color:var(--success);">${fmtMoney(d.paid)}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;">
+      <div style="display:flex;justify-content:space-between;
+                  border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;">
         <span style="font-weight:800;">Current Debt:</span>
-        <span style="font-weight:900;font-size:13px;color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?fmtMoney(debt):'✅ CLEAR'}</span>
+        <span style="font-weight:900;font-size:13px;
+                     color:${d.debt>0?'var(--danger)':'var(--success)'};">
+          ${d.debt>0?fmtMoney(d.debt):'✅ CLEAR'}
+        </span>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:3px;">
         <span style="color:var(--text3);">Deposit:</span>
         <span>${d.deposit}</span>
       </div>
     </div>
-    <div style="text-align:center;margin-top:8px;font-size:9px;color:var(--text3);">Click bar to edit order</div>`;
+    <div style="text-align:center;margin-top:8px;font-size:9px;color:var(--text3);">
+      Click bar to open order details
+    </div>`;
+
   tooltip.style.display='block';
-  const tx=Math.min(e.clientX+12,window.innerWidth-320);
-  const ty=Math.min(e.clientY-20,window.innerHeight-420);
-  tooltip.style.left=tx+'px';tooltip.style.top=ty+'px';
+  tooltip.style.opacity='1';
+
+  // Smart position - avoid going off screen
+  const tx=Math.min(e.clientX+14,window.innerWidth-325);
+  const ty=Math.min(e.clientY-10,window.innerHeight-450);
+  tooltip.style.left=Math.max(5,tx)+'px';
+  tooltip.style.top=Math.max(5,ty)+'px';
 }
-function hideGanttTooltip(){
-  const t=document.getElementById('gantt-tooltip');if(t)t.style.display='none';
+
+function hideGanttTip(){
+  const t=document.getElementById('gantt-tooltip');
+  if(t)t.style.display='none';
+}
+
+function closeGanttTip(){
+  hideGanttTip();
 }
 
 /* ============================================================
