@@ -2831,6 +2831,48 @@ function openPhotoLightbox(url){
  /* ============================================================
    PART 3: FLEET RADAR (GANTT CHART)
    ============================================================ */
+function carMatchesFilter(car){
+  const cEN=(car.Contract||'').toLowerCase().trim();
+  const cAR=(car['حاله التعاقد']||'').toLowerCase().trim();
+  const st=(car.status||'available').toLowerCase().trim();
+  const handover=parseDBDate(car['تاريخ التسليم']||'');
+  const isPast=handover&&new Date()>handover;
+  const isArchived=cEN==='finished'||cAR==='منتهى'||isPast;
+  const isAccident=st==='accident'||cEN==='accident';
+  const isMaint=st==='maintenance'||cEN==='maintenance';
+  const isActive=!isArchived&&!isAccident&&!isMaint;
+
+  const statusPass=
+    (isArchived&&FLEET_FILTER.status.archived)||
+    (isAccident&&FLEET_FILTER.status.accident)||
+    (isMaint&&FLEET_FILTER.status.maintenance)||
+    (isActive&&FLEET_FILTER.status.active);
+  if(!statusPass)return false;
+
+  const allOff=!Object.values(FLEET_FILTER.branches).some(v=>v);
+  const branchPass=allOff||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
+    if(!on)return false;
+    const bn=(BRANCH_MAP[code]||code).toLowerCase();
+    const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
+    return b.includes(bn)||
+           (car.Branch||'').toLowerCase().includes(bn)||
+           (car.City||'').toLowerCase().includes(bn)||
+           (car['المحافظة']||'').toLowerCase().includes(bn);
+  });
+  if(!branchPass)return false;
+
+  if(FLEET_FILTER.search){
+    const q=FLEET_FILTER.search.toLowerCase();
+    const hay=[
+      car.plate,car.model,car.Color,car.year,car.Type,
+      car['اللون'],car['الطراز'],car['رقم اللوحة'],
+      car['سنة الصنع'],car.ID,car.id
+    ].join(' ').toLowerCase();
+    if(!hay.includes(q))return false;
+  }
+  return true;
+}
+
 async function loadFleetRadar(){
   const el=document.getElementById('page-fleet-radar');if(!el)return;
   el.innerHTML=`
