@@ -2862,7 +2862,8 @@ async function loadFleetRadar(){
                     background:var(--glass);border:1px solid var(--border);border-radius:8px;font-size:11px;">
           <span style="color:var(--text3);">Timeline:</span>
           <select id="gantt-range" onchange="renderGantt()"
-                  style="background:transparent;border:none;color:var(--text);
+                  style="background:var(--surface2);border:1px solid var(--border2);
+                       border-radius:6px;color:var(--text);padding:3px 6px;
                          font-size:11px;font-weight:700;outline:none;cursor:pointer;">
             <option value="60">60 Days</option>
             <option value="90" selected>90 Days</option>
@@ -2988,6 +2989,11 @@ async function renderGantt(){
     const HEADER_H=46;
     const totalPx=totalDays*DAY_PX;
 
+    // Wait for fleet if not loaded yet
+    if(!G.fleet||G.fleet.length===0){
+      await loadFleet();
+    }
+    
     // ALL fleet cars that match filter - no limit
     const cars=G.fleet.filter(car=>{
       const cEN=(car.Contract||'').toLowerCase().trim();
@@ -3062,28 +3068,31 @@ async function renderGantt(){
     };
 
     cars.forEach((car,ci)=>{
-      // Build all possible IDs for this car
-      const possibleIds=new Set([
-        String(car.ID||'').trim(),
-        String(car.id||'').trim(),
-        String(car['No.']||'').trim(),
-        String(car['ID']||'').trim(),
-        String(parseInt(car.ID||0)||'').trim(),
-        String(parseInt(car.id||0)||'').trim()
-      ].filter(Boolean));
-      
-      const carOrders=bookings.filter(b=>{
-        const bCarId=String(b['كود السيارة']||'').trim();
-        if(!bCarId)return false;
-        // Direct match
-        if(possibleIds.has(bCarId))return true;
-        // Numeric match - strip leading zeros
-        const bNum=String(parseInt(bCarId)||0);
-        for(const pid of possibleIds){
-          if(String(parseInt(pid)||0)===bNum)return true;
-        }
-        return false;
-      });
+    // All possible ID values for this car
+    const possibleIds=new Set([
+      String(car.ID||'').trim(),
+      String(car.id||'').trim(),
+      String(car['No.']||'').trim(),
+      String(parseInt(car.ID||0)||'').trim(),
+      String(parseInt(car.id||0)||'').trim()
+    ].filter(x=>x&&x!=='0'));
+    
+    const carIdStr=String(car.ID||car.id||'').trim();
+    const carLabel=getCarLabel(car,'en');
+    const carIdDisplay=car['No.']||car.ID||car.id||'-';
+    const plateDisplay=car.plate||formatPlate(car);
+
+    const carOrders=bookings.filter(b=>{
+      const bCarId=String(b['كود السيارة']||'').trim();
+      if(!bCarId)return false;
+      if(possibleIds.has(bCarId))return true;
+      const bNum=String(parseInt(bCarId)||'');
+      for(const pid of possibleIds){
+        const pNum=String(parseInt(pid)||'');
+        if(pNum&&pNum!=='0'&&pNum===bNum)return true;
+      }
+      return false;
+    });
 
       carOrders.sort((a,b)=>{
         const{start:as}=getOrderDates(a);
