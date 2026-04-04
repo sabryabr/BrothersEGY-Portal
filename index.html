@@ -690,6 +690,10 @@ let G={
     penaltyLow:50,penaltyMedium:100,penaltyHigh:200,penaltyUrgent:500,
     callmebotKeys:{},callmebotPhones:{}}
 };
+
+let dashCharts={};
+let allLogs=[];
+  
 const BRANCH_MAP={HRG:'Hurghada',ALX:'Alexandria',CAI:'Cairo',RSH:'Rashid',
   'الغردقة':'Hurghada','الاسكندرية':'Alexandria','القاهرة':'Cairo','رشيد':'Rashid'};
 const BRANCH_AR={HRG:'الغردقة',ALX:'الاسكندرية',CAI:'القاهرة',RSH:'رشيد'};
@@ -2056,7 +2060,7 @@ async function loadDashKPIs(){
     const subEl=document.getElementById('kpi-revenue-sub');
     if(subEl)subEl.textContent=periodFinal.label==='All Time'?'All time':periodFinal.label;
     const labelEl=document.getElementById('kpi-revenue-label');
-    if(labelEl)labelEl.textContent=periodFinal.label==='All Time'?'Total Revenue':'Revenue';
+    if(labelEl)labelEl.textContent=periodFinal.label==='All Time'?'Total Revenue':'Income Collected';
 
   }catch(e){console.warn('KPI error:',e.message);}
 }
