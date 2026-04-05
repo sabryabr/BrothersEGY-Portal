@@ -12985,50 +12985,6 @@ function _safeFleetDiagnostic(){
   })));
 }
 
-const _origLoadFleet=loadFleet;
-async function loadFleet(){
-  await _origLoadFleet();
-  _safeFleetDiagnostic();
-}
-
-
-/* ============================================================
-   2. PAGE STATE PRESERVATION
-   Heavy pages only render once per session unless
-   explicitly refreshed. Lightweight pages always re-render.
-============================================================ */
-
-const _pageFirstRender={};
-
-const _origRenderPage=renderPage;
-function renderPage(pageId){
-  const alwaysRender=[
-    'dashboard','order-book','risk-radar','proposals',
-    'en-contract','ar-contract','receipts','income-expenses'
-  ];
-  const lazyRender=[
-    'fleet-radar','system-logs','vehicle-360','crm',
-    'tasks','approvals','settings'
-  ];
-
-  if(lazyRender.includes(pageId)&&_pageFirstRender[pageId]){
-    return;
-  }
-
-  _origRenderPage(pageId);
-
-  if(lazyRender.includes(pageId)){
-    _pageFirstRender[pageId]=true;
-  }
-}
-
-const _origDoLogout2=doLogout;
-async function doLogout(){
-  Object.keys(_pageFirstRender).forEach(k=>delete _pageFirstRender[k]);
-  await _origDoLogout2();
-}
-
-
 /* ============================================================
    3. RENDERVEHICLE360 FINAL FIX
    Replaces the empty stub with the full implementation.
@@ -13247,25 +13203,6 @@ async function refreshFleetCache(){
   }catch(e){console.warn('Fleet cache refresh:',e.message);}
 }
 
-const _origSaveCarEdit=saveCarEdit;
-async function saveCarEdit(docId){
-  await _origSaveCarEdit(docId);
-  await refreshFleetCache();
-}
-
-const _origSaveOrderEdit=saveOrderEdit;
-async function saveOrderEdit(orderId){
-  await _origSaveOrderEdit(orderId);
-  await refreshFleetCache();
-}
-
-const _origSaveQuickPayment=saveQuickPayment;
-async function saveQuickPayment(orderId,totalDue,prevPaid){
-  await _origSaveQuickPayment(orderId,totalDue,prevPaid);
-  await refreshFleetCache();
-}
-
-
 /* ============================================================
    9. NOTIFICATIONS — REAL-TIME FIX
    Unsubscribe before re-attaching to prevent duplicates.
@@ -13335,31 +13272,6 @@ function startOrderBadgeLive(){
     G.unsubscribers.push(_orderBadgeUnsub);
   }catch(e){console.warn('Order badge listener:',e.message);}
 }
-
-
-/* ============================================================
-   11. ONLOGINSUCCESS PATCH — Start live listeners
-============================================================ */
-
-const _origOnLoginSuccess=onLoginSuccess;
-function onLoginSuccess(){
-  _origOnLoginSuccess();
-  setTimeout(()=>startOrderBadgeLive(),2000);
-}
-
-
-/* ============================================================
-   12. LOGOUT PATCH — Stop all listeners cleanly
-============================================================ */
-
-const _origDoLogout3=doLogout;
-async function doLogout(){
-  if(_notifUnsub){try{_notifUnsub();}catch(e){}_notifUnsub=null;}
-  if(_orderBadgeUnsub){try{_orderBadgeUnsub();}catch(e){}_orderBadgeUnsub=null;}
-  if(_logUnsub){try{_logUnsub();}catch(e){}_logUnsub=null;}
-  await _origDoLogout3();
-}
-
 
 /* ============================================================
    13. ESC KEY — Close modals and dropdowns
@@ -13590,25 +13502,6 @@ function attachQRAndBarcode(ref){
   const vref=params.get('verify');
   if(vref)window._pendingVerifyRef=vref.replace(/[^a-zA-Z0-9\-_]/g,'');
 })();
-
-const _origOnLoginSuccess2=onLoginSuccess;
-function onLoginSuccess(){
-  _origOnLoginSuccess2();
-  if(window._pendingVerifyRef){
-    setTimeout(()=>{
-      showPage('receipts');
-      setTimeout(()=>{
-        const el=document.getElementById('rc-contract-no');
-        if(el){
-          el.value=window._pendingVerifyRef;
-          rcLookupContractDebounced();
-        }
-        window._pendingVerifyRef=null;
-      },500);
-    },1000);
-  }
-}
-
 
 /* ============================================================
    20. DIAGNOSE GANTT — DEV HELPER
