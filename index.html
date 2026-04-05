@@ -1505,7 +1505,7 @@ function attachQRAndBarcode(ref){
   const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
   setTimeout(()=>{
     const qrEl=document.getElementById(qrId);
-    if(qrEl){qrEl.innerHTML='';try{new QRCode(qrEl,{text:`https://brothersegy.com/verify/?ref=${ref}`,width:80,height:80,colorDark:'#1e40af',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){qrEl.textContent=ref;}}
+    if(qrEl){qrEl.innerHTML='';try{new QRCode(qrEl,{text:`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`,width:80,height:80,colorDark:'#1e40af',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){qrEl.textContent=ref;}}
     const bcEl=document.getElementById(bcId);
     if(bcEl){try{JsBarcode('#'+bcId,ref,{format:'CODE128',lineColor:'#1e40af',width:1.5,height:35,displayValue:true,fontSize:8,margin:2,background:'#f8fafc'});}catch(e){}}
   },150);
@@ -1519,7 +1519,7 @@ function a4FooterHTML(ref,docType,isRTL){
       <div style="font-size:11px;font-weight:800;color:#1e40af;">BROTHERS EGY – ${docType}</div>
       <div style="font-size:9px;color:#64748b;margin-top:2px;">Ref: ${ref}</div>
       <div style="font-size:9px;color:#64748b;">Issued by: ${G.user?.username||'-'} | ${new Date().toLocaleString('en-GB')}</div>
-      <div style="font-size:8px;color:#3b82f6;margin-top:2px;">Verify: brothersegy.com/verify/?ref=${ref}</div>
+      <div style="font-size:8px;color:#3b82f6;margin-top:2px;">Verify: sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}</div>
       <canvas id="${bcId}" style="max-width:180px;height:45px;display:block;margin-top:4px;"></canvas>
     </div>
     <div style="border:3px solid #1e40af;border-radius:50%;width:68px;height:68px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(30,64,175,0.06);">
@@ -13420,7 +13420,7 @@ function a4FooterHTML(ref,docType,isRTL){
   const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
 
   // Use relative path so it works on any domain/subdomain
-  const verifyUrl=`verify.html?ref=${ref}`;
+  const verifyUrl=`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`;
 
   return`<div style="display:flex;align-items:center;gap:14px;background:#f8fafc;
     border:1px solid #e2e8f0;border-radius:8px;padding:10px 13px;margin-top:14px;
@@ -13436,8 +13436,9 @@ function a4FooterHTML(ref,docType,isRTL){
         ${new Date().toLocaleString('en-GB')}
       </div>
       <div style="font-size:8px;color:#3b82f6;margin-top:2px;">
-        Scan QR to verify authenticity
+        Verify: sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}
       </div>
+
       <canvas id="${bcId}"
         style="max-width:180px;height:45px;display:block;margin-top:4px;">
       </canvas>
@@ -13462,7 +13463,7 @@ function a4FooterHTML(ref,docType,isRTL){
 function attachQRAndBarcode(ref){
   const qrId='qr-'+ref.replace(/[^a-zA-Z0-9]/g,'');
   const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
-  const verifyUrl=`verify.html?ref=${ref}`;
+  const verifyUrl=`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`;
 
   setTimeout(()=>{
     const qrEl=document.getElementById(qrId);
