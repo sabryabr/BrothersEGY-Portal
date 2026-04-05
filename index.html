@@ -6762,7 +6762,7 @@ function filterSavedReceipts(){
         <td>
           <div style="display:flex;gap:3px;">
             <button class="btn btn-ghost btn-xs" onclick="reprintReceipt('${r.id}')">🖨️</button>
-            <a href="https://brothersegy.com/verify/?ref=${r.receipt_ref||r.id}" target="_blank" class="btn btn-ghost btn-xs">🔗</a>
+            <a href="https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}" target="_blank" class="btn btn-ghost btn-xs">🔗</a>
           </div>
         </td>
       </tr>`).join('')}
@@ -11743,7 +11743,7 @@ function renderReceiptsTable(receipts){
             <button class="btn btn-primary btn-xs" onclick="reprintReceipt('${r.id}')">
               🖨️
             </button>
-            <a href="https://brothersegy.com/verify/?ref=${r.receipt_ref||r.id}"
+            <a href="https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}"
               target="_blank" class="btn btn-ghost btn-xs" title="Verify online">
               🔗
             </a>
