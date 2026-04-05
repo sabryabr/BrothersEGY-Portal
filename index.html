@@ -6762,7 +6762,7 @@ function filterSavedReceipts(){
         <td>
           <div style="display:flex;gap:3px;">
             <button class="btn btn-ghost btn-xs" onclick="reprintReceipt('${r.id}')">🖨️</button>
-            <a href="https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}" target="_blank" class="btn btn-ghost btn-xs">🔗</a>
+            <a href="https://brothersegy.com/verify/?ref=${r.receipt_ref||r.id}" target="_blank" class="btn btn-ghost btn-xs">🔗</a>
           </div>
         </td>
       </tr>`).join('')}
@@ -11682,6 +11682,8 @@ function renderReceiptsTable(receipts){
     return;
   }
 
+  const GITHUB_VERIFY='https://sabryabr.github.io/BrothersEGY-Portal/verify.html';
+
   wrap.innerHTML=`
   <table class="data-table">
     <thead><tr>
@@ -11698,61 +11700,74 @@ function renderReceiptsTable(receipts){
       <th>Actions</th>
     </tr></thead>
     <tbody>
-      ${receipts.map(r=>`<tr>
-        <td>
-          <span style="color:var(--accent);font-weight:700;cursor:pointer;"
-            onclick="reprintReceipt('${r.id}')">
-            ${r.receipt_ref||r.id}
-          </span>
-        </td>
-        <td style="font-size:10px;white-space:nowrap;">
-          ${r.receipt_date?new Date(r.receipt_date).toLocaleDateString('en-GB'):
-            r.timestamp?new Date(r.timestamp).toLocaleDateString('en-GB'):'—'}
-        </td>
-        <td>
-          <div style="font-weight:600;font-size:11px;">${r.client_name||'—'}</div>
-          ${r.client_id?`<div style="font-size:10px;color:var(--text3);">ID: ${r.client_id}</div>`:''}
-        </td>
-        <td>
-          <span style="color:var(--accent);cursor:pointer;font-weight:700;"
-            onclick="openOrderByNo('${r.contract_no||''}')">
-            ${r.contract_no||'—'}
-          </span>
-        </td>
-        <td style="font-size:11px;max-width:130px;white-space:nowrap;
-          overflow:hidden;text-overflow:ellipsis;">
-          ${r.car_label||'—'}
-        </td>
-        <td>
-          <span class="pill ${RC_TYPE_PILLS[r.type]||'pill-draft'}">
-            ${r.type||'—'}
-          </span>
-        </td>
-        <td>
-          <strong style="color:var(--success);">${fmtMoney(r.total_egp_equiv||0)}</strong>
-        </td>
-        <td style="color:${(r.outstanding_balance||0)>0?'var(--danger)':'var(--success)'};">
-          <strong>
-            ${(r.outstanding_balance||0)>0?fmtMoney(r.outstanding_balance):'✅ Clear'}
-          </strong>
-        </td>
-        <td style="font-size:11px;">${BRANCH_MAP[r.branch]||r.branch||'—'}</td>
-        <td style="font-size:11px;">${r.issued_by||'—'}</td>
-        <td>
-          <div style="display:flex;gap:3px;">
-            <button class="btn btn-primary btn-xs" onclick="reprintReceipt('${r.id}')">
-              🖨️
-            </button>
-            <a href="https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}"
-              target="_blank" class="btn btn-ghost btn-xs" title="Verify online">
-              🔗
-            </a>
-            ${r.contract_no?`<button class="btn btn-ghost btn-xs"
-              onclick="openOrderByNo('${r.contract_no}')"
-              title="Open order">📋</button>`:''}
-          </div>
-        </td>
-      </tr>`).join('')}
+      ${receipts.map(r=>{
+        const rRef=r.receipt_ref||r.id;
+        const verifyLink=`${GITHUB_VERIFY}?ref=${rRef}`;
+        return`<tr>
+          <td>
+            <span style="color:var(--accent);font-weight:700;cursor:pointer;"
+              onclick="reprintReceipt('${r.id}')">
+              ${rRef}
+            </span>
+          </td>
+          <td style="font-size:10px;white-space:nowrap;">
+            ${r.receipt_date?new Date(r.receipt_date).toLocaleDateString('en-GB'):
+              r.timestamp?new Date(r.timestamp).toLocaleDateString('en-GB'):'—'}
+          </td>
+          <td>
+            <div style="font-weight:600;font-size:11px;">${r.client_name||'—'}</div>
+            ${r.client_id?`<div style="font-size:10px;color:var(--text3);">ID: ${r.client_id}</div>`:''}
+          </td>
+          <td>
+            <span style="color:var(--accent);cursor:pointer;font-weight:700;"
+              onclick="openOrderByNo('${r.contract_no||''}')">
+              ${r.contract_no||'—'}
+            </span>
+          </td>
+          <td style="font-size:11px;max-width:130px;white-space:nowrap;
+            overflow:hidden;text-overflow:ellipsis;">
+            ${r.car_label||'—'}
+          </td>
+          <td>
+            <span class="pill ${RC_TYPE_PILLS[r.type]||'pill-draft'}">
+              ${r.type||'—'}
+            </span>
+          </td>
+          <td>
+            <strong style="color:var(--success);">
+              ${fmtMoney(r.total_egp_equiv||0)}
+            </strong>
+          </td>
+          <td style="color:${(r.outstanding_balance||0)>0?'var(--danger)':'var(--success)'};">
+            <strong>
+              ${(r.outstanding_balance||0)>0?fmtMoney(r.outstanding_balance):'✅ Clear'}
+            </strong>
+          </td>
+          <td style="font-size:11px;">${BRANCH_MAP[r.branch]||r.branch||'—'}</td>
+          <td style="font-size:11px;">${r.issued_by||'—'}</td>
+          <td>
+            <div style="display:flex;gap:3px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-xs"
+                onclick="reprintReceipt('${r.id}')"
+                title="Reprint Receipt">
+                🖨️ Print
+              </button>
+              <a href="${verifyLink}"
+                target="_blank"
+                class="btn btn-ghost btn-xs"
+                title="Verify online">
+                🔗 Verify
+              </a>
+              ${r.contract_no?`
+              <button class="btn btn-ghost btn-xs"
+                onclick="openOrderByNo('${r.contract_no}')"
+                title="Open order">
+                📋 Order
+              </button>`:''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
     </tbody>
   </table>
   <div style="padding:9px 11px;font-size:11px;color:var(--text3);
@@ -13473,39 +13488,69 @@ function attachQRAndBarcode(ref){
         new QRCode(qrEl,{
           text:verifyUrl,
           width:80,height:80,
-          colorDark:'#1e40af',colorLight:'#ffffff',
+          colorDark:'#1e40af',
+          colorLight:'#ffffff',
           correctLevel:QRCode.CorrectLevel.M
         });
       }catch(e){qrEl.textContent=ref;}
     }
-
     const bcEl=document.getElementById(bcId);
     if(bcEl){
       try{
         JsBarcode('#'+bcId,ref,{
-          format:'CODE128',lineColor:'#1e40af',
-          width:1.5,height:35,displayValue:true,
-          fontSize:8,margin:2,background:'#f8fafc'
+          format:'CODE128',
+          lineColor:'#1e40af',
+          width:1.5,height:35,
+          displayValue:true,
+          fontSize:8,margin:2,
+          background:'#f8fafc'
         });
       }catch(e){}
     }
-  },150);
+  },300);
 }
 
+function a4FooterHTML(ref,docType,isRTL){
+  const qrId='qr-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  const verifyUrl=`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`;
 
-/* ============================================================
-   19. VERIFY DEEP LINK HANDLER
-   If the ERP is opened with ?verify=REF in the URL,
-   auto-open the receipt lookup after login.
-   e.g. yourdomain.com/erp.html?verify=RC-HRG-0402-001
-   This is an optional fallback if verify.html is not used.
-============================================================ */
-
-(function checkVerifyParam(){
-  const params=new URLSearchParams(window.location.search);
-  const vref=params.get('verify');
-  if(vref)window._pendingVerifyRef=vref.replace(/[^a-zA-Z0-9\-_]/g,'');
-})();
+  return`<div style="display:flex;align-items:center;gap:14px;background:#f8fafc;
+    border:1px solid #e2e8f0;border-radius:8px;padding:10px 13px;margin-top:14px;
+    ${isRTL?'direction:rtl;':''}">
+    <div id="${qrId}" style="flex-shrink:0;width:80px;height:80px;"></div>
+    <div style="flex:1;">
+      <div style="font-size:11px;font-weight:800;color:#1e40af;">
+        BROTHERS EGY – ${docType}
+      </div>
+      <div style="font-size:9px;color:#64748b;margin-top:2px;">
+        Ref: ${ref}
+      </div>
+      <div style="font-size:9px;color:#64748b;">
+        Issued by: ${G.user?.username||'-'} | ${new Date().toLocaleString('en-GB')}
+      </div>
+      <div style="font-size:8px;color:#3b82f6;margin-top:2px;">
+        Verify: sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}
+      </div>
+      <canvas id="${bcId}"
+        style="max-width:180px;height:45px;display:block;margin-top:4px;">
+      </canvas>
+    </div>
+    <div style="border:3px solid #1e40af;border-radius:50%;width:68px;height:68px;
+      flex-shrink:0;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;background:rgba(30,64,175,0.06);">
+      <div style="font-size:8px;font-weight:900;color:#1e40af;text-align:center;">
+        ${G.user?.username?.toUpperCase()||'STAFF'}
+      </div>
+      <div style="font-size:7px;color:#64748b;text-align:center;">
+        ${BRANCH_MAP[G.user?.branch]||G.user?.branch||''}
+      </div>
+      <div style="font-size:6px;color:#94a3b8;text-align:center;">
+        ${new Date().toLocaleDateString('en-GB')}
+      </div>
+    </div>
+  </div>`;
+}
 
 /* ============================================================
    20. DIAGNOSE GANTT — DEV HELPER
@@ -13582,36 +13627,402 @@ async function diagnoseGantt(){
   );
 })();
 
-
 /* ============================================================
-   22. FIRESTORE SECURITY RULES REFERENCE
-   Copy to: Firebase Console → Firestore → Rules tab
+   ORDER DETAIL — ENHANCED WITH CONTRACT + RECEIPT REPRINT
 ============================================================ */
 
-/*
+// Override openOrderDetail to add reprint buttons
+const _origOpenOrderDetail=openOrderDetail;
+async function openOrderDetail(orderId){
+  await _origOpenOrderDetail(orderId);
+  // After modal opens, inject reprint buttons into actions div
+  setTimeout(()=>{
+    const actionsDiv=document.querySelector('#global-modal-body .btn-warning')?.parentElement;
+    if(actionsDiv&&!actionsDiv.querySelector('.reprint-contract-btn')){
+      const contractBtn=document.createElement('button');
+      contractBtn.className='btn btn-ghost reprint-contract-btn';
+      contractBtn.innerHTML='📄 Contract';
+      contractBtn.onclick=()=>{closeModal();reprintContractFromOrder(orderId);};
 
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{doc}        { allow read, write: if true; }
-    match /bookings/{doc}     { allow read, write: if true; }
-    match /fleet/{doc}        { allow read, write: if true; }
-    match /customers/{doc}    { allow read, write: if true; }
-    match /proposals/{doc}    { allow read, write: if true; }
-    match /receipts/{doc}     { allow read, write: if true; }
-    match /logs/{doc}         { allow read, write: if true; }
-    match /notifications/{doc}{ allow read, write: if true; }
-    match /tasks/{doc}        { allow read, write: if true; }
-    match /approvals/{doc}    { allow read, write: if true; }
-    match /settings/{doc}     { allow read, write: if true; }
-    match /collections/{doc}  { allow read, write: if true; }
-    match /car_expenses/{doc} { allow read, write: if true; }
-    match /gen_expenses/{doc} { allow read, write: if true; }
-    match /_counters/{doc}    { allow read, write: if true; }
-  }
+      const receiptBtn=document.createElement('button');
+      receiptBtn.className='btn btn-ghost reprint-receipt-btn';
+      receiptBtn.innerHTML='🧾 Receipt';
+      receiptBtn.onclick=()=>{closeModal();reprintReceiptFromOrder(orderId);};
+
+      actionsDiv.appendChild(contractBtn);
+      actionsDiv.appendChild(receiptBtn);
+    }
+  },200);
 }
 
-*/
+/* ---- Reprint Contract from existing order ---- */
+async function reprintContractFromOrder(orderId){
+  let o=allOrders.find(x=>x.id===orderId);
+  if(!o){
+    try{
+      const snap=await db.collection('bookings').doc(orderId).get();
+      if(!snap.exists){toast('Order not found','error');return;}
+      o={id:snap.id,...snap.data()};
+    }catch(e){toast('Could not load order','error');return;}
+  }
+
+  showPage('en-contract');
+
+  setTimeout(()=>{
+    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+
+    // Dates
+    set('en-pickup',o['بداية التعاقد']||'');
+    set('en-dropoff',o['نهاية التعاقد']||'');
+
+    // Financial
+    const daily=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||0;
+    set('en-daily',String(daily));
+    set('en-paid-egp',String(parseAmount(o['المدفوع EGP'])||0));
+
+    // Car
+    const carId=String(o['كود السيارة']||'');
+    const carSel=document.getElementById('en-car');
+    if(carSel&&carId){
+      carSel.value=carId;
+      showCarInfoBadge(carId,'en-car-badge');
+    }
+
+    // Branch
+    const branchSel=document.getElementById('en-branch');
+    if(branchSel&&o['فرع الإصدار'])branchSel.value=o['فرع الإصدار'];
+
+    // Contract ref in proposal field
+    set('en-proposal-ref',o.contract_ref||'');
+    const stEl=document.getElementById('en-proposal-status');
+    if(stEl){
+      stEl.textContent=`📄 Order #${o['No.']} | ${o['اسم العميل']||''} | Ref: ${o.contract_ref||'—'}`;
+      stEl.style.color='var(--accent)';
+    }
+
+    // Client from CRM
+    if(o['كود العميل']){
+      const client=G.customers.find(c=>String(c['No.'])===String(o['كود العميل']));
+      if(client){
+        fillCrmFields('en',client.id);
+      }else{
+        // Fallback: split name
+        const parts=(o['اسم العميل']||'').split(' ');
+        set('en-fname',parts[0]||'');
+        set('en-lname',parts.slice(1).join(' ')||'');
+        const fnEl=document.getElementById('en-fname');
+        const lnEl=document.getElementById('en-lname');
+        if(fnEl)fnEl.readOnly=false;
+        if(lnEl)lnEl.readOnly=false;
+      }
+    }else{
+      const parts=(o['اسم العميل']||'').split(' ');
+      set('en-fname',parts[0]||'');
+      set('en-lname',parts.slice(1).join(' ')||'');
+      const fnEl=document.getElementById('en-fname');
+      const lnEl=document.getElementById('en-lname');
+      if(fnEl)fnEl.readOnly=false;
+      if(lnEl)lnEl.readOnly=false;
+    }
+
+    enCalc();
+    toast(`Order #${o['No.']} loaded — click Generate Contract Preview to create PDF`,'info',5000);
+  },500);
+}
+
+/* ---- Reprint Receipt from existing order ---- */
+async function reprintReceiptFromOrder(orderId){
+  let o=allOrders.find(x=>x.id===orderId);
+  if(!o){
+    try{
+      const snap=await db.collection('bookings').doc(orderId).get();
+      if(!snap.exists){toast('Order not found','error');return;}
+      o={id:snap.id,...snap.data()};
+    }catch(e){toast('Could not load order','error');return;}
+  }
+
+  const orderNo=String(o['No.']||'');
+
+  // Find latest receipt for this order
+  try{
+    const recSnap=await db.collection('receipts')
+      .where('contract_no','==',orderNo)
+      .limit(10).get();
+
+    if(!recSnap.empty){
+      // Sort client-side by timestamp desc
+      const recs=recSnap.docs
+        .map(d=>({id:d.id,...d.data()}))
+        .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+
+      if(recs.length===1){
+        // Single receipt — reprint directly
+        showPage('receipts');
+        setTimeout(()=>reprintReceipt(recs[0].id),300);
+        return;
+      }
+
+      // Multiple receipts — show selection modal
+      openModal(`🧾 Receipts for Order #${orderNo}`,`
+      <div style="margin-bottom:11px;font-size:11px;color:var(--text3);">
+        ${recs.length} receipt${recs.length!==1?'s':''} found for this order
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Ref</th><th>Date</th><th>Type</th><th>Amount</th><th>Action</th>
+          </tr></thead>
+          <tbody>
+            ${recs.map(r=>`<tr>
+              <td style="color:var(--accent);font-weight:700;">${r.receipt_ref||r.id}</td>
+              <td style="font-size:10px;">${r.receipt_date||'—'}</td>
+              <td><span class="pill ${RC_TYPE_PILLS[r.type]||'pill-draft'}">${r.type||'—'}</span></td>
+              <td><strong style="color:var(--success);">${fmtMoney(r.total_egp_equiv||0)}</strong></td>
+              <td>
+                <button class="btn btn-primary btn-xs"
+                  onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300);">
+                  🖨️ Print
+                </button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`);
+      return;
+    }
+  }catch(e){console.warn('Receipt lookup:',e.message);}
+
+  // No receipt found — open receipt form pre-filled
+  showPage('receipts');
+  setTimeout(()=>{
+    const el=document.getElementById('rc-contract-no');
+    if(el){
+      el.value=orderNo;
+      rcLookupContractDebounced();
+    }
+    toast(`No receipt found for Order #${orderNo} — add payment amount and generate`,'info',5000);
+  },400);
+}
+
+/* ---- CRM Profile Enhancement: Show contracts and receipts ---- */
+async function openCRMProfile(customerId){
+  const c=G.customers.find(x=>x.id===customerId);if(!c)return;
+  const name=((c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')).trim();
+  const clientNo=String(c['No.']||c.id);
+
+  // Find all orders and receipts for this client
+  const[ordersSnap,receiptsSnap]=await Promise.all([
+    db.collection('bookings').where('كود العميل','==',clientNo).get(),
+    db.collection('receipts').where('client_id','==',clientNo).get()
+  ]);
+
+  const orders=ordersSnap.docs.map(d=>({id:d.id,...d.data()}))
+    .sort((a,b)=>(b._sys_updated||0)-(a._sys_updated||0));
+
+  const receipts=receiptsSnap.docs.map(d=>({id:d.id,...d.data()}))
+    .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+
+  const today=new Date();
+  const totalContracted=orders.reduce((s,o)=>s+parseAmount(o['إجمالي المستحق (Total)']),0);
+  const totalPaid=orders.reduce((s,o)=>s+parseAmount(o['المدفوع EGP']),0);
+  const totalReceiptsAmt=receipts.reduce((s,r)=>s+(r.total_egp_equiv||0),0);
+  const activeOrders=orders.filter(o=>getOrderStatus(o)==='Active').length;
+  const overdueOrders=orders.filter(o=>getOrderStatus(o)==='Overdue_Legacy').length;
+
+  const html=`
+  <!-- Profile Header -->
+  <div style="display:flex;align-items:flex-start;gap:14px;padding:13px;
+    background:var(--surface2);border-radius:var(--radius);margin-bottom:16px;">
+    <div style="width:50px;height:50px;border-radius:50%;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
+      ${initials(name).toUpperCase()}
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:16px;font-weight:900;">${name||'—'}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px;">
+        CRM #${clientNo} | ${c['رمز الدولة']||'—'}
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;">
+        ${activeOrders>0?`<span class="pill pill-active">🚗 ${activeOrders} Active</span>`:''}
+        ${overdueOrders>0?`<span class="pill pill-overdue">⚠️ ${overdueOrders} Overdue</span>`:''}
+        <span class="pill pill-closed">${orders.length} Orders Total</span>
+        <span class="pill pill-accepted">${receipts.length} Receipts</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info & Financials -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:16px;">
+    <div class="panel">
+      <div style="font-size:10px;font-weight:800;color:var(--accent);
+        text-transform:uppercase;margin-bottom:9px;">📇 Contact</div>
+      <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 11px;">
+        <span style="color:var(--text3);">Phone:</span>
+        <span style="font-weight:700;">${c['رقم التليفون']||'—'}</span>
+        <span style="color:var(--text3);">Email:</span>
+        <span>${c['عنوان البريد الإلكتروني']||'—'}</span>
+        <span style="color:var(--text3);">Passport:</span>
+        <span>${c['رقم جواز السفر']||'—'}</span>
+        <span style="color:var(--text3);">National ID:</span>
+        <span>${c['الرقم القومي']||'—'}</span>
+        <span style="color:var(--text3);">License:</span>
+        <span>${c['رقم رخصة القيادة']||'—'}</span>
+        <span style="color:var(--text3);">Address:</span>
+        <span>${c['العنوان']||'—'}</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div style="font-size:10px;font-weight:800;color:var(--accent);
+        text-transform:uppercase;margin-bottom:9px;">💰 Financial Summary</div>
+      <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 11px;">
+        <span style="color:var(--text3);">Total Contracted:</span>
+        <span style="font-weight:700;">${fmtMoney(totalContracted)}</span>
+        <span style="color:var(--text3);">Total Paid (EGP):</span>
+        <span style="font-weight:700;color:var(--success);">${fmtMoney(totalPaid)}</span>
+        <span style="color:var(--text3);">Outstanding:</span>
+        <span style="font-weight:700;color:${totalContracted-totalPaid>0?'var(--danger)':'var(--success)'};">
+          ${totalContracted-totalPaid>0?fmtMoney(totalContracted-totalPaid):'✅ Clear'}
+        </span>
+        <span style="color:var(--text3);">Receipts Total:</span>
+        <span>${fmtMoney(totalReceiptsAmt)}</span>
+        <span style="color:var(--text3);">Orders Count:</span>
+        <span>${orders.length}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders List -->
+  ${orders.length>0?`
+  <div class="panel" style="margin-bottom:13px;">
+    <div style="font-size:12px;font-weight:800;margin-bottom:11px;">
+      📋 Contracts / Orders (${orders.length})
+    </div>
+    <div class="table-wrap" style="max-height:200px;overflow-y:auto;">
+      <table class="data-table">
+        <thead><tr>
+          <th>Order #</th><th>Ref</th><th>Car</th>
+          <th>Period</th><th>Total</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${orders.map(o=>{
+            const{start,end}=getOrderDates(o);
+            const st=getOrderStatus(o);
+            const sk=st==='Accident'?'accident':st==='Overdue_Legacy'?'overdue':
+              st==='Closed'?'closed':'active';
+            const carCode=o['كود السيارة'];
+            const carInFleet=G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
+            const carLabel=carInFleet?getCarLabel(carInFleet,'en'):(o['اسم السيارة']||'—');
+            return`<tr>
+              <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
+              <td style="font-size:9px;color:var(--text3);">${o.contract_ref||'—'}</td>
+              <td style="font-size:11px;">${carLabel}</td>
+              <td style="font-size:10px;">
+                ${start?fmtDateShort(start):'—'} →<br>
+                ${end?fmtDateShort(end):'—'}
+              </td>
+              <td style="white-space:nowrap;">
+                ${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}
+              </td>
+              <td><span class="pill pill-${sk}">
+                ${st==='Overdue_Legacy'?'OVERDUE':st}
+              </span></td>
+              <td>
+                <div style="display:flex;gap:3px;">
+                  <button class="btn btn-ghost btn-xs"
+                    onclick="closeModal();openOrderDetail('${o.id}')">
+                    👁
+                  </button>
+                  <button class="btn btn-primary btn-xs"
+                    onclick="closeModal();reprintContractFromOrder('${o.id}')">
+                    📄
+                  </button>
+                  <button class="btn btn-ghost btn-xs"
+                    onclick="closeModal();reprintReceiptFromOrder('${o.id}')">
+                    🧾
+                  </button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`:''}
+
+  <!-- Receipts List -->
+  ${receipts.length>0?`
+  <div class="panel">
+    <div style="font-size:12px;font-weight:800;margin-bottom:11px;">
+      🧾 Receipts (${receipts.length})
+    </div>
+    <div class="table-wrap" style="max-height:200px;overflow-y:auto;">
+      <table class="data-table">
+        <thead><tr>
+          <th>Receipt Ref</th><th>Date</th><th>Contract</th>
+          <th>Type</th><th>Amount</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${receipts.map(r=>{
+            const rRef=r.receipt_ref||r.id;
+            return`<tr>
+              <td><span style="color:var(--accent);font-weight:700;font-size:11px;">
+                ${rRef}
+              </span></td>
+              <td style="font-size:10px;">${r.receipt_date||'—'}</td>
+              <td style="color:var(--accent);cursor:pointer;font-size:11px;"
+                onclick="closeModal();openOrderByNo('${r.contract_no||''}')">
+                ${r.contract_no||'—'}
+              </td>
+              <td><span class="pill ${RC_TYPE_PILLS[r.type]||'pill-draft'}">
+                ${r.type||'—'}
+              </span></td>
+              <td><strong style="color:var(--success);">
+                ${fmtMoney(r.total_egp_equiv||0)}
+              </strong></td>
+              <td>
+                <div style="display:flex;gap:3px;">
+                  <button class="btn btn-primary btn-xs"
+                    onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300);">
+                    🖨️
+                  </button>
+                  <a href="https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${rRef}"
+                    target="_blank" class="btn btn-ghost btn-xs">
+                    🔗
+                  </a>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`:''}
+
+  <!-- Actions -->
+  <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap;">
+    <button class="btn btn-ghost" onclick="closeModal();openEditCustomerModal('${c.id}')">
+      ✏️ Edit Profile
+    </button>
+    <button class="btn btn-primary"
+      onclick="closeModal();showPage('en-contract');setTimeout(()=>{
+        fillCrmFields('en','${c.id}');
+      },400);">
+      📄 New Contract
+    </button>
+    <button class="btn btn-ghost"
+      onclick="closeModal();showPage('receipts');setTimeout(()=>{
+        document.getElementById('rc-client-name').value='${name}';
+      },400);">
+      🧾 New Receipt
+    </button>
+  </div>`;
+
+  openModal(`👤 ${name}`,html,true);
+  await logAction('VIEW','CRM Hub',`Viewed profile: ${name}`);
+}
+
   
 </script>
 </body>
