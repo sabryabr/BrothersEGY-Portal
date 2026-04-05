@@ -13420,19 +13420,23 @@ function debounce(fn,delay){
   };
 }
 
-// Apply debounce to heavy filter functions
-const _filterOrdersOrig=filterOrders;
-const filterOrders=debounce(_filterOrdersOrig,150);
-
-const _filterCRMOrig=filterCRM;
-const filterCRM=debounce(_filterCRMOrig,200);
-
-const _filterLogsOrig=filterLogs;
-const filterLogs=debounce(_filterLogsOrig,150);
-
-const _filterSavedReceiptsOrig=filterSavedReceipts;
-const filterSavedReceipts=debounce(_filterSavedReceiptsOrig,150);
-
+// REPLACE WITH THIS:
+if(typeof filterOrders==='function'){
+  const _fo=filterOrders;
+  window.filterOrders=debounce(_fo,150);
+}
+if(typeof filterCRM==='function'){
+  const _fc=filterCRM;
+  window.filterCRM=debounce(_fc,200);
+}
+if(typeof filterLogs==='function'){
+  const _fl=filterLogs;
+  window.filterLogs=debounce(_fl,150);
+}
+if(typeof filterSavedReceipts==='function'){
+  const _fr=filterSavedReceipts;
+  window.filterSavedReceipts=debounce(_fr,150);
+}
 
 /* ============================================================
    16. PRINT ISOLATION — FINAL FIX
