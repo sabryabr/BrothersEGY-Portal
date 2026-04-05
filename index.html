@@ -2696,7 +2696,10 @@ async function openOrderDetail(orderId){
         <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">📅 Period</div>
         <div style="font-size:11px;"><strong>Start:</strong> ${start?fmtDate(start):'Invalid Date'}</div>
         <div style="font-size:11px;margin-top:3px;"><strong>End:</strong> ${end?fmtDate(end):'Invalid Date'}</div>
-        <div style="font-size:11px;margin-top:3px;color:var(--text3);">Duration: ${o['rental_days']||'-'} days</div>
+        <div style="font-size:11px;margin-top:3px;color:var(--text3);">Duration: ${
+          o['rental_days']||
+          (start&&end?Math.ceil((end-start)/86400000):'-')
+        } days</div>
         <div style="font-size:11px;margin-top:3px;color:var(--text3);">Branch: ${BRANCH_MAP[o['فرع الإصدار']]||o['فرع الإصدار']||'-'}</div>
       </div>
       <div class="panel">
