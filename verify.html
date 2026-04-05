@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Verify Document — Brothers EGY</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;
+    color:#334155;padding:20px;max-width:600px;margin:0 auto;}
+  .card{background:#fff;border-radius:12px;padding:24px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.08);margin-top:20px;}
+  .verified{background:#f0fdf4;border:2px solid #22c55e;border-radius:8px;
+    padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+  .fraud{background:#fef2f2;border:2px solid #dc2626;border-radius:8px;
+    padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+  .badge-icon{font-size:28px;}
+  .badge-text{font-size:14px;font-weight:800;}
+  .header{display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #e2e8f0;}
+  .logo{height:40px;}
+  table{width:100%;border-collapse:collapse;margin-top:16px;}
+  td{padding:9px 4px;border-bottom:1px solid #f1f5f9;font-size:13px;}
+  td:first-child{color:#64748b;width:42%;}
+  td:last-child{font-weight:600;}
+  .amount{font-size:22px;font-weight:900;color:#16a34a;}
+  .footer{text-align:center;font-size:11px;color:#94a3b8;
+    margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0;}
+  .spinner{width:32px;height:32px;border:3px solid #e2e8f0;
+    border-top-color:#1e40af;border-radius:50%;
+    animation:spin 0.7s linear infinite;margin:40px auto;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <img class="logo"
+      src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png"
+      alt="Brothers EGY"
+      onerror="this.style.display='none'"/>
+    <div style="font-size:11px;color:#64748b;">
+      Ref: <strong style="color:#1e40af;" id="ref-display"></strong>
+    </div>
+  </div>
+  <div class="spinner" id="spinner"></div>
+  <div id="content" style="display:none;"></div>
+</div>
+
+<script>
+  const PROJECT='brothers-egy-portal';
+  const BASE=`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+  const params=new URLSearchParams(window.location.search);
+  const ref=(params.get('ref')||'').replace(/[^a-zA-Z0-9\-_]/g,'');
+
+  document.getElementById('ref-display').textContent=ref||'No reference';
+
+  function fv(fields,key){
+    const f=fields[key];
+    if(!f)return '—';
+    return f.stringValue??f.integerValue??f.doubleValue??
+      (f.booleanValue!==undefined?String(f.booleanValue):'—');
+  }
+
+  function fmtMoney(val){
+    const n=parseFloat(String(val).replace(/[£,]/g,''))||0;
+    return '£'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+
+  async function fetchDoc(collection,docId){
+    try{
+      const res=await fetch(`${BASE}/${collection}/${encodeURIComponent(docId)}`);
+      if(!res.ok)return null;
+      return res.json();
+    }catch(e){return null;}
+  }
+
+  async function verify(){
+    if(!ref){showNotFound('No reference number provided.');return;}
+
+    let doc=await fetchDoc('receipts',ref);
+    let docType='Receipt';
+
+    if(!doc||doc.error){
+      doc=await fetchDoc('proposals',ref);
+      docType='Proposal';
+    }
+
+    if(!doc||doc.error){
+      doc=await fetchDoc('bookings',ref);
+      docType='Contract';
+    }
+
+    document.getElementById('spinner').style.display='none';
+    document.getElementById('content').style.display='block';
+
+    if(!doc||doc.error){
+      showNotFound(`No document found for reference <strong>${ref}</strong>.`);
+      return;
+    }
+
+    showVerified(doc.fields||{},docType);
+  }
+
+  function showVerified(fields,docType){
+    const isReceipt=docType==='Receipt';
+    const isProposal=docType==='Proposal';
+    const outstanding=parseFloat(
+      String(fv(fields,'outstanding_balance')).replace(/[£,]/g,'')||'0'
+    );
+    const amount=parseFloat(
+      String(
+        fv(fields,'total_egp_equiv')||
+        fv(fields,'total_estimate')||
+        fv(fields,'إجمالي المستحق (Total)')||'0'
+      ).replace(/[£,]/g,'')
+    );
+
+    document.getElementById('content').innerHTML=`
+    <div class="verified">
+      <span class="badge-icon">✅</span>
+      <div>
+        <div class="badge-text" style="color:#16a34a;">DOCUMENT VERIFIED</div>
+        <div style="font-size:11px;color:#16a34a;">
+          Issued by Brothers EGY Car Rental — ${docType}
+        </div>
+      </div>
+    </div>
+
+    <table>
+      ${isReceipt?`
+        <tr><td>Receipt Title</td><td>${fv(fields,'receipt_title')}</td></tr>
+        <tr><td>Receipt Type</td><td>${fv(fields,'type')}</td></tr>
+        <tr><td>Contract No.</td><td>${fv(fields,'contract_no')}</td></tr>
+      `:isProposal?`
+        <tr><td>Proposal Ref</td><td>${fv(fields,'proposal_ref')}</td></tr>
+        <tr><td>Status</td><td>${fv(fields,'status')}</td></tr>
+      `:`
+        <tr><td>Contract Ref</td><td>${fv(fields,'contract_ref')}</td></tr>
+        <tr><td>Order No.</td><td>${fv(fields,'No.')}</td></tr>
+        <tr><td>Status</td><td>${fv(fields,'حالة الطلب')}</td></tr>
+      `}
+      <tr><td>Client</td>
+        <td>${fv(fields,'client_name')||fv(fields,'اسم العميل')}</td></tr>
+      <tr><td>Vehicle</td>
+        <td>${fv(fields,'car_label')||fv(fields,'اسم السيارة')}</td></tr>
+      ${isReceipt?`
+        <tr><td>Rental Start</td><td>${fv(fields,'rental_start')}</td></tr>
+        <tr><td>Rental End</td><td>${fv(fields,'rental_end')}</td></tr>
+        <tr><td>Date Issued</td><td>${fv(fields,'receipt_date')}</td></tr>
+      `:`
+        <tr><td>Start Date</td><td>${fv(fields,'بداية التعاقد')}</td></tr>
+        <tr><td>End Date</td><td>${fv(fields,'نهاية التعاقد')}</td></tr>
+      `}
+      <tr><td>Branch</td><td>${fv(fields,'branch')||fv(fields,'فرع الإصدار')}</td></tr>
+      <tr><td>Issued By</td><td>${fv(fields,'issued_by')||fv(fields,'assigned_user')}</td></tr>
+      <tr>
+        <td>${isReceipt?'Amount Received':isProposal?'Total Estimate':'Contract Value'}</td>
+        <td class="amount">${fmtMoney(amount)}</td>
+      </tr>
+      ${isReceipt&&outstanding!==null?`
+      <tr>
+        <td>Outstanding Balance</td>
+        <td style="font-weight:800;color:${outstanding>0?'#dc2626':'#16a34a'};">
+          ${outstanding>0?fmtMoney(outstanding):'✅ Fully Paid'}
+        </td>
+      </tr>`:''}
+    </table>
+
+    <div class="footer">
+      Brothers EGY Car Rental Services •
+      <a href="https://brothersegy.com" style="color:#1e40af;">brothersegy.com</a><br>
+      Verified on ${new Date().toLocaleString('en-GB')}
+    </div>`;
+  }
+
+  function showNotFound(msg){
+    document.getElementById('content').innerHTML=`
+    <div class="fraud">
+      <span class="badge-icon">⚠️</span>
+      <div>
+        <div class="badge-text" style="color:#dc2626;">DOCUMENT NOT VERIFIED</div>
+        <div style="font-size:11px;color:#dc2626;">
+          This document could not be found in the Brothers EGY system
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;padding:20px;">
+      <p style="font-size:13px;">${msg}</p>
+      <p style="font-size:11px;color:#94a3b8;margin-top:9px;">
+        Contact Brothers EGY directly to verify the authenticity of this document.
+      </p>
+    </div>
+    <div class="footer">Brothers EGY Car Rental • brothersegy.com</div>`;
+  }
+
+  verify();
+</script>
+</body>
+</html>
