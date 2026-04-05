@@ -2740,10 +2740,10 @@ async function openOrderDetail(orderId){
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <button class="btn btn-warning" onclick="closeModal();openOrderEdit('${o.id}')">✏️ Edit Order</button>
       <button class="btn btn-primary" onclick="closeModal();quickAddPayment('${o.id}')">💰 Add Payment</button>
-      ${!isClosed?`<button class="btn btn-success" onclick="closeModal();requestCloseOrder('${o.id}')">✅ Close Order</button>`:''}
+      ${!isClosed?`<button class="btn btn-success" onclick="closeModal();requestCloseOrder('${o.id}')">✅ Close Order</button>`:"}
       <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('${o.id}')">📄 Contract</button>
       <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('${o.id}')">🧾 Receipt</button>
-    </div>;
+    </div>';
 
   openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`,html,true);
   logAction('VIEW','Order Book',`Viewed order #${o['No.']||o.id}`);
