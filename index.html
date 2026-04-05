@@ -6914,7 +6914,6 @@ async function loadVehicle360Details(){
   if(!car){content.innerHTML='<div class="empty-state"><p>Car not found in local cache. Try refreshing.</p></div>';return;}
 
   try{
-    // Fetch all bookings and car expenses — match by ID with same robust logic as Gantt
     const possibleIds=new Set([
       String(car.ID||'').trim(),
       String(car.id||'').trim(),
@@ -6941,7 +6940,6 @@ async function loadVehicle360Details(){
     const carExps=carExpSnap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>{
       const eCarId=String(e['كود السيارة']||'').trim();
       if(possibleIds.has(eCarId))return true;
-      // Also match by order number
       return orders.some(o=>String(o['No.'])===String(e['كود الاوردر']));
     });
 
@@ -6950,14 +6948,12 @@ async function loadVehicle360Details(){
     const statusColors={available:'var(--success)',rented:'var(--accent)',accident:'var(--danger)',maintenance:'var(--warning)',archived:'var(--text3)'};
     const dotColor=statusColors[catStatus]||'var(--text3)';
 
-    // Financial calculations
     const totalRevenue=orders.reduce((s,o)=>s+parseAmount(o['إجمالي المستحق (Total)']),0);
     const totalPaid=orders.reduce((s,o)=>s+parseAmount(o['المدفوع EGP']),0);
     const totalDeposit=orders.reduce((s,o)=>s+parseAmount(o['الوديعة المعلقة لدينا']),0);
     const totalExpenses=carExps.reduce((s,e)=>s+parseAmount(e['قيمة المصروف']),0);
     const netROI=totalPaid-totalExpenses;
 
-    // Pending debt with overdue calculations
     const pending=orders.reduce((s,o)=>{
       const{end}=getOrderDates(o);
       const st=getOrderStatus(o);
@@ -6971,23 +6967,19 @@ async function loadVehicle360Details(){
       return s+Math.max(0,debt);
     },0);
 
-    // License expiry countdown
     const licenseExp=parseDBDate(car['نهاية الترخيص']||'');
     const insuranceExp=parseDBDate(car['نهاية التأمين']||'');
-    const contractExp=parseDBDate(car['نهاية التعاقد']||'');
     const handoverDate=parseDBDate(car['تاريخ التسليم']||'');
 
-    const daysUntil=(d)=>{
-      if(!d)return null;
-      return Math.ceil((d-today)/86400000);
-    };
+    const daysUntil=(d)=>{if(!d)return null;return Math.ceil((d-today)/86400000);};
 
     const expiryBadge=(d,label)=>{
       if(!d)return`<span style="color:var(--text3);">—</span>`;
       const days=daysUntil(d);
       const color=days<=0?'var(--danger)':days<=30?'var(--warning)':'var(--success)';
+      const text=days<=0?`EXPIRED ${Math.abs(days)}d ago`:days<=30?`⚠️ ${days}d left`:`✓ ${days}d`;
       return`<span style="color:${color};font-weight:700;">${fmtDateShort(d)}</span>
-             <span style="font-size:9px;color:${color};">${days<=0?`EXPIRED ${Math.abs(days)}d ago`:days<=30?`⚠️ ${days}d left`:`✓ ${days}d`}</span>`;
+             <span style="font-size:9px;color:${color};">${text}</span>`;
     };
 
     const isPriv=['Admin','Executive'].includes(G.user?.role);
@@ -7018,7 +7010,7 @@ async function loadVehicle360Details(){
       <div class="kpi-card"><div class="kpi-label">Pending Debt</div><div class="kpi-value text-danger">${fmtMoney(pending)}</div><div class="kpi-sub">Outstanding</div></div>
       <div class="kpi-card"><div class="kpi-label">Held Deposits</div><div class="kpi-value text-warning">${fmtMoney(totalDeposit)}</div><div class="kpi-sub">Not refunded</div></div>
       <div class="kpi-card"><div class="kpi-label">Car Expenses</div><div class="kpi-value text-danger">${fmtMoney(totalExpenses)}</div><div class="kpi-sub">${carExps.length} records</div></div>
-      <div class="kpi-card" style="--kc:${netROI>=0?'var(--success)':'var(--danger)'};">
+      <div class="kpi-card">
         <div class="kpi-label">Net ROI</div>
         <div class="kpi-value" style="color:${netROI>=0?'var(--success)':'var(--danger)'};">${fmtMoney(netROI)}</div>
         <div class="kpi-sub">Collected - Expenses</div>
@@ -7053,17 +7045,11 @@ async function loadVehicle360Details(){
           <span style="color:var(--text3);">Start:</span><span>${fmtDateShort(parseDBDate(car['بداية التعاقد']||''))||'—'}</span>
           <span style="color:var(--text3);">End:</span><span>${fmtDateShort(parseDBDate(car['نهاية التعاقد']||''))||'—'}</span>
           <span style="color:var(--text3);">Handover:</span>
-          <span style="display:flex;flex-direction:column;">
-            ${handoverDate?expiryBadge(handoverDate,'Handover'):'—'}
-          </span>
+          <span style="display:flex;flex-direction:column;">${handoverDate?expiryBadge(handoverDate,'Handover'):'—'}</span>
           <span style="color:var(--text3);">License:</span>
-          <span style="display:flex;flex-direction:column;">
-            ${licenseExp?expiryBadge(licenseExp,'License'):'—'}
-          </span>
+          <span style="display:flex;flex-direction:column;">${licenseExp?expiryBadge(licenseExp,'License'):'—'}</span>
           <span style="color:var(--text3);">Insurance:</span>
-          <span style="display:flex;flex-direction:column;">
-            ${insuranceExp?expiryBadge(insuranceExp,'Insurance'):'—'}
-          </span>
+          <span style="display:flex;flex-direction:column;">${insuranceExp?expiryBadge(insuranceExp,'Insurance'):'—'}</span>
           <span style="color:var(--text3);">Insurance Co.:</span><span>${car['Insurance Comp.']||car['شركة التأمين']||'—'}</span>
           <span style="color:var(--text3);">Chassis:</span><span style="font-size:10px;">${car['رقم الشاسية']||'—'}</span>
           <span style="color:var(--text3);">Engine:</span><span>${car['رقم الموتور']||'—'}</span>
@@ -7107,7 +7093,7 @@ async function loadVehicle360Details(){
         </span>
       </div>
       ${orders.length===0?
-        '<div class="empty-state" style="padding:20px;"><p>No orders found for this car. Check that کود السيارة in bookings matches this car\'s ID.</p></div>':
+        '<div class="empty-state" style="padding:20px;"><p>No orders found for this car.</p></div>':
         `<div class="table-wrap">
           <table class="data-table">
             <thead><tr>
@@ -7116,13 +7102,15 @@ async function loadVehicle360Details(){
             </tr></thead>
             <tbody>
               ${orders.sort((a,b)=>{
-                const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);
+                const{start:as}=getOrderDates(a);
+                const{start:bs}=getOrderDates(b);
                 return(bs||0)-(as||0);
               }).map(o=>{
                 const{start,end}=getOrderDates(o);
                 const t=parseAmount(o['إجمالي المستحق (Total)']);
                 const p=parseAmount(o['المدفوع EGP']);
-                const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(t/Math.max(1,parseFloat(o.rental_days||1)));
+                const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||
+                  (t/Math.max(1,parseFloat(o.rental_days||1)));
                 const st=getOrderStatus(o);
                 const isCl=st==='Closed';
                 const isAc=st==='Accident';
@@ -7156,7 +7144,8 @@ async function loadVehicle360Details(){
               }).join('')}
             </tbody>
           </table>
-        </div>`}
+        </div>`
+      }
     </div>
 
     <!-- Car Expenses -->
@@ -7187,7 +7176,8 @@ async function loadVehicle360Details(){
               </tr>`).join('')}
             </tbody>
           </table>
-        </div>`}
+        </div>`
+      }
     </div>`;
 
     await logAction('VIEW','Vehicle 360',`Viewed: ${getCarLabel(car,'en')}`);
@@ -7197,7 +7187,6 @@ async function loadVehicle360Details(){
     console.warn('V360 error:',e);
   }
 }
-
 
 /* ============================================================
    RISK RADAR - ENHANCED WITH ALL 3 EXPIRY TYPES + FILTERS
@@ -9645,6 +9634,7 @@ async function computeIEKPIs(){
     const totalExp=carExp+genExp;
     const net=income-totalExp;
     const margin=income>0?Math.round((net/income)*100):0;
+    const periodLabel=period.month?` · ${period.label}`:' · All time';
 
     const kpiRow=document.getElementById('ie-kpi-row');
     if(kpiRow){
@@ -9652,7 +9642,7 @@ async function computeIEKPIs(){
       <div class="kpi-card" style="cursor:pointer;" onclick="showIETab('income',document.getElementById('ie-tab-income'))">
         <div class="kpi-label">Total Income</div>
         <div class="kpi-value text-success">${fmtMoney(income)}</div>
-        <div class="kpi-sub">${incomeCount} records${period.month?` · ${period.label}':' · All time'}</div>
+        <div class="kpi-sub">${incomeCount} records${periodLabel}</div>
         <div class="kpi-icon">📥</div>
       </div>
       <div class="kpi-card" style="cursor:pointer;" onclick="showIETab('car',document.getElementById('ie-tab-car'))">
@@ -9694,11 +9684,9 @@ async function computeIEKPIs(){
 
 async function loadIETrendChart(){
   const canvas=document.getElementById('ie-trend-chart');if(!canvas)return;
-
   const isPriv=['Admin','Executive'].includes(G.user?.role);
   const now=new Date();
 
-  // Build 6 months of labels
   const months=[];
   for(let i=5;i>=0;i--){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
@@ -9718,7 +9706,10 @@ async function loadIETrendChart(){
 
     const incomeByMonth={};
     const expByMonth={};
-    months.forEach(m=>{incomeByMonth[`${m.year}-${m.month}`]=0;expByMonth[`${m.year}-${m.month}`]=0;});
+    months.forEach(m=>{
+      incomeByMonth[`${m.year}-${m.month}`]=0;
+      expByMonth[`${m.year}-${m.month}`]=0;
+    });
 
     cSnap.docs.forEach(d=>{
       const data=d.data();
@@ -9742,7 +9733,6 @@ async function loadIETrendChart(){
       if(key in expByMonth)expByMonth[key]+=parseAmount(data['قيمة المصروف']);
     });
 
-    // Destroy old chart instance
     if(window._ieTrendChart){window._ieTrendChart.destroy();window._ieTrendChart=null;}
 
     const container=canvas.parentElement;
