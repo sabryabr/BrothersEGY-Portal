@@ -929,7 +929,13 @@ function formatPlate(car){
   const letters=[car['احرف اللوحة'],car['Field_23'],car['Field_24']].filter(Boolean).join(' ');
   return`${nums} | ${letters}`.trim()||'No Plate';
 }
-function getCarById(id){return G.fleet.find(c=>String(c.ID||c.id)===String(id))||null;}
+function getCarById(id){
+  if(!id)return null;
+  const strId=String(id).trim();
+  // Always match by Firestore document ID first — guaranteed unique
+  return G.fleet.find(c=>String(c.id||'').trim()===strId)||null;
+}
+
 function getCarCounts(){
   const counts={active:0,archived:0,accident:0,maintenance:0,rented:0};
   const bc={HRG:0,ALX:0,CAI:0,RSH:0};
@@ -1047,7 +1053,7 @@ function populateFleetDropdowns(){
   const opts=booking.map(car=>{
     const cat=getCarStatusCategory(car);
     const dot=cat==='available'?'🟢':cat==='rented'?'🔵':cat==='accident'?'🔴':cat==='maintenance'?'🟡':'⚪';
-    return`<option value="${car.ID||car.id}">${dot} ${getCarLabel(car,'en')}</option>`;
+    return`<option value="${car.id}">${dot} ${getCarLabel(car,'en')}</option>`;
   }).join('');
   const first='<option value="">-- Select Car --</option>';
   ['pr-car','en-car','ar-car'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=first+opts;});
@@ -13023,8 +13029,9 @@ async function _renderVehicle360Full(){
     const cat=getCarStatusCategory(c);
     const dot=cat==='available'?'🟢':cat==='rented'?'🔵':
       cat==='accident'?'🔴':cat==='maintenance'?'🟡':'⚪';
-    return`<option value="${c.ID||c.id}">${dot} ${getCarLabel(c,'en')}</option>`;
+    return`<option value="${c.id}">${dot} ${getCarLabel(c,'en')}</option>`;
   }).join('');
+
 
   el.innerHTML=`
   <div class="section-header">
@@ -13644,16 +13651,29 @@ async function reprintContractFromOrder(orderId){
   showPage('en-contract');
 
   setTimeout(()=>{
+    // Convert any date string to datetime-local format yyyy-MM-ddThh:mm
+    const toDateTimeLocal=(str)=>{
+      if(!str)return '';
+      const d=parseDBDate(str);
+      if(!d||isNaN(d.getTime()))return '';
+      const yyyy=d.getFullYear();
+      const mm=String(d.getMonth()+1).padStart(2,'0');
+      const dd=String(d.getDate()).padStart(2,'0');
+      const hh=String(d.getHours()).padStart(2,'0');
+      const min=String(d.getMinutes()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    };
+
     const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
 
-    // Dates
-    set('en-pickup',o['بداية التعاقد']||'');
-    set('en-dropoff',o['نهاية التعاقد']||'');
+    // Dates — converted to proper format
+    set('en-pickup', toDateTimeLocal(o['بداية التعاقد']));
+    set('en-dropoff', toDateTimeLocal(o['نهاية التعاقد']));
 
     // Financial
     const daily=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||0;
-    set('en-daily',String(daily));
-    set('en-paid-egp',String(parseAmount(o['المدفوع EGP'])||0));
+    set('en-daily', String(daily));
+    set('en-paid-egp', String(parseAmount(o['المدفوع EGP'])||0));
 
     // Car
     const carId=String(o['كود السيارة']||'');
@@ -13667,8 +13687,8 @@ async function reprintContractFromOrder(orderId){
     const branchSel=document.getElementById('en-branch');
     if(branchSel&&o['فرع الإصدار'])branchSel.value=o['فرع الإصدار'];
 
-    // Contract ref in proposal field
-    set('en-proposal-ref',o.contract_ref||'');
+    // Reference
+    set('en-proposal-ref', o.contract_ref||'');
     const stEl=document.getElementById('en-proposal-status');
     if(stEl){
       stEl.textContent=`📄 Order #${o['No.']} | ${o['اسم العميل']||''} | Ref: ${o.contract_ref||'—'}`;
@@ -13681,7 +13701,6 @@ async function reprintContractFromOrder(orderId){
       if(client){
         fillCrmFields('en',client.id);
       }else{
-        // Fallback: split name
         const parts=(o['اسم العميل']||'').split(' ');
         set('en-fname',parts[0]||'');
         set('en-lname',parts.slice(1).join(' ')||'');
