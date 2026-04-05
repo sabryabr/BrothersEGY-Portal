@@ -2740,9 +2740,11 @@ async function openOrderDetail(orderId){
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <button class="btn btn-warning" onclick="closeModal();openOrderEdit('${o.id}')">✏️ Edit Order</button>
       <button class="btn btn-primary" onclick="closeModal();quickAddPayment('${o.id}')">💰 Add Payment</button>
-      ${!isClosed?`<button class="btn btn-success" onclick="closeModal();requestCloseOrder('${o.id}')">✅ Request Close</button>`:''}
-      <button class="btn btn-ghost" onclick="closeModal();showPage('receipts')">🧾 Receipt</button>
-    </div>`;
+      ${!isClosed?`<button class="btn btn-success" onclick="closeModal();requestCloseOrder('${o.id}')">✅ Close Order</button>`:''}
+      <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('${o.id}')">📄 Contract</button>
+      <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('${o.id}')">🧾 Receipt</button>
+    </div>
+
   openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`,html,true);
   logAction('VIEW','Order Book',`Viewed order #${o['No.']||o.id}`);
 }
@@ -13626,34 +13628,6 @@ async function diagnoseGantt(){
     'color:#94a3b8;font-size:11px;'
   );
 })();
-
-/* ============================================================
-   ORDER DETAIL — ENHANCED WITH CONTRACT + RECEIPT REPRINT
-============================================================ */
-
-// Override openOrderDetail to add reprint buttons
-const _origOpenOrderDetail=openOrderDetail;
-async function openOrderDetail(orderId){
-  await _origOpenOrderDetail(orderId);
-  // After modal opens, inject reprint buttons into actions div
-  setTimeout(()=>{
-    const actionsDiv=document.querySelector('#global-modal-body .btn-warning')?.parentElement;
-    if(actionsDiv&&!actionsDiv.querySelector('.reprint-contract-btn')){
-      const contractBtn=document.createElement('button');
-      contractBtn.className='btn btn-ghost reprint-contract-btn';
-      contractBtn.innerHTML='📄 Contract';
-      contractBtn.onclick=()=>{closeModal();reprintContractFromOrder(orderId);};
-
-      const receiptBtn=document.createElement('button');
-      receiptBtn.className='btn btn-ghost reprint-receipt-btn';
-      receiptBtn.innerHTML='🧾 Receipt';
-      receiptBtn.onclick=()=>{closeModal();reprintReceiptFromOrder(orderId);};
-
-      actionsDiv.appendChild(contractBtn);
-      actionsDiv.appendChild(receiptBtn);
-    }
-  },200);
-}
 
 /* ---- Reprint Contract from existing order ---- */
 async function reprintContractFromOrder(orderId){
