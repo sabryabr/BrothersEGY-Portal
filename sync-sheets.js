@@ -93,15 +93,15 @@ function buildCarExtras(row, headers) {
   const model    = get('E');
   const year     = get('H');
   const color    = get('I');
-  const azVal    = get('AZ');   // "Valid" or other
+  const azVal    = get('AZ');   // "Valid"/"ساري" = active, anything else = archived
 
   const carLabel = [carType, model, year ? `(${year})` : '', color, plate ? `/ ${plate}` : '']
     .filter(Boolean).join(' ');
 
   return {
     car_label: carLabel,
-    is_active: azVal === 'Valid',
-    archived:  azVal !== 'Valid',
+    is_active: azVal === 'Valid' || azVal === 'ساري',
+    archived:  azVal !== 'Valid' && azVal !== 'ساري',
     owner_name: [get('BP'), get('BQ')].filter(Boolean).join(' '),
     contract_end_date: get('BC'),
     license_end_date:  get('AQ'),
