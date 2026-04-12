@@ -895,7 +895,7 @@ function getCarStatusCategory(car){
   const st=(car.status||'available').toLowerCase().trim();
   const handover=parseDBDate(car['تاريخ التسليم']||'');
   const isPast=handover&&new Date()>handover;
-  if(cEN==='finished'||cAR==='منتهى'||isPast)return 'archived';
+  if(cEN==='expired'||cEN==='finished'||cAR==='منتهي'||cAR==='منتهى'||isPast)return 'archived';
   if(st==='accident'||cEN==='accident')return 'accident';
   if(st==='maintenance'||cEN==='maintenance')return 'maintenance';
   if(st==='rented')return 'rented';
