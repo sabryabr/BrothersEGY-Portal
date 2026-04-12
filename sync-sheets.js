@@ -109,8 +109,8 @@ function buildCarExtras(row, headers) {
   const yearStr  = year ? `(${year})` : '';
   const plateStr = plate ? `| ${plate}` : '';
 
-  const car_label    = [modelEN, typeEN, yearStr, colorEN, plateStr].filter(Boolean).join(' ');
-  const car_label_ar = [modelAR, typeAR, yearStr, colorAR, plateStr].filter(Boolean).join(' ');
+  const car_label    = [typeEN, modelEN, yearStr, colorEN, plateStr].filter(Boolean).join(' ');
+  const car_label_ar = [typeAR, modelAR, yearStr, colorAR, plateStr].filter(Boolean).join(' ');
 
   return {
     car_label,
