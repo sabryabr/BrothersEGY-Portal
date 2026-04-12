@@ -228,6 +228,34 @@ async function main() {
           Object.assign(doc, buildCarExtras(row, headers));
         }
 
+        // Explicit field mappings for ERP compatibility
+        const r = (letter) => { const v = row[colLetterToIndex(letter)]; return v !== undefined ? v : ''; };
+        if (cfg.collection === 'bookings') {
+          doc['No.']                               = r('A');
+          doc['كود العميل']                        = r('B');
+          doc['كود السيارة']                       = r('C');
+          doc['سعر السيارة اليومي بالجنيه المصري'] = r('D');
+          doc['تاريخ بداية الايجار']               = r('L');
+          doc['تاريخ نهاية الايجار']               = r('T');
+          doc['إجمالي المستحق (Total)']            = r('AU');
+          doc['المدفوع EGP']                       = r('AX');
+          doc['المدفوع USD']                       = r('AY');
+          doc['المدفوع EUR']                       = r('AZ');
+          doc['مكان الاستلام']                     = r('M');
+          doc['مكان التسليم']                      = r('W');
+        }
+        if (cfg.collection === 'fleet') {
+          doc['ID']           = r('A');
+          doc['حالة التعاقد'] = r('AZ');
+          doc['نهاية الترخيص']= r('AQ');
+          doc['نهاية التأمين']= r('BJ');
+          doc['تاريخ التسليم']= r('BC');
+          doc['النوع']        = r('B');
+          doc['الطراز']       = r('E');
+          doc['سنة الصنع']    = r('H');
+          doc['اللون']        = r('I');
+        }
+
         const docRef = db.collection(cfg.collection).doc(idVal);
         batch.set(docRef, doc);
       }
