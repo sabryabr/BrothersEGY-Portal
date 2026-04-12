@@ -93,8 +93,8 @@ function excelSerialToISO(val) {
 function buildCarExtras(row, headers) {
   const get = (letter) => (row[colLetterToIndex(letter)] || '').toString().trim();
 
-  // Plate: AC AB AA Z Y X W (digits first, then letters) — non-empty parts only
-  const plate = ['AC','AB','AA','Z','Y','X','W'].map(get).filter(Boolean).join(' ');
+  // Plate: W X Y Z AA AB AC (left to right — Arabic reads right-to-left on screen)
+  const plate = ['W','X','Y','Z','AA','AB','AC'].map(get).filter(Boolean).join(' ');
 
   const typeAR  = get('B');   // Arabic type
   const typeEN  = get('C');   // English type
@@ -115,6 +115,7 @@ function buildCarExtras(row, headers) {
   return {
     car_label,
     car_label_ar,
+    plate,
     is_active: baVal === 'Valid' || azVal === 'ساري',
     archived:  baVal !== 'Valid' && azVal !== 'ساري',
     owner_name: [get('BP'), get('BQ')].filter(Boolean).join(' '),
@@ -277,6 +278,7 @@ async function main() {
           doc['نهاية التعاقد'] = rd('AX');
           doc['تاريخ التسليم'] = rd('BC');
           doc['نهاية التأمين'] = rd('BJ');
+          doc['plate'] = ['W','X','Y','Z','AA','AB','AC'].map(l=>{ const v=r(l); return v!==''?String(v).trim():''; }).filter(Boolean).join(' ');
         }
 
         const docRef = db.collection(cfg.collection).doc(idVal);

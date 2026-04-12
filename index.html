@@ -743,7 +743,7 @@ const storage=firebase.storage();
    GLOBAL STATE
    ============================================================ */
 let G={
-  user:null,fleet:[],customers:[],proposals:[],
+  user:null,fleet:[],customers:[],proposals:[],bookings:[],
   ratesUSD:50,ratesEUR:54,currentPage:'dashboard',
   sidebarCollapsed:false,pendingReturn:null,
   unsubscribers:[],notifUnread:0,
@@ -836,25 +836,15 @@ function getOrderDates(doc){
 function getOrderStatus(order){
   if(!order)return 'Active';
   const raw=order['حالة الطلب']||order['order_status']||order['Status']||'';
-  
-  // Accident and Cancelled always take priority from the stored value
   if(raw==='Accident'||raw==='Cancelled')return raw;
-  
-  // Check if explicitly closed
   if(raw==='Closed'||order.closed===true)return 'Closed';
-  
-  // Auto-close logic: fully paid + past end + not accident
   const total=parseAmount(order['إجمالي المستحق (Total)']);
   const paid=parseAmount(order['المدفوع EGP']);
   const{start,end}=getOrderDates(order);
   const today=new Date();
-  
   if(total>0&&paid>=total&&end&&today>end)return 'Closed';
-  
-  // Overdue: past end date, not closed, not accident
-  if(end&&today>end&&!order.closed)return 'Closed';
-  
-  // Default active
+  if(end&&today>end&&!order.closed)return 'Overdue';
+  if(start&&today<start)return 'Future';
   return 'Active';
 }
 
@@ -893,6 +883,8 @@ function getTimeAgo(ts){
    FLEET HELPERS
    ============================================================ */
 function getCarStatusCategory(car){
+  // Firestore-synced active/archived flags take first priority
+  if(car.archived===true||car.is_active===false)return 'archived';
   const cEN=(car.Contract||'').toLowerCase().trim();
   const cAR=(car['حاله التعاقد']||'').toLowerCase().trim();
   const st=(car.status||'available').toLowerCase().trim();
@@ -902,18 +894,32 @@ function getCarStatusCategory(car){
   if(st==='accident'||cEN==='accident')return 'accident';
   if(st==='maintenance'||cEN==='maintenance')return 'maintenance';
   if(st==='rented')return 'rented';
+  // Check order-based status using G.bookings cache
+  if(G.bookings&&G.bookings.length){
+    const today=new Date();
+    const carId=String(car.ID||car.id||'').trim();
+    const carOrders=G.bookings.filter(b=>String(b['كود السيارة']||'').trim()===carId);
+    const hasActive=carOrders.some(o=>{const{start,end}=getOrderDates(o);return start&&end&&start<=today&&today<=end;});
+    if(hasActive)return 'rented';
+    const hasOverdue=carOrders.some(o=>getOrderStatus(o)==='Overdue');
+    if(hasOverdue)return 'overdue';
+    const hasFuture=carOrders.some(o=>{const{start}=getOrderDates(o);return start&&start>today;});
+    if(hasFuture)return 'future';
+  }
   return 'available';
 }
 function getCarLabel(car,lang='en'){
   // Use pre-computed labels from sync (include model, type, year, color, plate)
   if(lang==='ar'&&car.car_label_ar)return car.car_label_ar;
+  if(lang==='en'&&car.car_label&&car.car_label_ar)return `${car.car_label} / ${car.car_label_ar}`;
   if(lang==='en'&&car.car_label)return car.car_label;
+  if(car.car_label_ar)return car.car_label_ar;
   // Fallback: build from individual fields (for manually-created docs)
   const typeEN=String(car.Type||car['النوع']||'').trim();
   const modelEN=String(car.Model||car.model||'').trim();
   const modelAR=String(car['الطراز']||car.model_name||'').trim();
   const year=String(car['سنة الصنع']||car.year||'').trim();
-  const plate=String(car.plate||formatPlate(car)).trim();
+  const plate=formatPlate(car);
   if(lang==='ar'){
     const typeAR=String(car['النوع']||typeEN).replace(/_/g,' ');
     const colorAR=String(car['اللون']||car.Color||'').trim();
@@ -923,10 +929,11 @@ function getCarLabel(car,lang='en'){
   return `${modelEN||typeEN||'Unknown'} (${year}) ${colorEN} | ${plate}`.trim();
 }
 function formatPlate(car){
-  if(car.plate)return car.plate;
-  const nums=[car['رقم اللوحة'],car['Field_26'],car['Field_27'],car['Field_28']].filter(Boolean).join(' ');
-  const letters=[car['احرف اللوحة'],car['Field_23'],car['Field_24']].filter(Boolean).join(' ');
-  return`${nums} | ${letters}`.trim()||'No Plate';
+  if(car.plate&&car.plate.length>3)return car.plate;
+  const parts=[car.col_W,car.col_X,car.col_Y,car.col_Z,car.col_AA,car.col_AB,car.col_AC]
+    .filter(p=>p&&String(p).trim()&&String(p).trim()!=='0')
+    .map(p=>String(p).trim());
+  return parts.length?parts.join(' '):(car.plate||'No Plate');
 }
 function getCarById(id){
   if(!id)return null;
@@ -1387,12 +1394,16 @@ function applyPermissions(){
    LOAD SHARED DATA
    ============================================================ */
 async function loadSharedData(){
-  await Promise.all([loadFleet(),loadCustomers(),loadProposalsList()]);
+  await Promise.all([loadFleet(),loadCustomers(),loadProposalsList(),loadBookingsCache()]);
   updateSidebarBadges();
 }
 async function loadFleet(){
   try{const snap=await db.collection('fleet').get();G.fleet=snap.docs.map(d=>({id:d.id,...d.data()}));populateFleetDropdowns();}
   catch(e){console.warn('Fleet load failed:',e.message);}
+}
+async function loadBookingsCache(){
+  try{const snap=await db.collection('bookings').get();G.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));}
+  catch(e){console.warn('Bookings cache load failed:',e.message);}
 }
   
 console.log('Fleet sample:',G.fleet.slice(0,3).map(c=>({
@@ -1422,7 +1433,7 @@ async function updateSidebarBadges(){
     const ordSnap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(300).get();
     let orders=ordSnap.docs.map(d=>({id:d.id,...d.data()}));
     if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
-    const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue_Legacy';}).length;
+    const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue'||st==='Future';}).length;
     const ob=document.getElementById('badge-orders');
     if(activeCount>0){ob.textContent=activeCount;ob.classList.remove('hidden');}
     const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
@@ -1964,7 +1975,7 @@ async function loadDashRecentOrders(){
       const isAccident=statusRaw==='Accident';
       const isClosed=statusRaw==='Closed'||o.closed===true;
       const isOverdue=!isClosed&&end&&today>end&&!o.closed&&
-                      (statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+                      (statusRaw==='Active'||statusRaw==='Overdue');
       let lateDays=0,latePenalty=0;
       if((isOverdue||isAccident)&&end&&!o.closed){
         lateDays=Math.max(0,Math.ceil((today-end)/86400000));
@@ -2292,7 +2303,7 @@ async function updateSidebarBadges(){
     const ordSnap=await db.collection('bookings').orderBy('_sys_updated','desc').limit(300).get();
     let orders=ordSnap.docs.map(d=>({id:d.id,...d.data()}));
     if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
-    const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue_Legacy';}).length;
+    const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue'||st==='Future';}).length;
     const ob=document.getElementById('badge-orders');
     if(ob&&activeCount>0){ob.textContent=activeCount;ob.classList.remove('hidden');}
 
@@ -2508,7 +2519,7 @@ function subscribeOrders(){
     .onSnapshot(snap=>{
       let orders=snap.docs.map(d=>({id:d.id,...d.data()}));
       if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
-      allOrders=orders;filterOrders();updateOrderSummaryBar();
+      allOrders=orders;G.bookings=orders;filterOrders();updateOrderSummaryBar();
     },e=>console.warn('Orders error:',e.message));
   G.unsubscribers.push(unsub);
 }
@@ -2527,7 +2538,7 @@ function filterOrders(){
     }
     if(status!=='all'){
       const st=getOrderStatus(o);
-      if(status==='overdue'){const{end}=getOrderDates(o);if(!(end&&today>end&&!o.closed&&(st==='Active'||st==='Overdue_Legacy')))return false;}
+      if(status==='overdue'){const{end}=getOrderDates(o);if(!(end&&today>end&&!o.closed&&(st==='Active'||st==='Overdue')))return false;}
       else if(status==='Active'){if(st!=='Active')return false;}
       else{if(st!==status)return false;}
     }
@@ -2564,7 +2575,7 @@ function updateOrderSummaryBar(){
   const bar=document.getElementById('ob-summary-bar');if(!bar||!allOrders.length)return;
   const today=new Date();
   const active=allOrders.filter(o=>getOrderStatus(o)==='Active').length;
-  const overdue=allOrders.filter(o=>{const{end}=getOrderDates(o);const st=getOrderStatus(o);return end&&today>end&&!o.closed&&(st==='Active'||st==='Overdue_Legacy');}).length;
+  const overdue=allOrders.filter(o=>{const{end}=getOrderDates(o);const st=getOrderStatus(o);return end&&today>end&&!o.closed&&(st==='Active'||st==='Overdue');}).length;
   const accident=allOrders.filter(o=>getOrderStatus(o)==='Accident').length;
   const closed=allOrders.filter(o=>{const st=getOrderStatus(o);return st==='Closed'||o.closed===true;}).length;
   const totalDebt=allOrders.reduce((sum,o)=>{
@@ -2599,7 +2610,7 @@ function renderOrdersTable(orders){
           const statusRaw=getOrderStatus(o);
           const isAccident=statusRaw==='Accident';
           const isClosed=statusRaw==='Closed'||o.closed===true;
-          const isOverdue=!isClosed&&end&&today>end&&!o.closed&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+          const isOverdue=!isClosed&&end&&today>end&&!o.closed&&(statusRaw==='Active'||statusRaw==='Overdue');
           let lateDays=0,latePenalty=0;
           if((isOverdue||isAccident)&&end&&!o.closed){lateDays=Math.max(0,Math.ceil((today-end)/86400000));latePenalty=lateDays*daily;}
           const totalDue=total+latePenalty;
@@ -2663,7 +2674,7 @@ async function openOrderDetail(orderId){
   const statusRaw=getOrderStatus(o);
   const isAccident=statusRaw==='Accident';
   const isClosed=statusRaw==='Closed'||o.closed===true;
-  const isOverdue=!isClosed&&end&&today>end&&!o.closed&&(statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+  const isOverdue=!isClosed&&end&&today>end&&!o.closed&&(statusRaw==='Active'||statusRaw==='Overdue');
   let lateDays=0,latePenalty=0;
   if((isOverdue||isAccident)&&end&&!o.closed){lateDays=Math.max(0,Math.ceil((today-end)/86400000));latePenalty=lateDays*daily;}
   const totalDue=total+latePenalty;
@@ -3323,7 +3334,7 @@ async function renderGantt(){
       const rows=[];
       carOrders.forEach(order=>{
         const{start,end}=getOrderDates(order);if(!start)return;
-        const effectiveEnd=end?new Date(Math.max(end.getTime(),today.getTime())):today;
+        const effectiveEnd=end||new Date(start.getTime()+86400000);
         let placed=false;
         for(let r=0;r<rows.length;r++){
           if(!rows[r].end||start>=rows[r].end){
@@ -3401,7 +3412,7 @@ async function renderGantt(){
             const isAccident=statusRaw==='Accident';
             const isClosed=statusRaw==='Closed'||order.closed===true;
             const isOverdue=!isClosed&&end&&today>end&&
-                            (statusRaw==='Active'||statusRaw==='Overdue_Legacy');
+                            (statusRaw==='Active'||statusRaw==='Overdue');
             const isFuture=start>today&&!isClosed;
             const total=parseAmount(order['إجمالي المستحق (Total)']);
             const paid=parseAmount(order['المدفوع EGP']);
@@ -3497,7 +3508,7 @@ async function renderGantt(){
                        (lt/Math.max(1,parseFloat(lastOrd.rental_days||1)));
             const lac=lst==='Accident';
             const lcl=lst==='Closed'||lastOrd.closed===true;
-            const lov=!lcl&&le&&today>le&&(lst==='Active'||lst==='Overdue_Legacy');
+            const lov=!lcl&&le&&today>le&&(lst==='Active'||lst==='Overdue');
             if(lcl||(lp>=lt&&lt>0&&!lac)){
               aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
             }else if(lac){
@@ -4623,7 +4634,7 @@ function openOrdersListModal(orders,clientName){
           ${orders.map(o=>{
             const{start,end}=getOrderDates(o);
             const st=getOrderStatus(o);
-            const isOD=!o.closed&&end&&today>end&&(st==='Active'||st==='Overdue_Legacy');
+            const isOD=!o.closed&&end&&today>end&&(st==='Active'||st==='Overdue');
             const statusKey=st==='Accident'?'accident':isOD?'overdue':st==='Closed'||o.closed?'closed':(st||'active').toLowerCase();
             const statusLabel=st==='Accident'?'ACCIDENT':isOD?'OVERDUE':st==='Closed'||o.closed?'Closed':(st||'Active');
             const carCode=o['كود السيارة'];
@@ -5098,7 +5109,7 @@ async function loadVehicle360Details(){
                 const p=parseAmount(o['المدفوع EGP']);
                 const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(t/Math.max(1,parseFloat(o.rental_days||1)));
                 const st=getOrderStatus(o);const isCl=st==='Closed'||o.closed;
-                const isAc=st==='Accident';const isOD=!isCl&&end&&today>end&&(st==='Active'||st==='Overdue_Legacy');
+                const isAc=st==='Accident';const isOD=!isCl&&end&&today>end&&(st==='Active'||st==='Overdue');
                 let ldays=0,lpen=0;if((isOD||isAc)&&end&&!o.closed){ldays=Math.max(0,Math.ceil((today-end)/86400000));lpen=ldays*d;}
                 const debt=isCl?0:Math.max(0,t+lpen-p);
                 const sk=isAc?'accident':isOD?'overdue':isCl?'closed':(st||'active').toLowerCase();
@@ -7299,7 +7310,7 @@ async function loadVehicle360Details(){
                 const st=getOrderStatus(o);
                 const isCl=st==='Closed';
                 const isAc=st==='Accident';
-                const isOD=st==='Overdue_Legacy';
+                const isOD=st==='Overdue';
                 let ldays=0,lpen=0;
                 if((isOD||isAc)&&end&&!o.closed){
                   ldays=Math.max(0,Math.ceil((today-end)/86400000));
@@ -7710,7 +7721,7 @@ async function openCRMProfile(customerId){
   const totalSpent=clientOrders.reduce((s,o)=>s+parseAmount(o['إجمالي المستحق (Total)']),0);
   const totalPaid=clientOrders.reduce((s,o)=>s+parseAmount(o['المدفوع EGP']),0);
   const activeOrders=clientOrders.filter(o=>getOrderStatus(o)==='Active').length;
-  const overdueOrders=clientOrders.filter(o=>getOrderStatus(o)==='Overdue_Legacy').length;
+  const overdueOrders=clientOrders.filter(o=>getOrderStatus(o)==='Overdue').length;
 
   const html=`
   <!-- Profile Header -->
@@ -7788,7 +7799,7 @@ async function openCRMProfile(customerId){
           ${clientOrders.slice(0,5).map(o=>{
             const{start,end}=getOrderDates(o);
             const st=getOrderStatus(o);
-            const sk=st==='Accident'?'accident':st==='Overdue_Legacy'?'overdue':st==='Closed'?'closed':'active';
+            const sk=st==='Accident'?'accident':st==='Overdue'?'overdue':st==='Closed'?'closed':'active';
             const carCode=o['كود السيارة'];
             const carInFleet=G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
             const carLabel=carInFleet?getCarLabel(carInFleet,'en'):(o['اسم السيارة']||'—');
@@ -7797,7 +7808,7 @@ async function openCRMProfile(customerId){
               <td style="font-size:11px;">${carLabel}</td>
               <td style="font-size:10px;">${start?fmtDate(start):'—'} → ${end?fmtDate(end):'—'}</td>
               <td>${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}</td>
-              <td><span class="pill pill-${sk}">${st==='Overdue_Legacy'?'OVERDUE':st}</span></td>
+              <td><span class="pill pill-${sk}">${st==='Overdue'?'OVERDUE':st}</span></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -11294,7 +11305,7 @@ async function doRCLookup(){
     const totalDue2=totalDue+latePenalty;
     const outstanding=Math.max(0,totalDue2-prevPaid);
 
-    const stColor=st==='Accident'?'var(--orange)':st==='Overdue_Legacy'?'var(--danger)':
+    const stColor=st==='Accident'?'var(--orange)':st==='Overdue'?'var(--danger)':
       st==='Closed'?'var(--text3)':'var(--success)';
 
     if(stEl){
@@ -11302,12 +11313,12 @@ async function doRCLookup(){
       <div style="display:flex;align-items:center;gap:9px;padding:9px;
         background:var(--surface2);border-radius:8px;">
         <span style="font-size:13px;">
-          ${st==='Accident'?'🚨':st==='Overdue_Legacy'?'⚠️':st==='Closed'?'✅':'🚗'}
+          ${st==='Accident'?'🚨':st==='Overdue'?'⚠️':st==='Closed'?'✅':'🚗'}
         </span>
         <div style="flex:1;">
           <div style="font-size:11px;font-weight:700;color:${stColor};">
             Order #${data['No.']||data.id} — ${data['اسم العميل']||'—'}
-            ${st==='Overdue_Legacy'?`<span style="color:var(--danger);">(${lateDays}d overdue)</span>`:''}
+            ${st==='Overdue'?`<span style="color:var(--danger);">(${lateDays}d overdue)</span>`:''}
           </div>
           <div style="font-size:10px;color:var(--text3);margin-top:2px;">
             Due: ${fmtMoney(totalDue2)} | Paid: ${fmtMoney(prevPaid)} |
@@ -11394,7 +11405,7 @@ async function generateReceipt(){
   if(rcType==='Deposit Return'&&rcCurrentBooking){
     const status=getOrderStatus(rcCurrentBooking);
     const heldDeposit=parseAmount(rcCurrentBooking['الوديعة المعلقة لدينا']||'0');
-    if(status!=='Closed'&&status!=='Overdue_Legacy'){
+    if(status!=='Closed'&&status!=='Overdue'){
       const proceed=confirm(
         'Warning: This order is not yet closed.\n\n'+
         'Deposit returns should only happen after the order is closed.\n\n'+
@@ -13357,25 +13368,16 @@ window.addEventListener('error',e=>{
 function getOrderStatus(order){
   if(!order)return 'Active';
   const raw=order['حالة الطلب']||order['order_status']||order['Status']||'';
-
-  // Explicit override statuses always take priority
   if(raw==='Accident')return 'Accident';
   if(raw==='Cancelled')return 'Cancelled';
-
-  // Explicit close flags
   if(raw==='Closed'||order.closed===true)return 'Closed';
-
-  // Auto-close: fully paid AND past end date AND not accident
   const total=parseAmount(order['إجمالي المستحق (Total)']);
   const paid=parseAmount(order['المدفوع EGP']);
   const{start,end}=getOrderDates(order);
   const today=new Date();
-
   if(total>0&&paid>=total&&end&&today>end)return 'Closed';
-
-  // Overdue: past end date, not closed, not accident
-  if(end&&today>end&&!order.closed)return 'Closed';
-
+  if(end&&today>end&&!order.closed)return 'Overdue';
+  if(start&&today<start)return 'Future';
   return 'Active';
 }
 
@@ -13516,7 +13518,7 @@ function startOrderBadgeLive(){
         }
         const count=orders.filter(o=>{
           const st=getOrderStatus(o);
-          return st==='Active'||st==='Overdue_Legacy';
+          return st==='Active'||st==='Overdue'||st==='Future';
         }).length;
         const ob=document.getElementById('badge-orders');
         if(ob){ob.textContent=count;ob.classList.toggle('hidden',count===0);}
@@ -14046,7 +14048,7 @@ async function openCRMProfile(customerId){
   const totalPaid=orders.reduce((s,o)=>s+parseAmount(o['المدفوع EGP']),0);
   const totalReceiptsAmt=receipts.reduce((s,r)=>s+(r.total_egp_equiv||0),0);
   const activeOrders=orders.filter(o=>getOrderStatus(o)==='Active').length;
-  const overdueOrders=orders.filter(o=>getOrderStatus(o)==='Overdue_Legacy').length;
+  const overdueOrders=orders.filter(o=>getOrderStatus(o)==='Overdue').length;
 
   const html=`
   <!-- Profile Header -->
@@ -14128,7 +14130,7 @@ async function openCRMProfile(customerId){
           ${orders.map(o=>{
             const{start,end}=getOrderDates(o);
             const st=getOrderStatus(o);
-            const sk=st==='Accident'?'accident':st==='Overdue_Legacy'?'overdue':
+            const sk=st==='Accident'?'accident':st==='Overdue'?'overdue':
               st==='Closed'?'closed':'active';
             const carCode=o['كود السيارة'];
             const carInFleet=G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
@@ -14145,7 +14147,7 @@ async function openCRMProfile(customerId){
                 ${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}
               </td>
               <td><span class="pill pill-${sk}">
-                ${st==='Overdue_Legacy'?'OVERDUE':st}
+                ${st==='Overdue'?'OVERDUE':st}
               </span></td>
               <td>
                 <div style="display:flex;gap:3px;">
