@@ -1352,6 +1352,7 @@ function onLoginSuccess(){
   applyPermissions();
   loadSharedData().then(()=>initFleetFilterState());
   fetchRates();loadNotifications();loadSettings();resetInactivity();
+  setTimeout(()=>startReminderChecker(),3000);
   showPage('dashboard');
 }
 
@@ -2749,8 +2750,9 @@ async function openOrderDetail(orderId){
       ` + (!isClosed ? `<button class="btn btn-success" onclick="closeModal();requestCloseOrder('` + o.id + `')">✅ Close</button>` : '') + `
       <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('` + o.id + `')">📄 Contract</button>
       <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('` + o.id + `')">🧾 Receipt</button>
+      <button class="btn btn-ghost" onclick="openReminderForm('` + o.id + `')">🔔 Set Reminder</button>
     </div>`;
-    
+
     openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`, html, true);
     logAction('VIEW','Order Book', `Viewed order #${o['No.']||o.id}`);
 
@@ -2847,6 +2849,25 @@ function quickAddPayment(orderId){
       <span style="font-weight:700;">Total This Payment</span>
       <span id="qp-total" style="font-size:15px;font-weight:900;color:var(--success);">£0.00</span>
     </div>
+    <div class="form-grid" style="margin-top:11px;">
+      <div class="field"><label>Date of Payment *</label><input type="date" id="qp-date" value="${new Date().toISOString().slice(0,10)}"/></div>
+      <div class="field"><label>Reason / Category *</label>
+        <select id="qp-category">
+          <option value="">-- Select --</option>
+          <option value="Rental Payment">Rental Payment</option>
+          <option value="Advance Payment">Advance Payment</option>
+          <option value="Full Settlement">Full Settlement</option>
+          <option value="Overdue Settlement">Overdue Settlement</option>
+          <option value="Traffic Fine">Traffic Fine</option>
+          <option value="Accident Settlement">Accident Settlement</option>
+          <option value="Extra KM Fee">Extra KM Fee</option>
+          <option value="Fuel Shortfall">Fuel Shortfall</option>
+          <option value="Damage Charge">Damage Charge</option>
+          <option value="Security Deposit">Security Deposit</option>
+          <option value="Other">Other</option>
+        </select></div>
+    </div>
+    <div class="field" style="margin-top:7px;"><label>Notes (optional)</label><input type="text" id="qp-notes" placeholder="Additional notes..."/></div>
     <div style="display:flex;gap:7px;margin-top:14px;">
       <button class="btn btn-success btn-full" onclick="saveQuickPayment('${orderId}',${total},${paid})">💾 Save Payment</button>
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -2868,6 +2889,11 @@ async function saveQuickPayment(orderId,totalDue,prevPaid){
   const card=parseFloat(document.getElementById('qp-card')?.value)||0;
   const thisPayment=egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card;
   if(thisPayment<=0){toast('Payment must be greater than 0','error');return;}
+  const payDate=document.getElementById('qp-date')?.value;
+  const payCategory=document.getElementById('qp-category')?.value;
+  const payNotes=document.getElementById('qp-notes')?.value||'';
+  if(!payDate){toast('Date of payment is required','error');return;}
+  if(!payCategory){toast('Reason / Category is required','error');return;}
   const order=allOrders.find(o=>o.id===orderId);
   try{
     const upd={'المدفوع EGP':String(prevPaid+egp),'_sys_updated':Date.now()};
@@ -2881,6 +2907,19 @@ async function saveQuickPayment(orderId,totalDue,prevPaid){
       toast('Order fully paid and closed!','success');
     }
     await db.collection('bookings').doc(orderId).update(upd);
+    await db.collection('payment_log').add({
+      order_id:orderId,
+      order_no:order?.['No.']||orderId,
+      client_name:order?.['اسم العميل']||'',
+      payment_date:payDate,
+      category:payCategory,
+      notes:payNotes,
+      egp,usd,eur,card,
+      total_egp:thisPayment,
+      recorded_by:G.user?.username||'',
+      branch:G.user?.branch||'',
+      created_at:Date.now()
+    }).catch(()=>{});
     await logAction('EDIT','Order Book',`Payment on Order #${order?.['No.']||orderId}: ${fmtMoney(thisPayment)}`);
     toast(`Payment of ${fmtMoney(thisPayment)} saved!`,'success');closeModal();
     setTimeout(()=>{const rcInput=document.getElementById('rc-contract-no');if(rcInput)rcInput.value=order?.['No.']||orderId;showPage('receipts');},400);
@@ -2906,6 +2945,86 @@ async function requestCloseOrder(orderId){
       adminSnap.docs.forEach(d=>{if(['Admin','Executive'].includes(d.data().role))createNotification(d.id,'approval',`Order close request from ${G.user.username}: #${order?.['No.']}`, 'approvals',orderId);});
     }catch(e){toast('Request failed: '+e.message,'error');}
   }
+}
+
+/* ---- Reminders ---- */
+function openReminderForm(orderId){
+  const order=allOrders.find(o=>o.id===orderId);
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const defaultDt=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const html=`
+    <div class="form-grid" style="margin-bottom:11px;">
+      <div class="field" style="grid-column:span 2;"><label>Remind At *</label>
+        <input type="datetime-local" id="rem-dt" value="${defaultDt}"/>
+      </div>
+      <div class="field" style="grid-column:span 2;"><label>Category *</label>
+        <select id="rem-cat">
+          <option value="Follow-up call">Follow-up call</option>
+          <option value="Check car">Check car</option>
+          <option value="Collect payment">Collect payment</option>
+          <option value="Return deposit">Return deposit</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div class="field" style="grid-column:span 2;"><label>Notes</label>
+        <input type="text" id="rem-note" placeholder="Optional notes..."/>
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;">
+      <button class="btn btn-primary btn-full" onclick="saveReminder('${orderId}')">🔔 Save Reminder</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(`Set Reminder — Order #${order?.['No.']||orderId}`,html);
+}
+
+async function saveReminder(orderId){
+  const dt=document.getElementById('rem-dt')?.value;
+  const cat=document.getElementById('rem-cat')?.value;
+  const note=document.getElementById('rem-note')?.value||'';
+  if(!dt){toast('Please select a date and time','error');return;}
+  if(!cat){toast('Please select a category','error');return;}
+  try{
+    await db.collection('reminders').add({
+      order_id:orderId,
+      remind_at:new Date(dt).getTime(),
+      category:cat,
+      note,
+      created_by:G.user?.username||'',
+      dismissed:false,
+      fired:false,
+      created_at:Date.now()
+    });
+    toast('Reminder saved!','success');
+    closeModal();
+  }catch(e){toast('Failed to save reminder: '+e.message,'error');}
+}
+
+function startReminderChecker(){
+  setInterval(async()=>{
+    if(!G.user?.username)return;
+    try{
+      const now=Date.now();
+      const snap=await db.collection('reminders')
+        .where('created_by','==',G.user.username)
+        .where('fired','==',false)
+        .where('dismissed','==',false)
+        .get();
+      snap.docs.forEach(async doc=>{
+        const r=doc.data();
+        if(r.remind_at<=now){
+          const order=allOrders.find(o=>o.id===r.order_id);
+          const label=order?`Order #${order['No.']||r.order_id}`:r.order_id;
+          toast(`🔔 Reminder: ${r.category} — ${label}${r.note?' — '+r.note:''}`,'info',8000);
+          await doc.ref.update({fired:true}).catch(()=>{});
+          createNotification(G.user.username,'reminder',
+            `${r.category}: ${label}${r.note?' — '+r.note:''}`,
+            'order-book',r.order_id
+          );
+        }
+      });
+    }catch(e){/* silent */}
+  },60000);
 }
 
 /* ---- Photo Upload ---- */
@@ -3722,8 +3841,8 @@ async function loadRiskRadar(){
       <div style="display:flex;gap:7px;">
         <select id="risk-range" onchange="loadRiskRadar()" style="padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;">
           <option value="7">Next 7 Days</option>
-          <option value="30" selected>Next 30 Days</option>
-          <option value="60">Next 60 Days</option>
+          <option value="30">Next 30 Days</option>
+          <option value="60" selected>Next 60 Days</option>
           <option value="90">Next 90 Days</option>
           <option value="180">Next 6 Months</option>
           <option value="365">Next 1 Year</option>
@@ -3733,7 +3852,7 @@ async function loadRiskRadar(){
     <div id="risk-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
     <div class="panel"><div id="risk-table-wrap" class="table-wrap"><div class="empty-state"><div class="spinner lg"></div></div></div></div>`;
   const rangeEl=document.getElementById('risk-range');
-  const days=parseInt(rangeEl?.value||30);
+  const days=parseInt(rangeEl?.value||60);
   const today=new Date();const futureDate=new Date(today.getTime()+days*86400000);
   const risks=[];
   G.fleet.forEach(car=>{
@@ -3741,7 +3860,7 @@ async function loadRiskRadar(){
       const d=parseDBDate(car[field]);if(!d)return;
       const daysLeft=Math.ceil((d-today)/86400000);
       if(daysLeft>days)return;
-      const risk=daysLeft<=0?'expired':daysLeft<=7?'high':daysLeft<=30?'medium':'low';
+      const risk=daysLeft<=0?'expired':daysLeft<=45?'high':daysLeft<=60?'medium':'low';
       risks.push({car,label,icon,date:d,daysLeft,risk,carLabel:getCarLabel(car,'en'),statusField});
     });
   });
@@ -3755,8 +3874,8 @@ async function loadRiskRadar(){
   if(kpiEl){
     kpiEl.innerHTML=`
       <div class="kpi-card"><div class="kpi-label">Expired</div><div class="kpi-value text-danger">${expired}</div><div class="kpi-sub">Immediate action</div></div>
-      <div class="kpi-card"><div class="kpi-label">High Risk</div><div class="kpi-value text-danger">${high}</div><div class="kpi-sub">Within 7 days</div></div>
-      <div class="kpi-card"><div class="kpi-label">Medium Risk</div><div class="kpi-value text-warning">${medium}</div><div class="kpi-sub">Within 30 days</div></div>
+      <div class="kpi-card"><div class="kpi-label">High Risk</div><div class="kpi-value text-danger">${high}</div><div class="kpi-sub">Within 45 days</div></div>
+      <div class="kpi-card"><div class="kpi-label">Medium Risk</div><div class="kpi-value text-warning">${medium}</div><div class="kpi-sub">Within 60 days</div></div>
       <div class="kpi-card"><div class="kpi-label">Low Risk</div><div class="kpi-value text-success">${low}</div><div class="kpi-sub">Within ${days} days</div></div>`;
   }
   const badge=document.getElementById('badge-risk');
@@ -3948,6 +4067,15 @@ async function loadSettingsPage(){
     </div>
     <div style="margin-top:14px;">
       <button class="btn btn-success" onclick="saveSettings()">💾 Save All Settings</button>
+    </div>
+    <!-- Bulk Close Tool -->
+    <div class="panel" style="margin-top:18px;border:1px solid var(--danger);background:rgba(239,68,68,0.04);">
+      <h3 style="font-size:13px;font-weight:800;margin-bottom:8px;color:var(--danger);">🗂️ Bulk Close — Pre-2026 Orders</h3>
+      <p style="font-size:11px;color:var(--text3);margin-bottom:11px;">
+        Marks all open/overdue orders whose contract end date is before <strong>1 Jan 2026</strong> as Closed. Irreversible — confirm before running.
+      </p>
+      <button class="btn btn-sm" style="background:var(--danger);color:#fff;" onclick="confirmBulkCloseOldOrders()">⚡ Run Bulk Close</button>
+      <span id="bulk-close-status" style="font-size:11px;margin-left:10px;color:var(--text3);"></span>
     </div>`;
   loadWhatsAppKeys();
 }
@@ -3990,6 +4118,54 @@ async function saveSettings(){
     await logAction('EDIT','Settings','System settings updated');
     toast('Settings saved successfully!','success');
   }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+/* ---- Bulk Close Pre-2026 Orders ---- */
+function confirmBulkCloseOldOrders(){
+  const cutoff=new Date('2026-01-01');
+  const candidates=allOrders.filter(o=>{
+    if(o.closed===true||o['حالة الطلب']==='Closed')return false;
+    const end=parseDBDate(o['نهاية التعاقد']||'');
+    return end&&end<cutoff;
+  });
+  if(!candidates.length){toast('No open pre-2026 orders found.','info');return;}
+  const html=`
+    <p style="font-size:13px;margin-bottom:10px;">
+      This will mark <strong style="color:var(--danger);">${candidates.length} order(s)</strong> with a contract end date before 1 Jan 2026 as <strong>Closed</strong>.
+    </p>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:14px;">This cannot be undone automatically. Proceed?</p>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" style="background:var(--danger);color:#fff;flex:1;" onclick="closeModal();bulkCloseOldOrders()">✅ Yes, Close All</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal('⚡ Bulk Close Confirmation',html);
+}
+
+async function bulkCloseOldOrders(){
+  const statusEl=document.getElementById('bulk-close-status');
+  if(statusEl)statusEl.textContent='Running…';
+  const cutoff=new Date('2026-01-01');
+  const candidates=allOrders.filter(o=>{
+    if(o.closed===true||o['حالة الطلب']==='Closed')return false;
+    const end=parseDBDate(o['نهاية التعاقد']||'');
+    return end&&end<cutoff;
+  });
+  if(!candidates.length){toast('No open pre-2026 orders found.','info');if(statusEl)statusEl.textContent='';return;}
+  let closed=0,failed=0;
+  const BATCH_SIZE=400;
+  for(let i=0;i<candidates.length;i+=BATCH_SIZE){
+    const batch=db.batch();
+    candidates.slice(i,i+BATCH_SIZE).forEach(o=>{
+      batch.update(db.collection('bookings').doc(o.id),{'حالة الطلب':'Closed','closed':true,'_sys_updated':Date.now()});
+    });
+    try{await batch.commit();closed+=Math.min(BATCH_SIZE,candidates.length-i);}
+    catch(e){failed+=Math.min(BATCH_SIZE,candidates.length-i);}
+  }
+  await logAction('EDIT','Order Book',`Bulk-closed ${closed} pre-2026 orders`);
+  const msg=`Bulk close complete: ${closed} closed${failed?`, ${failed} failed`:''}`;
+  toast(msg,failed?'error':'success');
+  if(statusEl)statusEl.textContent=msg;
+  await loadSharedData();
 }
 
 /* ============================================================
@@ -7213,8 +7389,8 @@ async function loadRiskRadar(){
         style="padding:7px 10px;background:var(--surface2);border:1px solid var(--border);
         border-radius:8px;color:var(--text);font-size:12px;">
         <option value="7">Next 7 Days</option>
-        <option value="30" selected>Next 30 Days</option>
-        <option value="60">Next 60 Days</option>
+        <option value="30">Next 30 Days</option>
+        <option value="60" selected>Next 60 Days</option>
         <option value="90">Next 90 Days</option>
         <option value="180">Next 6 Months</option>
         <option value="365">Next 1 Year</option>
@@ -7246,7 +7422,7 @@ async function loadRiskRadar(){
   </div>`;
 
   const rangeEl=document.getElementById('risk-range');
-  const days=parseInt(rangeEl?.value||30);
+  const days=parseInt(rangeEl?.value||60);
   const today=new Date();
 
   // Build risks array
@@ -7261,7 +7437,7 @@ async function loadRiskRadar(){
       const d=parseDBDate(car[field]);if(!d)return;
       const daysLeft=Math.ceil((d-today)/86400000);
       if(daysLeft>days)return;
-      const risk=daysLeft<=0?'expired':daysLeft<=7?'high':daysLeft<=30?'medium':'low';
+      const risk=daysLeft<=0?'expired':daysLeft<=45?'high':daysLeft<=60?'medium':'low';
       allRisks.push({
         car,label,icon,date:d,daysLeft,risk,
         carLabel:getCarLabel(car,'en'),
@@ -7296,12 +7472,12 @@ async function loadRiskRadar(){
     <div class="kpi-card" style="cursor:pointer;">
       <div class="kpi-label">High Risk</div>
       <div class="kpi-value text-danger">${high}</div>
-      <div class="kpi-sub">Within 7 days</div>
+      <div class="kpi-sub">Within 45 days</div>
     </div>
     <div class="kpi-card" style="cursor:pointer;">
       <div class="kpi-label">Medium Risk</div>
       <div class="kpi-value text-warning">${medium}</div>
-      <div class="kpi-sub">Within 30 days</div>
+      <div class="kpi-sub">Within 60 days</div>
     </div>
     <div class="kpi-card" style="cursor:pointer;">
       <div class="kpi-label">Low Risk</div>
@@ -11904,6 +12080,12 @@ async function loadProposalsPage(){
           style="font-size:10px;color:var(--accent);font-weight:700;"></span>
       </div>
 
+      <!-- Mode Toggle -->
+      <div style="display:flex;gap:6px;margin-bottom:13px;background:var(--surface2);border-radius:9px;padding:6px;">
+        <button class="btn btn-primary btn-sm" id="pr-btn-quick" onclick="prSetMode('quick')" style="flex:1;font-size:11px;">⚡ Quick Quote</button>
+        <button class="btn btn-ghost btn-sm" id="pr-btn-reservation" onclick="prSetMode('reservation')" style="flex:1;font-size:11px;">📋 Reservation</button>
+      </div>
+
       <!-- Client Search (CRM) -->
       <div class="crm-search-wrap">
         <div class="crm-search-header">
@@ -11942,6 +12124,14 @@ async function loadProposalsPage(){
           <div class="field">
             <label>Email</label>
             <input type="text" id="pr-email" placeholder="Email" readonly/>
+          </div>
+          <div class="field" id="pr-passport-wrap" style="display:none;">
+            <label>Passport / National ID *</label>
+            <input type="text" id="pr-passport" placeholder="ID Number"/>
+          </div>
+          <div class="field" id="pr-license-wrap" style="display:none;">
+            <label>Driver License *</label>
+            <input type="text" id="pr-license" placeholder="License No."/>
           </div>
         </div>
       </div>
@@ -12029,6 +12219,7 @@ async function loadProposalsPage(){
               <option value="750">750 KM Package</option>
               <option value="1000">1000 KM Package</option>
               <option value="unlimited">Unlimited KM</option>
+              <option value="unlimited_surcharge">Unlimited KM Daily Surcharge</option>
             </select>
           </div>
           <div class="field">
@@ -12057,13 +12248,10 @@ async function loadProposalsPage(){
           ④ Extras & Fees
         </div>
         <div class="form-grid">
-          <div class="field">
-            <label>Pickup Fee (EGP)</label>
+          <div class="field" style="grid-column:span 2;">
+            <label>Logistics Fee (EGP)</label>
             <input type="number" id="pr-pfee" value="0" min="0" oninput="prCalc()"/>
-          </div>
-          <div class="field">
-            <label>Dropoff Fee (EGP)</label>
-            <input type="number" id="pr-dfee" value="0" min="0" oninput="prCalc()"/>
+            <input type="hidden" id="pr-dfee" value="0"/>
           </div>
           <div class="field">
             <label>Security Deposit (EGP)</label>
@@ -12239,6 +12427,29 @@ function prCalc(){
   s('pr-est-total',total);
 }
 
+function prSetMode(mode){
+  window._prMode=mode;
+  const quickBtn=document.getElementById('pr-btn-quick');
+  const resBtn=document.getElementById('pr-btn-reservation');
+  const passWrap=document.getElementById('pr-passport-wrap');
+  const licWrap=document.getElementById('pr-license-wrap');
+  if(mode==='reservation'){
+    if(quickBtn){quickBtn.classList.remove('btn-primary');quickBtn.classList.add('btn-ghost');}
+    if(resBtn){resBtn.classList.remove('btn-ghost');resBtn.classList.add('btn-primary');}
+    if(passWrap)passWrap.style.display='';
+    if(licWrap)licWrap.style.display='';
+  }else{
+    if(quickBtn){quickBtn.classList.remove('btn-ghost');quickBtn.classList.add('btn-primary');}
+    if(resBtn){resBtn.classList.remove('btn-primary');resBtn.classList.add('btn-ghost');}
+    if(passWrap)passWrap.style.display='none';
+    if(licWrap)licWrap.style.display='none';
+    const passEl=document.getElementById('pr-passport');
+    const licEl=document.getElementById('pr-license');
+    if(passEl)passEl.value='';
+    if(licEl)licEl.value='';
+  }
+}
+
 /* ---- Overlap Detection ---- */
 
 let _prOverlapTimeout=null;
@@ -12369,6 +12580,13 @@ async function generateProposal(){
     document.getElementById('pr-client-search')?.focus();
     return;
   }
+  const prMode=window._prMode||'quick';
+  if(prMode==='reservation'){
+    const passport=(document.getElementById('pr-passport')?.value||'').trim();
+    const license=(document.getElementById('pr-license')?.value||'').trim();
+    if(!passport){toast('Passport / National ID is required in Reservation mode','error');return;}
+    if(!license){toast('Driver License is required in Reservation mode','error');return;}
+  }
   if(!carId){toast('Please select a car from the fleet.','error');return;}
   if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
 
@@ -12413,6 +12631,9 @@ async function generateProposal(){
     client_crm_id:window['_crm_pr_id']||'',
     client_phone:document.getElementById('pr-phone')?.value.trim()||'',
     client_email:document.getElementById('pr-email')?.value.trim()||'',
+    client_passport:document.getElementById('pr-passport')?.value.trim()||'',
+    client_license:document.getElementById('pr-license')?.value.trim()||'',
+    proposal_mode:window._prMode||'quick',
     car_id:String(carId),
     car_label:carLabel,
     pickup_date:pickup,
@@ -12471,7 +12692,8 @@ function buildProposalA4(ref,d){
     500:'500 KM Package',
     750:'750 KM Package',
     1000:'1000 KM Package',
-    unlimited:'Unlimited KM'
+    unlimited:'Unlimited KM',
+    unlimited_surcharge:'Unlimited KM Daily Surcharge'
   };
   const insMap={
     basic:'Basic – 100% Client Liability',
@@ -12489,10 +12711,8 @@ function buildProposalA4(ref,d){
     d.insurance_fee>0?{desc:'Insurance Fee',
       detail:`${d.duration_days} days × ${fmtMoney(d.insurance_fee)}`,
       amount:fmtMoney(d.insurance_fee*d.duration_days)}:null,
-    d.pickup_fee>0?{desc:'Pickup / Delivery Fee','detail':'',
+    d.pickup_fee>0?{desc:'Logistics Fee','detail':'',
       amount:fmtMoney(d.pickup_fee)}:null,
-    d.delivery_fee>0?{desc:'Return / Dropoff Fee','detail':'',
-      amount:fmtMoney(d.delivery_fee)}:null,
     d.child_seat_days>0?{desc:'Child Seat',
       detail:`${d.child_seat_days} days × £250`,
       amount:fmtMoney(d.child_seat_days*250)}:null,
@@ -12935,8 +13155,10 @@ function fillContractFromProposal(prefix,proposalId){
 function clearProposalForm(){
   [
     'pr-client-search','pr-fname','pr-lname','pr-phone','pr-email',
+    'pr-passport','pr-license',
     'pr-pickup','pr-dropoff','pr-ploc','pr-dloc','pr-days'
   ].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  prSetMode('quick');
 
   [
     'pr-daily','pr-km-cost','pr-ins-fee',
