@@ -81,6 +81,14 @@ function indexToColLetter(idx) {
 
 const CZ_IDX = colLetterToIndex('CZ'); // 103  (columns A–CZ)
 
+// ── Excel serial date → yyyy-mm-dd ────────────────────────────────────────────
+function excelSerialToISO(val) {
+  const n = typeof val === 'number' ? val : parseFloat(val);
+  if (!n || isNaN(n) || n < 40000 || n > 60000) return val || ''; // not a plausible date serial
+  const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+  return d.toISOString().slice(0, 10); // yyyy-mm-dd
+}
+
 // ── Cars-specific computed fields ─────────────────────────────────────────────
 function buildCarExtras(row, headers) {
   const get = (letter) => (row[colLetterToIndex(letter)] || '').toString().trim();
@@ -110,11 +118,11 @@ function buildCarExtras(row, headers) {
     is_active: baVal === 'Valid' || azVal === 'ساري',
     archived:  baVal !== 'Valid' && azVal !== 'ساري',
     owner_name: [get('BP'), get('BQ')].filter(Boolean).join(' '),
-    contract_start_date:  get('AW'),
-    contract_end_date:    get('AX'),
-    handover_date:        get('BC'),
-    license_end_date:     get('AQ'),
-    insurance_end_date:   get('BJ'),
+    contract_start_date:  excelSerialToISO(get('AW')),
+    contract_end_date:    excelSerialToISO(get('AX')),
+    handover_date:        excelSerialToISO(get('BC')),
+    license_end_date:     excelSerialToISO(get('AQ')),
+    insurance_end_date:   excelSerialToISO(get('BJ')),
     monthly_fee:             get('CJ'),
     payment_frequency_days:  get('CK'),
     deduction_pct:           get('CL'),
@@ -256,18 +264,19 @@ async function main() {
           doc['مكان التسليم']                      = r('U');
         }
         if (cfg.collection === 'fleet') {
+          const rd = (letter) => excelSerialToISO(r(letter)); // date fields
           doc['ID']            = r('A');
           doc['النوع']         = r('B');
           doc['الطراز']        = r('E');
           doc['سنة الصنع']     = r('H');
           doc['اللون']         = r('I');
-          doc['نهاية الترخيص'] = r('AQ');
+          doc['نهاية الترخيص'] = rd('AQ');
           doc['حاله التعاقد']  = r('AZ');   // ه — matches getCarStatusCategory
           doc['Contract']      = r('BA');   // English: 'Valid'/'Expired'
-          doc['بداية التعاقد'] = r('AW');
-          doc['نهاية التعاقد'] = r('AX');
-          doc['تاريخ التسليم'] = r('BC');
-          doc['نهاية التأمين'] = r('BJ');
+          doc['بداية التعاقد'] = rd('AW');
+          doc['نهاية التعاقد'] = rd('AX');
+          doc['تاريخ التسليم'] = rd('BC');
+          doc['نهاية التأمين'] = rd('BJ');
         }
 
         const docRef = db.collection(cfg.collection).doc(idVal);

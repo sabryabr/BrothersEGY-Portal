@@ -852,7 +852,7 @@ function getOrderStatus(order){
   if(total>0&&paid>=total&&end&&today>end)return 'Closed';
   
   // Overdue: past end date, not closed, not accident
-  if(end&&today>end&&!order.closed)return 'Overdue_Legacy';
+  if(end&&today>end&&!order.closed)return 'Closed';
   
   // Default active
   return 'Active';
@@ -860,11 +860,14 @@ function getOrderStatus(order){
 
 function fmtDate(d){
   if(!d)return 'N/A';
-  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const Y=d.getFullYear(),M=String(d.getMonth()+1).padStart(2,'0'),D=String(d.getDate()).padStart(2,'0');
+  const h=String(d.getHours()).padStart(2,'0'),m=String(d.getMinutes()).padStart(2,'0');
+  return `${Y}-${M}-${D} ${h}:${m}`;
 }
 function fmtDateShort(d){
   if(!d)return 'N/A';
-  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const Y=d.getFullYear(),M=String(d.getMonth()+1).padStart(2,'0'),D=String(d.getDate()).padStart(2,'0');
+  return `${Y}-${M}-${D}`;
 }
 function fmtMoney(n){
   return '£'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -902,26 +905,22 @@ function getCarStatusCategory(car){
   return 'available';
 }
 function getCarLabel(car,lang='en'){
-  const typeEN=String(car.Type||'').trim();
-  const fullModel=String(car.model||'').trim();
-  const modelName=String(car.model_name||car['الطراز']||'').trim();
-  const year=String(car.year||car['سنة الصنع']||'').trim();
+  // Use pre-computed labels from sync (include model, type, year, color, plate)
+  if(lang==='ar'&&car.car_label_ar)return car.car_label_ar;
+  if(lang==='en'&&car.car_label)return car.car_label;
+  // Fallback: build from individual fields (for manually-created docs)
+  const typeEN=String(car.Type||car['النوع']||'').trim();
+  const modelEN=String(car.Model||car.model||'').trim();
+  const modelAR=String(car['الطراز']||car.model_name||'').trim();
+  const year=String(car['سنة الصنع']||car.year||'').trim();
   const plate=String(car.plate||formatPlate(car)).trim();
   if(lang==='ar'){
-    const tAR=(car['النوع']||typeEN).replace(/_/g,' ');
-    const mAR=car['الطراز']||modelName||fullModel;
-    const cAR=String(car['اللون']||car.Color||'').trim();
-    const base=fullModel.toLowerCase().startsWith(tAR.toLowerCase())?fullModel:`${tAR} ${mAR}`.trim();
-    return `${base} - (${year}) ${cAR} / ${plate}`.trim();
+    const typeAR=String(car['النوع']||typeEN).replace(/_/g,' ');
+    const colorAR=String(car['اللون']||car.Color||'').trim();
+    return `${modelAR||typeAR} (${year}) ${colorAR} | ${plate}`.trim();
   }
   const colorEN=String(car.Color||car['اللون']||'').trim();
-  let base;
-  if(fullModel){base=fullModel;}
-  else if(typeEN&&modelName){
-    const mn=modelName.toLowerCase(),te=typeEN.toLowerCase();
-    base=mn.startsWith(te)?modelName:`${typeEN} ${modelName}`;
-  }else{base=typeEN||(car['النوع']||'').replace(/_/g,' ')||'Unknown';}
-  return `${base} - (${year}) ${colorEN} / ${plate}`.trim();
+  return `${modelEN||typeEN||'Unknown'} (${year}) ${colorEN} | ${plate}`.trim();
 }
 function formatPlate(car){
   if(car.plate)return car.plate;
@@ -13375,7 +13374,7 @@ function getOrderStatus(order){
   if(total>0&&paid>=total&&end&&today>end)return 'Closed';
 
   // Overdue: past end date, not closed, not accident
-  if(end&&today>end&&!order.closed)return 'Overdue_Legacy';
+  if(end&&today>end&&!order.closed)return 'Closed';
 
   return 'Active';
 }
@@ -13384,11 +13383,15 @@ function getOrderStatus(order){
 /* ============================================================
    7. PARSEDBDATE — DEFINITIVE FINAL VERSION
    Handles Arabic مساءً/صباحاً + T-normalization for Safari.
+   Also handles Excel serial dates (e.g. 45855 → 2025-07-05).
 ============================================================ */
 
 function parseDBDate(str){
   if(!str)return null;
   if(str&&str.toDate)return str.toDate();
+  // Excel serial date (number or 5-digit string like 45855)
+  const serial=typeof str==='number'?str:(typeof str==='string'&&/^\d{5}$/.test(str.trim())?parseInt(str):null);
+  if(serial&&serial>40000&&serial<60000)return new Date(Date.UTC(1899,11,30)+serial*86400000);
 
   const isPM=/مساءً|مساء|PM/i.test(str);
   const isAM=/صباحاً|صباح|AM/i.test(str);
