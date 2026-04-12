@@ -262,10 +262,10 @@ async function main() {
           doc['سنة الصنع']     = r('H');
           doc['اللون']         = r('I');
           doc['نهاية الترخيص'] = r('AQ');
-          doc['حالة التعاقد']  = r('AZ');
+          doc['حاله التعاقد']  = r('AZ');   // ه — matches getCarStatusCategory
+          doc['Contract']      = r('BA');   // English: 'Valid'/'Expired'
           doc['بداية التعاقد'] = r('AW');
           doc['نهاية التعاقد'] = r('AX');
-          doc['BA']            = r('BA');
           doc['تاريخ التسليم'] = r('BC');
           doc['نهاية التأمين'] = r('BJ');
         }
