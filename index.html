@@ -2615,8 +2615,8 @@ function renderOrdersTable(orders){
             <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
             <td><div style="font-weight:600;">${o['اسم العميل']||'-'}</div>${clientId?`<div style="font-size:10px;color:var(--text3);">ID: ${clientId}</div>`:''}</td>
             <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${carLabel}</td>
-            <td style="font-size:11px;white-space:nowrap;">${start?fmtDateShort(start):'<span style="color:var(--danger);">No date</span>'}</td>
-            <td style="font-size:11px;white-space:nowrap;">${end?fmtDateShort(end):'<span style="color:var(--danger);">No date</span>'}${isOverdue?`<div style="font-size:9px;color:var(--danger);">${lateDays}d overdue</div>`:''}</td>
+            <td style="font-size:11px;white-space:nowrap;">${start?fmtDate(start):'<span style="color:var(--danger);">No date</span>'}</td>
+            <td style="font-size:11px;white-space:nowrap;">${end?fmtDate(end):'<span style="color:var(--danger);">No date</span>'}${isOverdue?`<div style="font-size:9px;color:var(--danger);">${lateDays}d overdue</div>`:''}</td>
             <td style="white-space:nowrap;">${fmtMoney(total)}</td>
             <td><div style="white-space:nowrap;">${fmtMoney(paid)}</div>
               <div style="background:var(--surface3);border-radius:99px;height:3px;width:55px;margin-top:3px;overflow:hidden;">
@@ -4632,8 +4632,8 @@ function openOrdersListModal(orders,clientName){
             return`<tr style="cursor:pointer;" onclick="closeModal();openOrderDetail('${o.id}')">
               <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
               <td style="font-size:11px;">${carLabel}</td>
-              <td style="font-size:11px;">${start?fmtDateShort(start):'-'}</td>
-              <td style="font-size:11px;">${end?fmtDateShort(end):'-'}</td>
+              <td style="font-size:11px;">${start?fmtDate(start):'-'}</td>
+              <td style="font-size:11px;">${end?fmtDate(end):'-'}</td>
               <td>${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}</td>
               <td>${fmtMoney(parseAmount(o['المدفوع EGP']))}</td>
               <td><span class="pill pill-${statusKey}">${statusLabel}</span></td>
@@ -5105,8 +5105,8 @@ async function loadVehicle360Details(){
                 return`<tr style="cursor:pointer;" onclick="openOrderDetail('${o.id}')">
                   <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
                   <td>${o['اسم العميل']||'-'}</td>
-                  <td style="font-size:10px;">${start?fmtDateShort(start):'-'}</td>
-                  <td style="font-size:10px;">${end?fmtDateShort(end):'-'}</td>
+                  <td style="font-size:10px;">${start?fmtDate(start):'-'}</td>
+                  <td style="font-size:10px;">${end?fmtDate(end):'-'}</td>
                   <td>${fmtMoney(t)}</td>
                   <td>${fmtMoney(p)}</td>
                   <td style="color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?fmtMoney(debt):'✅'}</td>
@@ -7313,8 +7313,8 @@ async function loadVehicle360Details(){
                     <div style="font-weight:600;">${o['اسم العميل']||'—'}</div>
                     ${o['كود العميل']?`<div style="font-size:9px;color:var(--text3);">ID: ${o['كود العميل']}</div>`:''}
                   </td>
-                  <td style="font-size:10px;">${start?fmtDateShort(start):'—'}</td>
-                  <td style="font-size:10px;">${end?fmtDateShort(end):'—'}
+                  <td style="font-size:10px;">${start?fmtDate(start):'—'}</td>
+                  <td style="font-size:10px;">${end?fmtDate(end):'—'}
                     ${ldays>0?`<div style="font-size:9px;color:var(--danger);">+${ldays}d</div>`:''}
                   </td>
                   <td style="font-size:11px;">${fmtMoney(d)}</td>
@@ -7795,7 +7795,7 @@ async function openCRMProfile(customerId){
             return`<tr style="cursor:pointer;" onclick="closeModal();openOrderDetail('${o.id}')">
               <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
               <td style="font-size:11px;">${carLabel}</td>
-              <td style="font-size:10px;">${start?fmtDateShort(start):'—'} → ${end?fmtDateShort(end):'—'}</td>
+              <td style="font-size:10px;">${start?fmtDate(start):'—'} → ${end?fmtDate(end):'—'}</td>
               <td>${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}</td>
               <td><span class="pill pill-${sk}">${st==='Overdue_Legacy'?'OVERDUE':st}</span></td>
             </tr>`;
@@ -14138,8 +14138,8 @@ async function openCRMProfile(customerId){
               <td style="font-size:9px;color:var(--text3);">${o.contract_ref||'—'}</td>
               <td style="font-size:11px;">${carLabel}</td>
               <td style="font-size:10px;">
-                ${start?fmtDateShort(start):'—'} →<br>
-                ${end?fmtDateShort(end):'—'}
+                ${start?fmtDate(start):'—'} →<br>
+                ${end?fmtDate(end):'—'}
               </td>
               <td style="white-space:nowrap;">
                 ${fmtMoney(parseAmount(o['إجمالي المستحق (Total)']))}
