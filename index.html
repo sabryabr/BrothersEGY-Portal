@@ -902,19 +902,19 @@ function getCarStatusCategory(car){
   return 'available';
 }
 function getCarLabel(car,lang='en'){
-  const typeEN=(car.Type||'').trim();
-  const fullModel=(car.model||'').trim();
-  const modelName=(car.model_name||car['الطراز']||'').trim();
-  const year=(car.year||car['سنة الصنع']||'').trim();
-  const plate=(car.plate||formatPlate(car)).trim();
+  const typeEN=String(car.Type||'').trim();
+  const fullModel=String(car.model||'').trim();
+  const modelName=String(car.model_name||car['الطراز']||'').trim();
+  const year=String(car.year||car['سنة الصنع']||'').trim();
+  const plate=String(car.plate||formatPlate(car)).trim();
   if(lang==='ar'){
     const tAR=(car['النوع']||typeEN).replace(/_/g,' ');
     const mAR=car['الطراز']||modelName||fullModel;
-    const cAR=(car['اللون']||car.Color||'').trim();
+    const cAR=String(car['اللون']||car.Color||'').trim();
     const base=fullModel.toLowerCase().startsWith(tAR.toLowerCase())?fullModel:`${tAR} ${mAR}`.trim();
     return `${base} - (${year}) ${cAR} / ${plate}`.trim();
   }
-  const colorEN=(car.Color||car['اللون']||'').trim();
+  const colorEN=String(car.Color||car['اللون']||'').trim();
   let base;
   if(fullModel){base=fullModel;}
   else if(typeEN&&modelName){
@@ -9618,13 +9618,13 @@ function arSelectCar(){
 
 // Patch the existing doLogout to also stop the log listener
 const _origDoLogout=doLogout;
-async function doLogout(){
+doLogout=async function(){
   if(_logUnsub){
     try{_logUnsub();}catch(e){}
     _logUnsub=null;
   }
   await _origDoLogout();
-}
+};
 
 /* ============================================================
    PART 7: INCOME & EXPENSES — COMPLETE ENHANCED MODULE
