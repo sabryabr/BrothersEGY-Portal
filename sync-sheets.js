@@ -85,27 +85,36 @@ const CZ_IDX = colLetterToIndex('CZ'); // 103  (columns A–CZ)
 function buildCarExtras(row, headers) {
   const get = (letter) => (row[colLetterToIndex(letter)] || '').toString().trim();
 
-  // Plate: columns W X Y Z AA AB AC joined with spaces (non-empty parts only)
-  const plateLetters = ['W','X','Y','Z','AA','AB','AC'];
-  const plate = plateLetters.map(get).filter(Boolean).join(' ');
+  // Plate: AC AB AA Z Y X W (digits first, then letters) — non-empty parts only
+  const plate = ['AC','AB','AA','Z','Y','X','W'].map(get).filter(Boolean).join(' ');
 
-  const carType  = get('B');
-  const model    = get('E');
-  const year     = get('H');
-  const color    = get('I');
-  const azVal    = get('AZ');   // "Valid"/"ساري" = active, anything else = archived
+  const typeAR  = get('B');   // Arabic type
+  const typeEN  = get('C');   // English type
+  const modelAR = get('E');   // Arabic model
+  const modelEN = get('F');   // English model
+  const year    = get('H');
+  const colorAR = get('I');   // Arabic color
+  const colorEN = get('J');   // English color
+  const azVal   = get('AZ');  // Arabic: 'ساري' or 'منتهي'
+  const baVal   = get('BA');  // English: 'Valid' or 'Expired'
 
-  const carLabel = [carType, model, year ? `(${year})` : '', color, plate ? `/ ${plate}` : '']
-    .filter(Boolean).join(' ');
+  const yearStr  = year ? `(${year})` : '';
+  const plateStr = plate ? `| ${plate}` : '';
+
+  const car_label    = [modelEN, typeEN, yearStr, colorEN, plateStr].filter(Boolean).join(' ');
+  const car_label_ar = [modelAR, typeAR, yearStr, colorAR, plateStr].filter(Boolean).join(' ');
 
   return {
-    car_label: carLabel,
-    is_active: azVal === 'Valid' || azVal === 'ساري',
-    archived:  azVal !== 'Valid' && azVal !== 'ساري',
+    car_label,
+    car_label_ar,
+    is_active: baVal === 'Valid' || azVal === 'ساري',
+    archived:  baVal !== 'Valid' && azVal !== 'ساري',
     owner_name: [get('BP'), get('BQ')].filter(Boolean).join(' '),
-    contract_end_date: get('BC'),
-    license_end_date:  get('AQ'),
-    insurance_end_date: get('BJ'),
+    contract_start_date:  get('AW'),
+    contract_end_date:    get('AX'),
+    handover_date:        get('BC'),
+    license_end_date:     get('AQ'),
+    insurance_end_date:   get('BJ'),
     monthly_fee:             get('CJ'),
     payment_frequency_days:  get('CK'),
     deduction_pct:           get('CL'),
@@ -247,15 +256,18 @@ async function main() {
           doc['مكان التسليم']                      = r('U');
         }
         if (cfg.collection === 'fleet') {
-          doc['ID']           = r('A');
-          doc['حالة التعاقد'] = r('AZ');
-          doc['نهاية الترخيص']= r('AQ');
-          doc['نهاية التأمين']= r('BJ');
-          doc['تاريخ التسليم']= r('BC');
-          doc['النوع']        = r('B');
-          doc['الطراز']       = r('E');
-          doc['سنة الصنع']    = r('H');
-          doc['اللون']        = r('I');
+          doc['ID']            = r('A');
+          doc['النوع']         = r('B');
+          doc['الطراز']        = r('E');
+          doc['سنة الصنع']     = r('H');
+          doc['اللون']         = r('I');
+          doc['نهاية الترخيص'] = r('AQ');
+          doc['حالة التعاقد']  = r('AZ');
+          doc['بداية التعاقد'] = r('AW');
+          doc['نهاية التعاقد'] = r('AX');
+          doc['BA']            = r('BA');
+          doc['تاريخ التسليم'] = r('BC');
+          doc['نهاية التأمين'] = r('BJ');
         }
 
         const docRef = db.collection(cfg.collection).doc(idVal);
