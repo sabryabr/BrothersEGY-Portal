@@ -2187,10 +2187,11 @@ async function loadDashKPIs(){
   try{
     const isPriv=['Admin','Executive'].includes(G.user?.role);
     const period=getPeriodFilter();
-    const now=new Date();
-
-    const snap=await db.collection('bookings').limit(600).get();
-    let bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
+    
+    // Ensure our single source of truth is ready
+    if(!G.activeBookings) G.activeBookings = G.bookings || [];
+    let bookings = G.activeBookings;
+    
     if(!isPriv)bookings=bookings.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
 
     const active=bookings.filter(o=>getOrderStatus(o)==='Active');
@@ -2347,9 +2348,10 @@ async function loadDashFleetChart(){
 async function updateSidebarBadges(){
   const isPriv=['Admin','Executive'].includes(G.user?.role);
   try{
-    // Orders badge - compute from already-loaded data or fetch
-    const ordSnap=await db.collection('bookings').limit(600).get();
-    let orders=ordSnap.docs.map(d=>({id:d.id,...d.data()}));
+    // Orders badge - compute from our filtered active bookings
+    if(!G.activeBookings) G.activeBookings = G.bookings || [];
+    let orders = G.activeBookings;
+    
     if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
     const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue'||st==='Future';}).length;
     const ob=document.getElementById('badge-orders');
@@ -3242,18 +3244,43 @@ function ganttScrollToToday(){
 }
 
 async function renderGantt(){
-  // 1. Define your cutoff date
-    const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
+  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
+  wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
+  window._ganttData={};
 
-    // 2. Filter the global bookings array to only include 2026+ data
-    const activeBookings = G.bookings.filter(b => {
-        // Check the return/end date of the contract
-        const dateStr = b['تاريخ العودة'] || b['نهاية التعاقد'] || b['بداية التعاقد'];
-        if (!dateStr) return false; 
-        
-        const bDate = new Date(dateStr);
-        return bDate >= CUTOFF_DATE;
+  try{
+    // Wait for fleet if not loaded yet
+    if(!G.fleet || G.fleet.length === 0) await loadFleet();
+    if(!G.fleet || G.fleet.length === 0){
+       wrap.innerHTML='<div class="empty-state"><p>No fleet data available.</p></div>';
+       return;
+    }
+
+    // Ensure our single source of truth is ready
+    if(!G.activeBookings) G.activeBookings = G.bookings || [];
+
+    // Pre-index only the active orders into the Hash Map (Fixes UI Freezing)
+    const ordersByCar = {};
+    G.activeBookings.forEach(b => {
+        const carCode = String(b['كود السيارة'] || '').trim();
+        if(carCode) {
+            if(!ordersByCar[carCode]) ordersByCar[carCode] = [];
+            ordersByCar[carCode].push(b);
+        }
     });
+
+    const today=new Date();today.setHours(0,0,0,0);
+    const totalDays=_ganttDays||90;
+    const pastDays=Math.floor(totalDays*0.33);
+    const ganttStart=new Date(today);
+    ganttStart.setDate(ganttStart.getDate()-pastDays);
+
+    const DAY_PX=14;
+    const CAR_COL=230;
+    const ASSIGN_COL=230;
+    const ROW_H=38;
+    const HEADER_H=46;
+    const totalPx=totalDays*DAY_PX;
 
     // NOW use `activeBookings` instead of `G.bookings` for your Gantt loops!
   
@@ -3408,18 +3435,14 @@ async function renderGantt(){
     const carIdDisplay=car['No.']||car.ID||car.id||'-';
     const plateDisplay=car.plate||formatPlate(car);
 
-    const carOrders=bookings.filter(b=>{
-      const bCarId=String(getOrderCarCode(b)||'').trim();
-      if(!bCarId)return false;
-      if(possibleIds.has(bCarId))return true;
-      const bNum=String(parseInt(bCarId)||'');
-      for(const pid of possibleIds){
-        const pNum=String(parseInt(pid)||'');
-        if(pNum&&pNum!=='0'&&pNum===bNum)return true;
-      }
-      return false;
-    });
-
+    // Instantly find orders using the Hash Map instead of a massive loop
+    let carOrders = [];
+    for (const pid of possibleIds) {
+        if (ordersByCar[pid]) {
+            carOrders = carOrders.concat(ordersByCar[pid]);
+        }
+    }
+      
       carOrders.sort((a,b)=>{
         const{start:as}=getOrderDates(a);
         const{start:bs}=getOrderDates(b);
