@@ -763,9 +763,9 @@ function triggerGlobalRender() {
     globalRenderTimer = setTimeout(() => {
         // This ensures charts and Gantt only draw ONCE after all data is ready
         console.log("Executing Debounced Render...");
-        if(typeof renderGantt === 'function') renderGantt();
-        if(typeof updateDashboard === 'function') updateDashboard();
-        if(typeof checkRisks === 'function') checkRisks();
+        if(typeof renderGantt === 'function') triggerGlobalRender();
+        if(typeof updateDashboard === 'function') triggerGlobalRender();
+        if(typeof checkRisks === 'function') triggerGlobalRender();
     }, 300);
 }
   
@@ -1444,10 +1444,6 @@ async function loadBookingsCache(){
   try{const snap=await db.collection('bookings').get();G.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));}
   catch(e){console.warn('Bookings cache load failed:',e.message);}
 }
-  
-console.log('Fleet sample:',G.fleet.slice(0,3).map(c=>({
-  docId:c.id, ID:c.ID, No:c['No.'], plate:c.plate
-})));
   
 async function loadCustomers(){
   try{const snap=await db.collection('customers').limit(500).get();G.customers=snap.docs.map(d=>({id:d.id,...d.data()}));}
@@ -3293,9 +3289,17 @@ async function renderGantt(){
        return;
     }
 
-    // Optimization: Pre-index orders into a Hash Map to drop complexity from O(n*m) to O(n+m)
+    // 1. Filter FIRST
+    const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
+    const activeBookings = G.bookings.filter(b => {
+        const dateStr = b['تاريخ العودة'] || b['نهاية التعاقد'] || b['بداية التعاقد'];
+        if (!dateStr) return false; 
+        return new Date(dateStr) >= CUTOFF_DATE;
+    });
+
+    // 2. THEN index only the active orders into the Hash Map
     const ordersByCar = {};
-    bookings.forEach(b => {
+    activeBookings.forEach(b => {
         const carCode = String(b['كود السيارة'] || '').trim();
         if(carCode) {
             if(!ordersByCar[carCode]) ordersByCar[carCode] = [];
@@ -3918,7 +3922,7 @@ async function saveCarEdit(docId){
     await logAction('EDIT','Fleet Radar',`Updated car: ${docId} → ${upd.Contract} / ${upd.status}`);
     toast('Car updated successfully!','success');
     closeModal();
-    renderGantt();
+    triggerGlobalRender();
   }catch(e){toast('Update failed: '+e.message,'error');}
 }
 
