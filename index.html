@@ -502,21 +502,23 @@ button{cursor:pointer;}
       </div>
       <div class="login-title"><h1>BROTHERS EGY</h1></div>
       <div class="login-subtitle" id="login-typewriter"></div>
-      <div class="login-field">
-        <span class="field-icon">👤</span>
-        <input type="text" id="li-user" placeholder="Username" autocomplete="username"
-               onkeydown="if(event.key==='Enter')doLogin()"/>
-      </div>
-      <div class="login-field">
-        <span class="field-icon">🔒</span>
-        <input type="password" id="li-pass" placeholder="Password" autocomplete="current-password"
-               onkeydown="if(event.key==='Enter')doLogin()"/>
-        <button class="pw-toggle" type="button" onclick="togglePW()" id="pw-toggle-btn">👁</button>
-      </div>
-      <button class="login-btn" id="login-btn" onclick="doLogin()">
-        <span id="login-btn-text">AUTHORIZE ACCESS</span>
-        <div class="login-spinner" id="login-spinner"></div>
-      </button>
+      
+      <form onsubmit="event.preventDefault(); doLogin();" style="width: 100%;">
+        <div class="login-field">
+          <span class="field-icon">👤</span>
+          <input type="text" id="li-user" placeholder="Username" autocomplete="username"/>
+        </div>
+        <div class="login-field">
+          <span class="field-icon">🔒</span>
+          <input type="password" id="li-pass" placeholder="Password" autocomplete="current-password"/>
+          <button class="pw-toggle" type="button" onclick="togglePW()" id="pw-toggle-btn">👁</button>
+        </div>
+        <button class="login-btn" id="login-btn" type="submit">
+          <span id="login-btn-text">AUTHORIZE ACCESS</span>
+          <div class="login-spinner" id="login-spinner"></div>
+        </button>
+      </form>
+      
       <div class="login-err" id="login-err"></div>
     </div>
     <div class="login-footer">
@@ -3251,10 +3253,25 @@ async function renderGantt(){
     const HEADER_H=46;
     const totalPx=totalDays*DAY_PX;
 
-    // Wait for fleet if not loaded yet
-    if(!G.fleet||G.fleet.length===0){
+    // Wait for fleet if not loaded yet and prevent race condition
+    if(!G.fleet || G.fleet.length === 0){
       await loadFleet();
     }
+    
+    if(!G.fleet || G.fleet.length === 0){
+       wrap.innerHTML='<div class="empty-state"><p>No fleet data available. Check Sync.</p></div>';
+       return;
+    }
+
+    // Optimization: Pre-index orders into a Hash Map to drop complexity from O(n*m) to O(n+m)
+    const ordersByCar = {};
+    bookings.forEach(b => {
+        const carCode = String(b['كود السيارة'] || '').trim();
+        if(carCode) {
+            if(!ordersByCar[carCode]) ordersByCar[carCode] = [];
+            ordersByCar[carCode].push(b);
+        }
+    });
     
     // ALL fleet cars that match filter - use is_active/archived flags from sync
     const cars=G.fleet.filter(car=>{
@@ -5350,12 +5367,14 @@ function doCrmSearch(prefix){
   const sugBox=document.getElementById(`${prefix}-suggestions`);if(!sugBox)return;
   if(!q||q.length<2){sugBox.style.display='none';return;}
   const matches=G.customers.filter(c=>{
-    const name=((c['الاسم الأول']||c.col_C||'')+' '+(c['الاسم الأخير']||c.col_D||'')).toLowerCase();
-    const passport=(c['رقم جواز السفر']||'').toLowerCase();
-    const natid=(c['الرقم القومي']||'').toLowerCase();
-    const phone=(c['رقم التليفون']||'').toLowerCase();
-    return name.includes(q)||passport.includes(q)||natid.includes(q)||phone.includes(q);
-  });
+      // Explicitly cast to String to prevent the Uncaught TypeError on numeric National IDs/Phones
+      const name = String((c['الاسم الأول']||c.col_C||'')+' '+(c['الاسم الأخير']||c.col_D||'')).toLowerCase();
+      const passport = String(c['رقم جواز السفر']||'').toLowerCase();
+      const natid = String(c['الرقم القومي']||'').toLowerCase();
+      const phone = String(c['رقم التليفون']||'').toLowerCase();
+      
+      return name.includes(q)||passport.includes(q)||natid.includes(q)||phone.includes(q);
+    });
   if(!matches.length){sugBox.style.display='none';return;}
   sugBox.style.display='block';
   sugBox.innerHTML=matches.slice(0,8).map(c=>{
