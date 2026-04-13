@@ -759,11 +759,9 @@ let globalRenderTimer = null;
 
 function triggerGlobalRender() {
     clearTimeout(globalRenderTimer);
-    // NEW: We added "async" right here so it can wait for data!
     globalRenderTimer = setTimeout(async () => {
         console.log("Executing Debounced Render...");
 
-        // NEW: Force the system to wait for the Fleet BEFORE doing any math!
         if (typeof loadFleet === 'function' && (!G.fleet || G.fleet.length === 0)) {
             await loadFleet();
         }
@@ -771,16 +769,37 @@ function triggerGlobalRender() {
         const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
 
         G.activeBookings = G.bookings.filter(b => {
-            const status = typeof getOrderStatus === 'function' ? getOrderStatus(b) : 'Active';
-            if (status === 'Closed' || b['الحالة'] === 'منتهي' || b['الحالة'] === 'ملغي') return false;
+            
+            // 1. Calculate Financials for Auto-Close
+            let total = 0, paid = 0;
+            if (typeof getOrderTotal === 'function' && typeof getOrderPaid === 'function') {
+                total = getOrderTotal(b);
+                paid = getOrderPaid(b);
+            }
+            const isPaidInFull = (total > 0 && paid >= total);
 
+            // 2. AUTO-CLOSE LOGIC: If paid in full, tell the system it's closed!
+            if (isPaidInFull || b['الحالة'] === 'منتهي') {
+                b.closed = true;             // Native closed flag
+                b['الحالة'] = 'منتهي';       // Override sheet status in memory
+            }
+
+            // 3. ONLY completely hide explicitly "Canceled" (ملغي) orders 
+            if (b['الحالة'] === 'ملغي') {
+                return false; 
+            }
+
+            // 4. DATE FILTER: Hide all old 2025 data to keep the system fast
             if (typeof getOrderDates === 'function') {
                 const dates = getOrderDates(b);
                 const compareDate = dates.end || dates.start;
-                if (status === 'Active' || status === 'Overdue') return true;
-                if (compareDate && compareDate >= CUTOFF_DATE) return true;
-                return false;
+                
+                if (compareDate && compareDate < CUTOFF_DATE) {
+                    return false; // Hide if older than 2026
+                }
             }
+            
+            // 5. KEEP EVERYTHING ELSE! (This keeps Closed/Paid 2026 orders on the Gantt chart)
             return true;
         });
 
