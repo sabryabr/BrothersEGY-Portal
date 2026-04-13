@@ -3270,7 +3270,7 @@ async function renderGantt(){
     });
 
     const today=new Date();today.setHours(0,0,0,0);
-    const totalDays=_ganttDays||90;
+    const totalDays=window._ganttDays||90;
     const pastDays=Math.floor(totalDays*0.33);
     const ganttStart=new Date(today);
     ganttStart.setDate(ganttStart.getDate()-pastDays);
@@ -3282,74 +3282,8 @@ async function renderGantt(){
     const HEADER_H=46;
     const totalPx=totalDays*DAY_PX;
 
-    // NOW use `activeBookings` instead of `G.bookings` for your Gantt loops!
-  
-  const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
-  wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
-  window._ganttData={};
-
-  try{
-    const snap=await db.collection('bookings').limit(600).get();
-    const bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
-
-    // Build a lookup of all car IDs from bookings to understand what format they use
-    const bookingCarIds=new Set(bookings.map(b=>String(b['كود السيارة']||'').trim()).filter(Boolean));
-
-    // Build fleet lookup - try to match by both ID field and document id
-    const fleetById={};
-    G.fleet.forEach(car=>{
-      const id1=String(car.ID||'').trim();
-      const id2=String(car.id||'').trim();
-      if(id1)fleetById[id1]=car;
-      if(id2)fleetById[id2]=car;
-      // Also try numeric versions
-      if(id1)fleetById[parseInt(id1)||id1]=car;
-    });
-
-    const today=new Date();today.setHours(0,0,0,0);
-    const totalDays=_ganttDays||90;
-    const pastDays=Math.floor(totalDays*0.33);
-    const ganttStart=new Date(today);
-    ganttStart.setDate(ganttStart.getDate()-pastDays);
-
-    const DAY_PX=14;
-    const CAR_COL=230;
-    const ASSIGN_COL=230;
-    const ROW_H=38;
-    const HEADER_H=46;
-    const totalPx=totalDays*DAY_PX;
-
-    // Wait for fleet if not loaded yet and prevent race condition
-    if(!G.fleet || G.fleet.length === 0){
-      await loadFleet();
-    }
-    
-    if(!G.fleet || G.fleet.length === 0){
-       wrap.innerHTML='<div class="empty-state"><p>No fleet data available. Check Sync.</p></div>';
-       return;
-    }
-
-    // 1. Filter FIRST
-    const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
-    const activeBookings = G.bookings.filter(b => {
-        const dateStr = b['تاريخ العودة'] || b['نهاية التعاقد'] || b['بداية التعاقد'];
-        if (!dateStr) return false; 
-        return new Date(dateStr) >= CUTOFF_DATE;
-    });
-
-    // 2. THEN index only the active orders into the Hash Map
-    const ordersByCar = {};
-    activeBookings.forEach(b => {
-        const carCode = String(b['كود السيارة'] || '').trim();
-        if(carCode) {
-            if(!ordersByCar[carCode]) ordersByCar[carCode] = [];
-            ordersByCar[carCode].push(b);
-        }
-    });
-    
     // ALL fleet cars that match filter - use is_active/archived flags from sync
     const cars=G.fleet.filter(car=>{
-      // Determine category using the same flags set by sync-sheets.js
       const isArchived=car.archived===true||car.is_active===false;
       const st=(car.status||'').toLowerCase().trim();
       const cEN=(car.Contract||'').toLowerCase().trim();
@@ -3364,7 +3298,6 @@ async function renderGantt(){
       if(!statusPass)return false;
       const allOff=!Object.values(FLEET_FILTER.branches).some(v=>v);
       const allOn=Object.values(FLEET_FILTER.branches).every(v=>v);
-      // When all branches selected or none selected, show all cars regardless of branch field
       const branchPass=allOff||allOn||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
         if(!on)return false;
         const bn=(BRANCH_MAP[code]||code).toLowerCase();
