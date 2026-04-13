@@ -759,39 +759,36 @@ let globalRenderTimer = null;
 
 function triggerGlobalRender() {
     clearTimeout(globalRenderTimer);
-    globalRenderTimer = setTimeout(() => {
+    // NEW: We added "async" right here so it can wait for data!
+    globalRenderTimer = setTimeout(async () => {
         console.log("Executing Debounced Render...");
 
-        // 1. Single Source of Truth Cutoff Date
+        // NEW: Force the system to wait for the Fleet BEFORE doing any math!
+        if (typeof loadFleet === 'function' && (!G.fleet || G.fleet.length === 0)) {
+            await loadFleet();
+        }
+
         const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
 
-        // 2. Filter using the ERP's built-in smart formatters
         G.activeBookings = G.bookings.filter(b => {
-            // Use the built-in status parser
             const status = typeof getOrderStatus === 'function' ? getOrderStatus(b) : 'Active';
-            
-            // Instantly hide completely closed or canceled orders
             if (status === 'Closed' || b['الحالة'] === 'منتهي' || b['الحالة'] === 'ملغي') return false;
 
-            // Use the built-in date parser (which understands your Google Sheets formats)
             if (typeof getOrderDates === 'function') {
                 const dates = getOrderDates(b);
                 const compareDate = dates.end || dates.start;
-                
-                // Keep the order if it is currently Active/Overdue, OR if it occurs in 2026+
                 if (status === 'Active' || status === 'Overdue') return true;
                 if (compareDate && compareDate >= CUTOFF_DATE) return true;
-                
-                return false; // Otherwise, hide it
+                return false;
             }
-            
-            return true; // Fallback
+            return true;
         });
 
-        // 3. Trigger UI Updates (Fixed the dashboard function name!)
         if(typeof renderGantt === 'function') renderGantt();
-        if(typeof loadDashKPIs === 'function') loadDashKPIs(); // <-- This triggers your dashboard numbers!
+        if(typeof loadDashKPIs === 'function') loadDashKPIs();
         if(typeof checkRisks === 'function') checkRisks();
+        if(typeof renderPage === 'function') renderPage();
+
     }, 300);
 }
   
@@ -2207,12 +2204,22 @@ async function loadDashKPIs(){
     
     if(!isPriv)bookings=bookings.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
 
-    const active=bookings.filter(o=>getOrderStatus(o)==='Active');
-    document.getElementById('kpi-active').textContent=active.length;
+    const active = bookings.filter(o => getOrderStatus(o) === 'Active');
+    document.getElementById('kpi-active').textContent = active.length;
 
-    const today=new Date();
-    const overdue=active.filter(o=>{const{end}=getOrderDates(o);return end&&today>end&&!o.closed;});
-    document.getElementById('kpi-overdue').textContent=overdue.length;
+    const today = new Date();
+    
+    // FIX: Search the main 'bookings' array, not the filtered 'active' array!
+    const overdue = bookings.filter(o => {
+        const st = typeof getOrderStatus === 'function' ? getOrderStatus(o) : '';
+        if (st === 'Overdue') return true; // Catch it if the system already labeled it Overdue
+        
+        // Catch it manually if the date has passed
+        const dates = typeof getOrderDates === 'function' ? getOrderDates(o) : {};
+        return dates.end && today > dates.end && !o.closed && st !== 'Closed' && o['الحالة'] !== 'منتهي';
+    });
+    
+    document.getElementById('kpi-overdue').textContent = overdue.length;
 
     document.getElementById('kpi-avail').textContent=G.fleet.filter(c=>c.is_active===true&&(getCarStatusCategory(c)==='available'||getCarStatusCategory(c)==='future')).length;
 
