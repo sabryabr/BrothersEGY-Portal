@@ -3646,17 +3646,19 @@ async function renderGantt(){
     setTimeout(()=>ganttScrollToToday(),200);
 
     // If no order bars appeared, log diagnostic
-    if(bookings.length>0&&cars.length>0){
+    if(G.activeBookings.length > 0 && cars.length > 0){
       const matchCount=cars.reduce((sum,car)=>{
         const cid=String(car.ID||car.id||'').trim();
-        return sum+bookings.filter(b=>String(b['كود السيارة']||'').trim()===cid).length;
+        return sum + G.activeBookings.filter(b=>String(b['كود السيارة']||'').trim()===cid).length;
       },0);
+      
       if(matchCount===0){
-        console.warn('GANTT: 0 orders matched to cars. Booking car IDs sample:',
-          [...bookingCarIds].slice(0,5),
+        const activeCarIds = [...new Set(G.activeBookings.map(b=>String(b['كود السيارة']||'').trim()).filter(Boolean))];
+        console.warn('GANTT: 0 orders matched to cars. Active Booking car IDs sample:',
+          activeCarIds.slice(0,5),
           'Fleet IDs sample:',G.fleet.slice(0,5).map(c=>({ID:c.ID,id:c.id})));
       }else{
-        console.log(`GANTT: ${matchCount} orders matched across ${cars.length} cars`);
+        console.log(`GANTT: ${matchCount} active orders matched across ${cars.length} cars`);
       }
     }
 
