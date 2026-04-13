@@ -757,15 +757,28 @@ let G={
 // Add this near your global variables
 let globalRenderTimer = null;
 
-// Replace your direct calls to renderGantt() or updateDashboard() with this:
 function triggerGlobalRender() {
     clearTimeout(globalRenderTimer);
     globalRenderTimer = setTimeout(() => {
-        // This ensures charts and Gantt only draw ONCE after all data is ready
         console.log("Executing Debounced Render...");
-        if(typeof renderGantt === 'function') triggerGlobalRender();
-        if(typeof updateDashboard === 'function') triggerGlobalRender();
-        if(typeof checkRisks === 'function') triggerGlobalRender();
+
+        // SINGLE SOURCE OF TRUTH: Filter old/closed orders out globally!
+        const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
+        
+        G.activeBookings = G.bookings.filter(b => {
+            const status = (b['الحالة'] || '').trim();
+            if(status === 'منتهي' || status === 'ملغي') return false; // Hide closed/canceled entirely
+            
+            const dateStr = b['تاريخ العودة'] || b['نهاية التعاقد'] || b['بداية التعاقد'];
+            if (!dateStr) return status === 'ساري'; 
+            
+            // Keep it if it's strictly Active, OR if the date is 2026+
+            return status === 'ساري' || new Date(dateStr) >= CUTOFF_DATE; 
+        });
+
+        if(typeof renderGantt === 'function') renderGantt();
+        if(typeof updateDashboard === 'function') updateDashboard();
+        if(typeof checkRisks === 'function') checkRisks();
     }, 300);
 }
   
