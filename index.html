@@ -754,6 +754,21 @@ let G={
     callmebotKeys:{},callmebotPhones:{}}
 };
 
+// Add this near your global variables
+let globalRenderTimer = null;
+
+// Replace your direct calls to renderGantt() or updateDashboard() with this:
+function triggerGlobalRender() {
+    clearTimeout(globalRenderTimer);
+    globalRenderTimer = setTimeout(() => {
+        // This ensures charts and Gantt only draw ONCE after all data is ready
+        console.log("Executing Debounced Render...");
+        if(typeof renderGantt === 'function') renderGantt();
+        if(typeof updateDashboard === 'function') updateDashboard();
+        if(typeof checkRisks === 'function') checkRisks();
+    }, 300);
+}
+  
 let dashCharts={};
 let allLogs=[];
   
@@ -3161,7 +3176,7 @@ async function loadFleetRadar(){
          padding:13px;box-shadow:0 12px 40px rgba(0,0,0,0.7);pointer-events:none;"></div>`;
 
   buildFleetFilterBar('fleet-filter-bar-gantt','renderGantt');
-  await renderGantt();
+  await triggerGlobalRender();
   initGanttDrag();
 }
 
@@ -3174,7 +3189,7 @@ function setGanttRange(days){
     b.style.color=parseInt(b.dataset.days)===days?'#fff':'var(--text2)';
     b.style.borderColor=parseInt(b.dataset.days)===days?'var(--accent)':'var(--border)';
   });
-  renderGantt();
+  triggerGlobalRender();
 }
 
 /* ---- Drag to scroll ---- */
@@ -3218,6 +3233,21 @@ function ganttScrollToToday(){
 }
 
 async function renderGantt(){
+  // 1. Define your cutoff date
+    const CUTOFF_DATE = new Date('2026-01-01T00:00:00');
+
+    // 2. Filter the global bookings array to only include 2026+ data
+    const activeBookings = G.bookings.filter(b => {
+        // Check the return/end date of the contract
+        const dateStr = b['تاريخ العودة'] || b['نهاية التعاقد'] || b['بداية التعاقد'];
+        if (!dateStr) return false; 
+        
+        const bDate = new Date(dateStr);
+        return bDate >= CUTOFF_DATE;
+    });
+
+    // NOW use `activeBookings` instead of `G.bookings` for your Gantt loops!
+  
   const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
   wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
   window._ganttData={};
