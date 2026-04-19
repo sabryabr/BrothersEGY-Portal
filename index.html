@@ -1479,17 +1479,33 @@ async function loadSharedData(){
   updateSidebarBadges();
 }
 async function loadFleet(){
-  try{const snap=await db.collection('fleet').get();G.fleet=snap.docs.map(d=>({id:d.id,...d.data()}));populateFleetDropdowns();}
-  catch(e){console.warn('Fleet load failed:',e.message);}
+  try{
+    const snap=await db.collection('fleet').get();
+    G.fleet=snap.docs.map(d=>({id:d.id,...d.data()}));
+    console.log('[Fleet] Loaded',G.fleet.length,'cars. Sample:',G.fleet.slice(0,3).map(c=>({docId:c.id,plate:c.plate,is_active:c.is_active})));
+    populateFleetDropdowns();
+  }catch(e){console.warn('Fleet load failed:',e.message);}
 }
 async function loadBookingsCache(){
-  try{const snap=await db.collection('bookings').get();G.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));}
-  catch(e){console.warn('Bookings cache load failed:',e.message);}
+  try{
+    const snap=await db.collection('bookings').limit(500).get();
+    G.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
+    console.log('[Bookings Cache] Loaded',G.bookings.length,'bookings');
+  }catch(e){console.warn('Bookings cache load failed:',e.message);}
 }
-  
 async function loadCustomers(){
-  try{const snap=await db.collection('customers').limit(500).get();G.customers=snap.docs.map(d=>({id:d.id,...d.data()}));}
-  catch(e){console.warn('Customers load failed:',e.message);}
+  try{
+    const snap=await db.collection('customers').orderBy('_sys_updated','desc').limit(500).get();
+    G.customers=snap.docs.map(d=>({id:d.id,...d.data()}));
+    console.log('[CRM] Loaded',G.customers.length,'customers');
+  }catch(e){
+    console.warn('Customers load with orderBy failed, trying without:',e.message);
+    try{
+      const snap2=await db.collection('customers').limit(500).get();
+      G.customers=snap2.docs.map(d=>({id:d.id,...d.data()}));
+      console.log('[CRM] Loaded',G.customers.length,'customers (no sort)');
+    }catch(e2){console.warn('Customers load failed completely:',e2.message);}
+  }
 }
 async function loadProposalsList(){
   try{
@@ -1507,19 +1523,26 @@ async function loadSettings(){
 async function updateSidebarBadges(){
   const isPriv=['Admin','Executive'].includes(G.user?.role);
   try{
-    const ordSnap=await db.collection('bookings').limit(600).get();
-    let orders=ordSnap.docs.map(d=>({id:d.id,...d.data()}));
+    // Use G.activeBookings cache (already loaded) — no extra Firestore read needed
+    if(!G.activeBookings) G.activeBookings = G.bookings || [];
+    let orders = G.activeBookings;
     if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
     const activeCount=orders.filter(o=>{const st=getOrderStatus(o);return st==='Active'||st==='Overdue'||st==='Future';}).length;
     const ob=document.getElementById('badge-orders');
     if(activeCount>0){ob.textContent=activeCount;ob.classList.remove('hidden');}
-    const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
-    const tb=document.getElementById('badge-tasks');
-    if(!taskSnap.empty){tb.textContent=taskSnap.size;tb.classList.remove('hidden');}
+    // Tasks badge
+    try{
+      const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
+      const tb=document.getElementById('badge-tasks');
+      if(!taskSnap.empty){tb.textContent=taskSnap.size;tb.classList.remove('hidden');}
+    }catch(te){console.warn('Task badge failed:',te.message);}
+    // Approvals badge (admin only)
     if(isPriv){
-      const apSnap=await db.collection('approvals').where('status','==','pending').get();
-      const ab=document.getElementById('badge-approvals');
-      if(!apSnap.empty){ab.textContent=apSnap.size;ab.classList.remove('hidden');}
+      try{
+        const apSnap=await db.collection('approvals').where('status','==','pending').get();
+        const ab=document.getElementById('badge-approvals');
+        if(!apSnap.empty){ab.textContent=apSnap.size;ab.classList.remove('hidden');}
+      }catch(ae){console.warn('Approvals badge failed:',ae.message);}
     }
   }catch(e){console.warn('Badge update failed:',e.message);}
 }
@@ -1540,7 +1563,7 @@ function showPage(pageId){
 function renderPage(pageId){
   const renders={
     'dashboard':renderDashboard,'fleet-radar':renderFleetRadar,
-    'order-book':renderOrderBook,'vehicle-360':renderVehicle360,
+    'order-book':renderOrderBook,'vehicle-360':_showVehicle360,
     'risk-radar':renderRiskRadar,'proposals':renderProposals,
     'en-contract':renderENContract,'ar-contract':renderARContract,
     'receipts':renderReceipts,'income-expenses':renderIncomeExpenses,
@@ -1643,7 +1666,8 @@ function renderPageLoading(pageId,icon,title){
 function renderDashboard(){renderPageLoading('page-dashboard','📊','Dashboard');loadDashboard();}
 function renderFleetRadar(){renderPageLoading('page-fleet-radar','📡','Fleet Radar');loadFleetRadar();}
 function renderOrderBook(){renderPageLoading('page-order-book','📋','Order Book');loadOrderBook();}
-function renderVehicle360(){renderPageLoading('page-vehicle-360','🔭','Vehicle 360');}
+function _showVehicle360(){renderPageLoading('page-vehicle-360','🔭','Vehicle 360');renderVehicle360();}
+function renderVehicle360Page(){renderVehicle360();}
 function renderRiskRadar(){renderPageLoading('page-risk-radar','⚠️','Risk Radar');loadRiskRadar();}
 function renderProposals(){renderPageLoading('page-proposals','📋','Proposals');loadProposalsPage();}
 function renderENContract(){renderPageLoading('page-en-contract','📄','English Contract');loadENContract();}
@@ -2607,9 +2631,20 @@ function subscribeOrders(){
   const unsub=db.collection('bookings').limit(600)
     .onSnapshot(snap=>{
       let orders=snap.docs.map(d=>({id:d.id,...d.data()}));
+      console.log('[OrderBook] Raw orders from Firestore:',orders.length,'| isPriv:',isPriv,'| branch:',G.user?.branch);
       if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
-      allOrders=orders;G.bookings=orders;filterOrders();updateOrderSummaryBar();
-    },e=>console.warn('Orders error:',e.message));
+      console.log('[OrderBook] After branch filter:',orders.length,'orders');
+      allOrders=orders;G.bookings=orders;
+      // Sort client-side by _sys_updated desc
+      allOrders.sort((a,b)=>(b._sys_updated||0)-(a._sys_updated||0));
+      filterOrders();updateOrderSummaryBar();
+    },e=>{
+      console.warn('Orders onSnapshot error:',e.message,e.code);
+      // Fallback: try without ordering if index error
+      if(e.code==='failed-precondition'||e.code==='unimplemented'){
+        toast('Order book index building — loading with fallback','warning',3000);
+      }
+    });
   G.unsubscribers.push(unsub);
 }
 
@@ -2787,13 +2822,13 @@ async function openOrderDetail(orderId){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px;">
       <div class="panel">
         <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">👤 Client</div>
-        <div style="font-size:13px;font-weight:700;">${o['اسم العميل']||'-'}</div>
+        <div style="font-size:13px;font-weight:700;cursor:${customer?'pointer':'default'};color:${customer?'var(--accent)':'var(--text)'};" ${customer?`onclick="closeModal();showPage('crm');setTimeout(()=>{const s=document.getElementById('crm-search');if(s){s.value='${(o['اسم العميل']||'').replace(/'/g,"'")}';filterCRM();}},300)"`:''} title="${customer?'Open CRM profile':'No CRM record'}">${o['اسم العميل']||'-'}${customer?' 🔗':''}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:3px;">CRM ID: ${o['كود العميل']||'-'}</div>
         ${customer?`<div style="font-size:11px;color:var(--text2);margin-top:3px;">📞 ${customer['رقم التليفون']||'-'}</div><div style="font-size:11px;color:var(--text2);">🪪 ${customer['رقم جواز السفر']||customer['الرقم القومي']||'-'}</div>`:''}
       </div>
       <div class="panel">
         <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">🚗 Vehicle</div>
-        <div style="font-size:12px;font-weight:700;">${carLabel}</div>
+        <div style="font-size:12px;font-weight:700;cursor:${carInFleet?'pointer':'default'};color:${carInFleet?'var(--accent)':'var(--text)'};" ${carInFleet?`onclick="closeModal();showPage('vehicle-360');setTimeout(()=>{const s=document.getElementById('v360-car-select');if(s){s.value='${carCode}';loadVehicle360Details();}},300)"`:''} title="${carInFleet?'Open Vehicle 360':'Vehicle not in fleet'}">${carLabel}${carInFleet?' 🔗':''}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:3px;">Code: ${carCode||'-'}</div>
         <div style="font-size:11px;color:var(--text2);">📍 Pickup: ${o['مكان الاستلام']||'-'}</div>
         <div style="font-size:11px;color:var(--text2);">📍 Dropoff: ${o['مكان التسليم']||'-'}</div>
