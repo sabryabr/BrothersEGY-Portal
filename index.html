@@ -715,6 +715,7 @@ button{cursor:pointer;}
   </div>
 </div>
 <div id="toast-wrap"></div>
+<button id="back-btn" onclick="goBack()" style="position:fixed;bottom:80px;left:200px;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);cursor:pointer;display:none;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">← Back</button>
 <div class="modal-overlay" id="global-modal">
   <div class="modal-box" id="global-modal-box">
     <div class="modal-header">
@@ -1556,7 +1557,17 @@ async function updateSidebarBadges(){
 /* ============================================================
    NAVIGATION
    ============================================================ */
-function showPage(pageId){
+let NAV_HISTORY=[];
+
+function showPage(pageId,params={}){
+  // Push previous page to history (skip if same page or going back)
+  if(G.currentPage&&G.currentPage!==pageId&&!G._navGoingBack){
+    NAV_HISTORY.push({page:G.currentPage,params:G.currentParams||{}});
+    if(NAV_HISTORY.length>20)NAV_HISTORY.shift(); // cap history
+  }
+  G._navGoingBack=false;
+  G.currentParams=params;
+
   document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
   const target=document.getElementById('page-'+pageId);if(target)target.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1565,6 +1576,17 @@ function showPage(pageId){
   logAction('VIEW',pageId,`Opened: ${pageId}`);
   if(G.pendingReturn?.destination===pageId)showReturnBanner();else hideReturnBanner();
   document.getElementById('sidebar').classList.remove('mobile-open');
+
+  // Show/hide back button
+  const backBtn=document.getElementById('back-btn');
+  if(backBtn)backBtn.style.display=NAV_HISTORY.length>0?'block':'none';
+}
+
+function goBack(){
+  if(!NAV_HISTORY.length)return;
+  const prev=NAV_HISTORY.pop();
+  G._navGoingBack=true;
+  showPage(prev.page,prev.params);
 }
 function renderPage(pageId){
   const renders={
@@ -2691,6 +2713,13 @@ function filterOrders(){
     if(from||to){const{start}=getOrderDates(o);if(from&&start&&start<new Date(from))return false;if(to&&start&&start>new Date(to))return false;}
     return true;
   });
+  // FIX 7: sort by start date newest first
+  filtered.sort((a,b)=>{
+    const{start:sa}=getOrderDates(a);
+    const{start:sb}=getOrderDates(b);
+    if(!sa&&!sb)return 0;if(!sa)return 1;if(!sb)return -1;
+    return sb-sa;
+  });
   renderOrdersTable(filtered);
   updateFilterPills(search,status,branch,from,to);
 }
@@ -2731,11 +2760,14 @@ function updateOrderSummaryBar(){
     if(end&&today>end&&!o.closed)debt+=Math.max(0,Math.ceil((today-end)/86400000))*daily;
     return sum+Math.max(0,debt);
   },0);
+  const curStatus=document.getElementById('ob-status')?.value||'all';
+  const cardStyle=(key)=>`padding:9px 13px;cursor:pointer;border:2px solid ${curStatus===key?'var(--accent)':'transparent'};transition:border 0.15s;`;
   bar.innerHTML=`
-    <div class="kpi-card" style="padding:9px 13px;"><div class="kpi-label">Active</div><div class="kpi-value text-accent" style="font-size:18px;">${active}</div></div>
-    <div class="kpi-card" style="padding:9px 13px;"><div class="kpi-label">Overdue</div><div class="kpi-value text-danger" style="font-size:18px;">${overdue}</div></div>
-    <div class="kpi-card" style="padding:9px 13px;"><div class="kpi-label">Accident</div><div class="kpi-value text-warning" style="font-size:18px;">${accident}</div></div>
-    <div class="kpi-card" style="padding:9px 13px;"><div class="kpi-label">Closed</div><div class="kpi-value" style="font-size:18px;color:var(--text3);">${closed}</div></div>
+    <div class="kpi-card" style="${cardStyle('all')}" onclick="setOrderFilter('all')" title="Show all orders"><div class="kpi-label">All</div><div class="kpi-value" style="font-size:18px;">${allOrders.length}</div></div>
+    <div class="kpi-card" style="${cardStyle('Active')}" onclick="setOrderFilter('Active')" title="Filter: Active"><div class="kpi-label">Active</div><div class="kpi-value text-accent" style="font-size:18px;">${active}</div></div>
+    <div class="kpi-card" style="${cardStyle('overdue')}" onclick="setOrderFilter('overdue')" title="Filter: Overdue"><div class="kpi-label">Overdue</div><div class="kpi-value text-danger" style="font-size:18px;">${overdue}</div></div>
+    <div class="kpi-card" style="${cardStyle('Accident')}" onclick="setOrderFilter('Accident')" title="Filter: Accident"><div class="kpi-label">Accident</div><div class="kpi-value text-warning" style="font-size:18px;">${accident}</div></div>
+    <div class="kpi-card" style="${cardStyle('Closed')}" onclick="setOrderFilter('Closed')" title="Filter: Closed"><div class="kpi-label">Closed</div><div class="kpi-value" style="font-size:18px;color:var(--text3);">${closed}</div></div>
     <div class="kpi-card" style="padding:9px 13px;"><div class="kpi-label">Total Debt</div><div class="kpi-value text-danger" style="font-size:14px;">${fmtMoney(totalDebt)}</div></div>`;
 }
 
@@ -2843,7 +2875,7 @@ async function openOrderDetail(orderId){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px;">
       <div class="panel">
         <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">👤 Client</div>
-        <div style="font-size:13px;font-weight:700;cursor:${customer?'pointer':'default'};color:${customer?'var(--accent)':'var(--text)'};" ${customer?`onclick="closeModal();showPage('crm');setTimeout(()=>{const s=document.getElementById('crm-search');if(s){s.value='${(o['اسم العميل']||'').replace(/'/g,"'")}';filterCRM();}},300)"`:''} title="${customer?'Open CRM profile':'No CRM record'}">${o['اسم العميل']||'-'}${customer?' 🔗':''}</div>
+        <div style="font-size:13px;font-weight:700;cursor:${customer?'pointer':'default'};color:${customer?'var(--accent)':'var(--text)'};" ${customer?`onclick="closeModal();setTimeout(()=>openClientProfile('${customer.id}'),100)"`:''} title="${customer?'Open CRM profile':'No CRM record'}">${o['اسم العميل']||'-'}${customer?' 🔗':''}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:3px;">CRM ID: ${o['كود العميل']||'-'}</div>
         ${customer?`<div style="font-size:11px;color:var(--text2);margin-top:3px;">📞 ${customer['رقم التليفون']||'-'}</div><div style="font-size:11px;color:var(--text2);">🪪 ${customer['رقم جواز السفر']||customer['الرقم القومي']||'-'}</div>`:''}
       </div>
@@ -2905,6 +2937,7 @@ async function openOrderDetail(orderId){
       ` + (!isClosed ? `<button class="btn btn-success" onclick="closeModal();requestCloseOrder('` + o.id + `')">✅ Close</button>` : '') + `
       <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('` + o.id + `')">📄 Contract</button>
       <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('` + o.id + `')">🧾 Receipt</button>
+      <button class="btn btn-ghost" onclick="viewOrderPayments('` + o.id + `','` + (o['No.']||o.id) + `')">💳 Payments</button>
       <button class="btn btn-ghost" onclick="openReminderForm('` + o.id + `')">🔔 Set Reminder</button>
     </div>`;
 
@@ -3510,14 +3543,15 @@ async function renderGantt(){
                onclick="openCarDetailModal('${carIdStr}')"
                onmouseover="this.style.background='var(--glass2)'"
                onmouseout="this.style.background='${rowBg}'">
-            <div style="max-width:220px;overflow:hidden;">
-              <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-                   title="${car.car_label||carLabel}">${getCarLabel(car,'en')}</div>
-              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-                   title="${car.car_label_ar||''}">${getCarLabel(car,'ar')}</div>
-              <div style="font-size:10px;margin-top:2px;">
-                <span class="pill pill-${statusKey}" style="font-size:9px;">${statusLabel}</span>
-                <span style="color:var(--text3);margin-left:4px;">${orderCount} orders</span>
+            <div style="padding:6px 8px;max-width:230px;overflow:hidden;">
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
+                <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;" title="${getCarLabel(car,'en')}">${getCarLabel(car,'en')}</div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;direction:rtl;text-align:right;" title="${getCarLabel(car,'ar')}">${getCarLabel(car,'ar')}</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+                <span class="pill pill-${statusKey}" style="font-size:8px;padding:1px 5px;">${statusLabel}</span>
+                <span style="font-size:9px;color:var(--text3);">${orderCount} orders</span>
               </div>
             </div>
           </div>
@@ -3610,9 +3644,7 @@ async function renderGantt(){
               onmouseout="this.style.filter=''"
               onclick="event.stopPropagation();closeGanttTip();openOrderDetail('${order.id}')"`;
 
-            // FIX 10: show only first name, max 12 chars; hover shows full name
-            const _fullName=order['اسم العميل']||'';
-            const _barLabel=(_fullName.split(' ')[0]||'').slice(0,12);
+            const _clientName=order['اسم العميل']||'';
 
             if(isFuture&&barW>0){
               barsHTML+=`<div style="position:absolute;left:${clampedStartPx}px;top:${barTop}px;
@@ -3621,7 +3653,7 @@ async function renderGantt(){
                 background:rgba(59,130,246,0.1);" ${barEvents}>
                 <div style="padding:1px 4px;font-size:9px;font-weight:700;color:var(--accent);
                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                            line-height:${barH}px;" title="${_fullName}">${_barLabel}</div>
+                            line-height:${barH}px;" title="${_clientName}">${_clientName}</div>
               </div>`;
             }else if(barW>0){
               barsHTML+=`<div style="position:absolute;left:${clampedStartPx}px;top:${barTop}px;
@@ -3632,7 +3664,7 @@ async function renderGantt(){
                 transition:filter 0.12s;" ${barEvents}>
                 <div style="padding:1px 4px;font-size:9px;font-weight:700;color:#fff;
                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                            line-height:${barH}px;" title="${_fullName}">${_barLabel}</div>
+                            line-height:${barH}px;" title="${_clientName}">${_clientName}</div>
               </div>`;
               if(tailW>0&&tailBg){
                 barsHTML+=`<div style="position:absolute;left:${baseEndPx}px;top:${barTop}px;
@@ -14404,7 +14436,299 @@ async function openCRMProfile(customerId){
   await logAction('VIEW','CRM Hub',`Viewed profile: ${name}`);
 }
 
-  
+/* ============================================================
+   FIXES: Back nav, order filter, client profile, payments,
+          CRM date, CRM rows, Vehicle 360 cards, income filter
+============================================================ */
+
+// FIX 8: set order status filter from summary bar click
+function setOrderFilter(status){
+  const sel=document.getElementById('ob-status');
+  if(sel)sel.value=status;
+  filterOrders();
+  updateOrderSummaryBar(); // re-render bar to update highlight
+}
+
+// FIX 3 + FIX 6: openClientProfile = alias for openCRMProfile
+function openClientProfile(customerId){
+  if(typeof openCRMProfile==='function') openCRMProfile(customerId);
+}
+
+// FIX 4: view payment records for an order
+async function viewOrderPayments(orderId, orderNo){
+  const modal=document.getElementById('global-modal');if(modal)modal.classList.remove('open');
+  try{
+    const[plSnap,rcSnap]=await Promise.all([
+      db.collection('payment_log').where('order_id','==',orderId).get().catch(()=>({docs:[]})),
+      db.collection('receipts').where('contract_no','==',String(orderNo)).get().catch(()=>({docs:[]}))
+    ]);
+    const payments=plSnap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+    const receipts=rcSnap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+
+    const html=`
+    <div style="margin-bottom:13px;">
+      <div style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;">
+        💳 Payment Log (${payments.length})
+      </div>
+      ${payments.length?`<table class="data-table"><thead><tr><th>Date</th><th>Amount (EGP)</th><th>Method</th><th>Note</th></tr></thead><tbody>
+        ${payments.map(p=>`<tr>
+          <td style="font-size:11px;">${p.date||p.timestamp?new Date(p.timestamp||p.date).toLocaleDateString('en-GB'):'—'}</td>
+          <td style="font-weight:700;color:var(--success);">${fmtMoney(p.amount||p.amount_egp||0)}</td>
+          <td style="font-size:11px;">${p.method||p.currency||'—'}</td>
+          <td style="font-size:10px;color:var(--text3);">${p.note||p.notes||'—'}</td>
+        </tr>`).join('')}
+      </tbody></table>`:
+      `<div style="color:var(--text3);font-size:12px;padding:10px;">No payment log entries found.</div>`}
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;">
+        🧾 Receipts (${receipts.length})
+      </div>
+      ${receipts.length?`<table class="data-table"><thead><tr><th>Ref</th><th>Date</th><th>Amount</th><th>Type</th><th></th></tr></thead><tbody>
+        ${receipts.map(r=>`<tr>
+          <td><span style="color:var(--accent);font-weight:700;font-size:11px;">${r.receipt_ref||r.id}</span></td>
+          <td style="font-size:11px;">${r.receipt_date||'—'}</td>
+          <td style="font-weight:700;color:var(--success);">${fmtMoney(r.total_egp_equiv||r.amount_egp||0)}</td>
+          <td style="font-size:11px;">${r.type||'—'}</td>
+          <td><button class="btn btn-ghost btn-xs" onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300);">🖨️</button></td>
+        </tr>`).join('')}
+      </tbody></table>`:
+      `<div style="color:var(--text3);font-size:12px;padding:10px;">No receipts found for this order.</div>`}
+    </div>`;
+    openModal(`💳 Payments — Order #${orderNo}`,html,true);
+  }catch(e){
+    openModal('💳 Payments',`<p style="color:var(--danger);">Failed to load: ${e.message}</p>`);
+  }
+}
+
+// FIX 5: format CRM registered date (handles Excel serial + partial dates)
+function fmtCRMDate(val){
+  if(!val)return '—';
+  const n=typeof val==='number'?val:(typeof val==='string'&&/^\d{5}$/.test(val.trim())?parseInt(val):null);
+  if(n&&n>40000&&n<60000){
+    const d=new Date(Date.UTC(1899,11,30)+n*86400000);
+    return d.toISOString().slice(0,10);
+  }
+  return String(val).slice(0,10);
+}
+
+// FIX 5 + FIX 6: override filterCRM — clickable rows + fixed date display
+function filterCRM(){
+  const q=(document.getElementById('crm-search')?.value||'').toLowerCase();
+  const nat=document.getElementById('crm-nat-filter')?.value||'all';
+  const wrap=document.getElementById('crm-table-wrap');if(!wrap)return;
+  let customers=G.customers;
+  if(q){customers=customers.filter(c=>[
+    c['الاسم الأول']||c.col_C,c['الاسم الأخير']||c.col_D,
+    c['رقم جواز السفر'],c['الرقم القومي'],
+    c['رقم التليفون'],c['عنوان البريد الإلكتروني'],
+    c['رمز الدولة']||c.col_H,c['No.']||c.col_A,c['العنوان']
+  ].join(' ').toLowerCase().includes(q));}
+  if(nat!=='all')customers=customers.filter(c=>(c['رمز الدولة']||c.col_H)===nat);
+  const countEl=document.getElementById('crm-showing-count');
+  if(countEl)countEl.textContent=Math.min(200,customers.length);
+  if(!customers.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">👥</div><p>No customers match your search</p></div>`;return;}
+  wrap.innerHTML=`
+  <table class="data-table">
+    <thead><tr>
+      <th>CRM ID</th><th>Name</th><th>Passport / ID</th>
+      <th>Phone</th><th>Email</th><th>Nationality</th>
+      <th>License</th><th>Registered</th><th>Actions</th>
+    </tr></thead>
+    <tbody>
+      ${customers.slice(0,200).map(c=>{
+        const firstName=c['الاسم الأول']||c.col_C||'';
+        const lastName=c['الاسم الأخير']||c.col_D||'';
+        const name=(firstName+' '+lastName).trim();
+        const clientCode=c['No.']||c.col_A||c.id;
+        const nationality=c['رمز الدولة']||c.col_H||'';
+        const hasLicense=!!(c['رقم رخصة القيادة']||'');
+        return`<tr style="cursor:pointer;" onclick="openClientProfile('${c.id}')"
+          onmouseover="this.style.background='var(--glass2)'"
+          onmouseout="this.style.background=''">
+          <td><span style="color:var(--accent);font-weight:700;">#${clientCode}</span></td>
+          <td>
+            <div style="font-weight:700;">${name||'—'}</div>
+            ${c['العنوان']?`<div style="font-size:10px;color:var(--text3);margin-top:1px;">📍 ${c['العنوان']}</div>`:''}
+          </td>
+          <td style="font-size:11px;">
+            ${c['رقم جواز السفر']?`<div>🛂 ${c['رقم جواز السفر']}</div>`:''}
+            ${c['الرقم القومي']?`<div>🪪 ${c['الرقم القومي']}</div>`:''}
+          </td>
+          <td style="font-size:11px;">${c['رقم التليفون']||'—'}</td>
+          <td style="font-size:11px;">${c['عنوان البريد الإلكتروني']||'—'}</td>
+          <td style="font-size:11px;">${nationality||'—'}</td>
+          <td style="font-size:11px;">${hasLicense?`<span class="pill pill-active">✓ ${c['رقم رخصة القيادة']}</span>`:`<span style="color:var(--text3);">—</span>`}</td>
+          <td style="font-size:10px;color:var(--text3);">${fmtCRMDate(c['تاريخ التسجيل'])}</td>
+          <td onclick="event.stopPropagation()">
+            <div style="display:flex;gap:3px;flex-wrap:wrap;">
+              <button class="btn btn-ghost btn-xs" onclick="openClientProfile('${c.id}')">👁</button>
+              <button class="btn btn-ghost btn-xs" onclick="openEditCustomerModal('${c.id}')">✏️</button>
+              <button class="btn btn-primary btn-xs" onclick="viewCustomerOrders('${clientCode}','${name.replace(/'/g,'')}')">📋</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+  <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">
+    Showing ${Math.min(200,customers.length)} of ${customers.length} customers — click any row to open profile
+  </div>`;
+}
+
+// FIX 9: Vehicle 360 — tabs + car card grid (overrides _renderVehicle360Full)
+async function _renderVehicle360Full(){
+  const el=document.getElementById('page-vehicle-360');if(!el)return;
+  if(!G.fleet||!G.fleet.length)await loadFleet();
+
+  let v360Tab=window._v360Tab||'active';
+
+  const renderCarGrid=()=>{
+    const gridEl=document.getElementById('v360-car-grid');if(!gridEl)return;
+    let cars=G.fleet;
+    if(v360Tab==='active')cars=G.fleet.filter(c=>c.is_active===true||(!c.archived&&c.is_active!==false));
+    else if(v360Tab==='archived')cars=G.fleet.filter(c=>c.archived===true||c.is_active===false);
+    const statusColors={available:'#22c55e',rented:'#3b82f6',overdue:'#ef4444',future:'#f59e0b',maintenance:'#f59e0b',accident:'#ef4444',archived:'#64748b'};
+    gridEl.innerHTML=cars.length?cars.map(c=>{
+      const cat=getCarStatusCategory(c);
+      const dot=statusColors[cat]||'#64748b';
+      const en=getCarLabel(c,'en');
+      const ar=getCarLabel(c,'ar');
+      const fee=c.monthly_fee||c['col_CJ']||'';
+      return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+        padding:12px;cursor:pointer;transition:all 0.2s;"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.transform=''"
+        onclick="loadVehicle360ById('${c.id}')">
+        <div style="font-size:22px;text-align:center;margin-bottom:6px;">🚗</div>
+        <div style="font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${en}">${en||'—'}</div>
+        <div style="font-size:10px;color:var(--text3);direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;" title="${ar}">${ar||'—'}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0;"></span>
+          <span style="font-size:9px;color:var(--text3);">${cat}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;">🔢 ${c.plate||'No plate'}</div>
+        ${fee?`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 ${fee}/mo</div>`:''}
+      </div>`;
+    }).join(''):`<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text3);">No cars in this category</div>`;
+  };
+
+  el.innerHTML=`
+  <div class="section-header">
+    <div><h2>🔭 Vehicle 360</h2><p>Complete financial and operational view per vehicle</p></div>
+    <button class="btn btn-ghost btn-sm" onclick="_renderVehicle360Full()">🔄 Refresh</button>
+  </div>
+
+  <!-- Hidden select keeps loadVehicle360Details working unchanged -->
+  <select id="v360-car-select" onchange="loadVehicle360Details()" style="display:none;"></select>
+
+  <!-- Tab bar -->
+  <div style="display:flex;gap:7px;margin-bottom:14px;">
+    <button id="v360-tab-active" onclick="window._v360Tab='active';_v360SwitchTab()" class="btn btn-ghost btn-sm" style="border-color:var(--accent);color:var(--accent);">✅ Active Contracts</button>
+    <button id="v360-tab-all"    onclick="window._v360Tab='all';_v360SwitchTab()"    class="btn btn-ghost btn-sm">🚗 All Cars (${G.fleet.length})</button>
+    <button id="v360-tab-archived" onclick="window._v360Tab='archived';_v360SwitchTab()" class="btn btn-ghost btn-sm">📦 Archived</button>
+  </div>
+
+  <!-- Car grid -->
+  <div id="v360-car-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px;"></div>
+
+  <!-- Detail pane -->
+  <div id="v360-content">
+    <div class="empty-state">
+      <div class="es-icon">🔭</div>
+      <p style="font-size:13px;font-weight:700;margin-bottom:5px;">Select a vehicle above</p>
+      <p>View complete financials, all rental history, expenses, expiry dates and owner details</p>
+    </div>
+  </div>`;
+
+  window._v360Tab='active';
+  renderCarGrid();
+
+  // Tab switching helper
+  window._v360SwitchTab=function(){
+    const tabs=['active','all','archived'];
+    tabs.forEach(t=>{
+      const btn=document.getElementById('v360-tab-'+t);
+      if(!btn)return;
+      const on=window._v360Tab===t;
+      btn.style.borderColor=on?'var(--accent)':'var(--border)';
+      btn.style.color=on?'var(--accent)':'var(--text2)';
+    });
+    renderCarGrid();
+  };
+}
+
+// Helper: load V360 by Firestore doc ID (for card grid clicks)
+function loadVehicle360ById(carDocId){
+  const sel=document.getElementById('v360-car-select');
+  if(!sel)return;
+  // Ensure options are populated so the value sticks
+  if(!sel.querySelector(`option[value="${carDocId}"]`)){
+    const opt=document.createElement('option');
+    opt.value=carDocId;sel.appendChild(opt);
+  }
+  sel.value=carDocId;
+  loadVehicle360Details();
+  // Scroll to detail pane
+  const content=document.getElementById('v360-content');
+  if(content)content.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// loadVehicle360ById sets a hidden select value so loadVehicle360Details works unchanged
+
+// FIX 10: improve revenue calculation — try multiple date field strategies
+async function _loadDashKPIsRevenue(period,isPriv){
+  try{
+    const colSnap=await db.collection('collections').get();
+    let revenue=0;
+    colSnap.docs.forEach(d=>{
+      const data=d.data();
+      if(!isPriv){
+        const b=data['موقع الفرع']||data.Branch||'';
+        if(!b.toLowerCase().includes((BRANCH_MAP[G.user?.branch]||'').toLowerCase())&&
+           !b.includes((window.BRANCH_AR||{})[G.user?.branch]||''))return;
+      }
+      if(period.month===null){revenue+=parseAmount(data['قيمة التحصيل']);return;}
+
+      // Strategy 1: explicit month/year fields
+      const rawMonth=String(data['شهر']||data.col_G||'').replace(/^0+/,'');
+      const rawYear=String(data['سنة']||data.col_H||'');
+      if(rawMonth&&rawYear&&rawMonth===period.month&&rawYear===period.year){
+        revenue+=parseAmount(data['قيمة التحصيل']);return;
+      }
+
+      // Strategy 2: parse from any date field
+      const dateRaw=data['تاريخ التحصيل']||data['Date']||data.col_A||data.col_B||'';
+      if(dateRaw){
+        const parsed=parseDBDate(dateRaw);
+        if(parsed&&!isNaN(parsed)){
+          const m=String(parsed.getMonth()+1);
+          const y=String(parsed.getFullYear());
+          if(m===period.month&&y===period.year){revenue+=parseAmount(data['قيمة التحصيل']);return;}
+        }
+      }
+    });
+    return revenue;
+  }catch(e){console.warn('Revenue load error:',e.message);return 0;}
+}
+
+// Override loadDashKPIs to use improved revenue function
+const _origLoadDashKPIs=loadDashKPIs;
+async function loadDashKPIs(){
+  await _origLoadDashKPIs();
+  // Re-run revenue with improved multi-strategy parsing
+  try{
+    const isPriv=['Admin','Executive'].includes(G.user?.role);
+    const period=getPeriodFilter();
+    const revenue=await _loadDashKPIsRevenue(period,isPriv);
+    const el=document.getElementById('kpi-revenue');
+    if(el)el.textContent=fmtMoney(revenue);
+  }catch(e){}
+}
+
+
 </script>
 </body>
 </html>
