@@ -2250,19 +2250,28 @@ async function loadDashKPIs(){
 
     const today = new Date();
     
-    // FIX: Search the main 'bookings' array, not the filtered 'active' array!
-    const overdue = bookings.filter(o => {
-        const st = typeof getOrderStatus === 'function' ? getOrderStatus(o) : '';
-        if (st === 'Overdue') return true; // Catch it if the system already labeled it Overdue
-        
-        // Catch it manually if the date has passed
-        const dates = typeof getOrderDates === 'function' ? getOrderDates(o) : {};
-        return dates.end && today > dates.end && !o.closed && st !== 'Closed' && o['الحالة'] !== 'منتهي';
+    // Overdue: only count orders that have a 2026+ end date (exclude old historical debts)
+    const OVERDUE_CUTOFF = new Date('2025-01-01');
+    const overdue = G.bookings.filter(o => {
+      if(o.closed===true) return false;
+      const st = getOrderStatus(o);
+      if(st === 'Closed') return false;
+      if(o['الحالة'] === 'منتهي') return false;
+      if(!isPriv && o['فرع الإصدار'] !== G.user.branch && o.assigned_user !== G.user.username) return false;
+      const {end} = getOrderDates(o);
+      if(!end) return false;
+      if(end < OVERDUE_CUTOFF) return false; // ignore ancient history
+      return today > end; // end date has passed → overdue
     });
-    
     document.getElementById('kpi-overdue').textContent = overdue.length;
 
-    document.getElementById('kpi-avail').textContent=G.fleet.filter(c=>c.is_active===true&&(getCarStatusCategory(c)==='available'||getCarStatusCategory(c)==='future')).length;
+    // Available Cars: use getCarStatusCategory() alone — it already handles is_active internally
+    // (is_active===false → returns 'archived', so those are excluded automatically)
+    const availableCars = G.fleet.filter(c => {
+      const cat = getCarStatusCategory(c);
+      return cat === 'available' || cat === 'future';
+    }).length;
+    document.getElementById('kpi-avail').textContent = availableCars;
 
     try{
       const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
