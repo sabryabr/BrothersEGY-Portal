@@ -1,6 +1,8 @@
 /**
  * sync-sheets.js
- * Reads 6 Google Sheets and writes them to Firestore (clean-slate each run).
+ * Reads 6 Google Sheets and upserts (merge) them to Firestore.
+ * Protected collections (receipts, payment_log, tasks, approvals, proposals,
+ * notifications, logs) are NEVER touched by this script.
  */
 
 'use strict';
@@ -130,21 +132,14 @@ function buildCarExtras(row, headers) {
   };
 }
 
-// ── Firestore batch delete (500 docs per batch) ───────────────────────────────
-async function deleteCollection(db, collectionName) {
-  const colRef = db.collection(collectionName);
-  let deleted = 0;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const snap = await colRef.limit(400).get();
-    if (snap.empty) break;
-    const batch = db.batch();
-    snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-    deleted += snap.size;
-  }
-  return deleted;
-}
+// Collections that sync is allowed to upsert into (never delete from)
+const SYNC_COLLECTIONS = new Set([
+  'fleet','bookings','customers','gen_expenses','car_expenses','collections'
+]);
+// Collections that must never be cleared or overwritten by sync
+const PROTECTED_COLLECTIONS = new Set([
+  'receipts','payment_log','tasks','approvals','proposals','notifications','logs'
+]);
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
@@ -194,10 +189,15 @@ async function main() {
     const dataRows = rows.slice(1); // row 2+
     console.log(`  📊  ${dataRows.length} data rows, ${headers.length} header columns`);
 
-    // 2. Delete existing collection
-    console.log(`  🗑️   Clearing existing documents…`);
-    const deletedCount = await deleteCollection(db, cfg.collection);
-    console.log(`  ✅  Deleted ${deletedCount} old documents`);
+    // Safety guard: skip protected collections
+    if (PROTECTED_COLLECTIONS.has(cfg.collection)) {
+      console.log(`  🔒  SKIPPED — ${cfg.collection} is a protected collection`);
+      summary[cfg.name] = { written: 0, errors: 0, note: 'Protected — skipped' };
+      continue;
+    }
+
+    // 2. Upsert (merge) — never delete existing documents
+    console.log(`  🔄  Upserting with merge — existing Firestore data preserved`);
 
     // 3. Write new documents in batches of 400
     let written = 0;
@@ -282,7 +282,7 @@ async function main() {
         }
 
         const docRef = db.collection(cfg.collection).doc(idVal);
-        batch.set(docRef, doc);
+        batch.set(docRef, doc, { merge: true }); // upsert: preserve manually-entered fields
       }
 
       try {
