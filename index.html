@@ -913,8 +913,10 @@ function getOrderStatus(order){
   const paid=getOrderPaid(order);
   const{start,end}=getOrderDates(order);
   const today=new Date();
+  const todayStart=new Date();todayStart.setHours(0,0,0,0);
   if(total>0&&paid>=total&&end&&today>end)return 'Closed';
-  if(end&&today>end&&!order.closed)return 'Overdue';
+  if(start&&end&&start<=today&&end>=todayStart&&!order.closed)return 'Active';
+  if(end&&end<todayStart&&!order.closed)return 'Overdue';
   if(start&&today<start)return 'Future';
   return 'Active';
 }
@@ -1100,8 +1102,8 @@ function toggleAllBranches(cbName){
   if(cbName&&window[cbName])window[cbName]();
 }
 function toggleAllStatuses(cbName){
-  const allOn=Object.values(FLEET_FILTER.status).every(v=>v);
-  Object.keys(FLEET_FILTER.status).forEach(k=>{FLEET_FILTER.status[k]=!allOn;});
+  // "All" always enables every status (clears multi-select to show everything)
+  Object.keys(FLEET_FILTER.status).forEach(k=>{FLEET_FILTER.status[k]=true;});
   saveFleetFilterState();refreshFleetFilterPills();
   if(cbName&&window[cbName])window[cbName]();
 }
@@ -1484,7 +1486,13 @@ async function loadFleet(){
     G.fleet=snap.docs.map(d=>({id:d.id,...d.data()}));
     console.log('[Fleet] Loaded',G.fleet.length,'cars. Sample:',G.fleet.slice(0,3).map(c=>({docId:c.id,plate:c.plate,is_active:c.is_active})));
     populateFleetDropdowns();
+    updateDashboardKPIs();
   }catch(e){console.warn('Fleet load failed:',e.message);}
+}
+function updateDashboardKPIs(){
+  const el=document.getElementById('kpi-avail');if(!el)return;
+  const available=G.fleet.filter(c=>!c.archived&&getCarStatusCategory(c)==='available').length;
+  el.textContent=available;
 }
 async function loadBookingsCache(){
   try{
@@ -1712,6 +1720,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 async function loadDashboard(){
   const el=document.getElementById('page-dashboard');if(!el)return;
+  // Always re-fetch live data so KPIs don't use stale cache from previous tab visits
+  await loadSharedData();
   if(!document.getElementById('dash-pulse-style')){
     const s=document.createElement('style');s.id='dash-pulse-style';
     s.textContent='@keyframes dashPulse{0%,100%{opacity:1;}50%{opacity:0.3;}}';
@@ -1760,7 +1770,7 @@ async function loadDashboard(){
         <div class="kpi-sub">Ready to rent</div>
         <div class="kpi-icon">🚗</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card" onclick="showPage('income-expenses')" style="cursor:pointer;">
         <div class="kpi-label" id="kpi-revenue-label">Monthly Revenue</div>
         <div class="kpi-value text-success" id="kpi-revenue">--</div>
         <div class="kpi-sub" id="kpi-revenue-sub">This month</div>
@@ -2634,11 +2644,15 @@ async function loadOrderBook(){
 }
 
 function subscribeOrders(){
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  const unsub=db.collection('bookings').limit(600)
+  const isPriv=['Admin','Executive'].includes(G.user?.role)||G.user?.access==='All';
+  // Admin/All-access: fetch full collection (no branch filter, high limit)
+  const query=isPriv
+    ? db.collection('bookings').limit(2000)
+    : db.collection('bookings').limit(600);
+  const unsub=query
     .onSnapshot(snap=>{
       let orders=snap.docs.map(d=>({id:d.id,...d.data()}));
-      console.log('[OrderBook] Raw orders from Firestore:',orders.length,'| isPriv:',isPriv,'| branch:',G.user?.branch);
+      console.log('[OrderBook] fetched',orders.length,'orders, user access:',G.user?.access,'role:',G.user?.role,'isPriv:',isPriv);
       if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
       console.log('[OrderBook] After branch filter:',orders.length,'orders');
       allOrders=orders;G.bookings=orders;
@@ -3481,6 +3495,9 @@ async function renderGantt(){
       const rowBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.015)';
       const catStatus=getCarStatusCategory(car);
       const dotColor=statusColors[catStatus]||'var(--text3)';
+      const statusKey=catStatus;
+      const statusLabel=catStatus.charAt(0).toUpperCase()+catStatus.slice(1);
+      const orderCount=carOrders.length;
 
       rowsHTML+=`
         <div style="display:flex;background:${rowBg};border-bottom:1px solid var(--border);">
@@ -3493,25 +3510,14 @@ async function renderGantt(){
                onclick="openCarDetailModal('${carIdStr}')"
                onmouseover="this.style.background='var(--glass2)'"
                onmouseout="this.style.background='${rowBg}'">
-            <div style="overflow:hidden;width:100%;">
-              <div style="display:flex;align-items:center;gap:5px;margin-bottom:1px;">
-                <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
-                <div style="overflow:hidden;flex:1;">
-                  <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-                       title="${car.car_label||carLabel}">${car.car_label||carLabel}</div>
-                  ${car.car_label_ar?`<div style="font-size:9px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:right;"
-                       title="${car.car_label_ar}">${car.car_label_ar}</div>`:''}
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap;">
-                <span style="font-size:9px;color:${dotColor};font-weight:700;">${catStatus}</span>
-                <span style="font-size:9px;color:var(--text3);">| #${carIdDisplay}</span>
-              </div>
-              <div style="font-size:9px;color:var(--text3);margin-top:1px;
-                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                ${plateDisplay}
-                ${carOrders.length>0?`<span style="color:var(--accent);margin-left:5px;">
-                  ${carOrders.length} order${carOrders.length!==1?'s':''}</span>`:''}
+            <div style="max-width:220px;overflow:hidden;">
+              <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                   title="${car.car_label||carLabel}">${getCarLabel(car,'en')}</div>
+              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                   title="${car.car_label_ar||''}">${getCarLabel(car,'ar')}</div>
+              <div style="font-size:10px;margin-top:2px;">
+                <span class="pill pill-${statusKey}" style="font-size:9px;">${statusLabel}</span>
+                <span style="color:var(--text3);margin-left:4px;">${orderCount} orders</span>
               </div>
             </div>
           </div>
@@ -3604,6 +3610,10 @@ async function renderGantt(){
               onmouseout="this.style.filter=''"
               onclick="event.stopPropagation();closeGanttTip();openOrderDetail('${order.id}')"`;
 
+            // FIX 10: show only first name, max 12 chars; hover shows full name
+            const _fullName=order['اسم العميل']||'';
+            const _barLabel=(_fullName.split(' ')[0]||'').slice(0,12);
+
             if(isFuture&&barW>0){
               barsHTML+=`<div style="position:absolute;left:${clampedStartPx}px;top:${barTop}px;
                 width:${barW}px;height:${barH}px;z-index:3;cursor:pointer;
@@ -3611,7 +3621,7 @@ async function renderGantt(){
                 background:rgba(59,130,246,0.1);" ${barEvents}>
                 <div style="padding:1px 4px;font-size:9px;font-weight:700;color:var(--accent);
                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                            line-height:${barH}px;">${order['اسم العميل']||''}</div>
+                            line-height:${barH}px;" title="${_fullName}">${_barLabel}</div>
               </div>`;
             }else if(barW>0){
               barsHTML+=`<div style="position:absolute;left:${clampedStartPx}px;top:${barTop}px;
@@ -3622,7 +3632,7 @@ async function renderGantt(){
                 transition:filter 0.12s;" ${barEvents}>
                 <div style="padding:1px 4px;font-size:9px;font-weight:700;color:#fff;
                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                            line-height:${barH}px;">${order['اسم العميل']||''}</div>
+                            line-height:${barH}px;" title="${_fullName}">${_barLabel}</div>
               </div>`;
               if(tailW>0&&tailBg){
                 barsHTML+=`<div style="position:absolute;left:${baseEndPx}px;top:${barTop}px;
