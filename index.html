@@ -1488,24 +1488,22 @@ async function loadFleet(){
 }
 async function loadBookingsCache(){
   try{
-    const snap=await db.collection('bookings').limit(500).get();
+    const snap=await db.collection('bookings').limit(1000).get();
     G.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
     console.log('[Bookings Cache] Loaded',G.bookings.length,'bookings');
   }catch(e){console.warn('Bookings cache load failed:',e.message);}
 }
 async function loadCustomers(){
   try{
-    const snap=await db.collection('customers').orderBy('_sys_updated','desc').limit(500).get();
+    // NOTE: Do NOT use orderBy('_sys_updated') here — Firestore silently excludes
+    // documents that don't have that field, returning 0 results without an error.
+    const snap=await db.collection('customers').limit(1000).get();
     G.customers=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Sort client-side by _sys_updated or _synced_at if available
+    G.customers.sort((a,b)=>(b._sys_updated||b._synced_at||0)-(a._sys_updated||a._synced_at||0));
     console.log('[CRM] Loaded',G.customers.length,'customers');
-  }catch(e){
-    console.warn('Customers load with orderBy failed, trying without:',e.message);
-    try{
-      const snap2=await db.collection('customers').limit(500).get();
-      G.customers=snap2.docs.map(d=>({id:d.id,...d.data()}));
-      console.log('[CRM] Loaded',G.customers.length,'customers (no sort)');
-    }catch(e2){console.warn('Customers load failed completely:',e2.message);}
-  }
+    if(G.customers.length===0)console.warn('[CRM] WARNING: customers collection appears empty in Firestore. Check sync script.');
+  }catch(e){console.warn('Customers load failed:',e.message);}
 }
 async function loadProposalsList(){
   try{
