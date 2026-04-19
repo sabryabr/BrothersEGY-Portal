@@ -1491,15 +1491,31 @@ async function loadFleet(){
   }catch(e){console.warn('Fleet load failed:',e.message);}
 }
 function updateDashboardKPIs(){
-  const el=document.getElementById('kpi-avail');if(!el)return;
-  const available=G.fleet.filter(c=>!c.archived&&getCarStatusCategory(c)==='available').length;
-  el.textContent=available;
+  // Available cars (from fleet)
+  const availEl=document.getElementById('kpi-avail');
+  if(availEl&&G.fleet.length){
+    availEl.textContent=G.fleet.filter(c=>!c.archived&&getCarStatusCategory(c)==='available').length;
+  }
+  // Active & Overdue counts (from bookings cache)
+  const activeEl=document.getElementById('kpi-active');
+  const overdueEl=document.getElementById('kpi-overdue');
+  if((activeEl||overdueEl)&&G.bookings&&G.bookings.length){
+    let active=0,overdue=0;
+    G.bookings.forEach(o=>{
+      const st=getOrderStatus(o);
+      if(st==='Active')active++;
+      else if(st==='Overdue')overdue++;
+    });
+    if(activeEl)activeEl.textContent=active;
+    if(overdueEl)overdueEl.textContent=overdue;
+  }
 }
 async function loadBookingsCache(){
   try{
     const snap=await db.collection('bookings').limit(1000).get();
     G.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
     console.log('[Bookings Cache] Loaded',G.bookings.length,'bookings');
+    updateDashboardKPIs(); // refresh active/overdue KPIs now that bookings are ready
   }catch(e){console.warn('Bookings cache load failed:',e.message);}
 }
 async function loadCustomers(){
@@ -3299,16 +3315,29 @@ async function loadFleetRadar(){
         ${l.label}
       </div>`).join('')}
     </div>
-    <!-- Gantt container - drag enabled -->
-    <div id="gantt-wrap"
-         style="overflow:hidden;max-height:calc(100vh - 320px);
-                border:1px solid var(--border);border-radius:var(--radius);
-                background:var(--surface);cursor:grab;user-select:none;"
-         onmousedown="ganttDragStart(event)"
-         onmousemove="ganttDragMove(event)"
-         onmouseup="ganttDragEnd(event)"
-         onmouseleave="ganttDragEnd(event)">
-      <div class="empty-state"><div class="spinner lg"></div></div>
+    <!-- Scroll arrows + Gantt container -->
+    <div style="position:relative;">
+      <button onclick="(function(){const w=document.getElementById('gantt-wrap');if(w)w.scrollBy({left:-300,behavior:'smooth'});})()"
+              style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;
+                     width:30px;height:50px;background:rgba(15,23,42,0.85);border:1px solid var(--border2);
+                     border-radius:0 8px 8px 0;color:var(--text);font-size:16px;cursor:pointer;
+                     display:flex;align-items:center;justify-content:center;opacity:0.8;">◀</button>
+      <button onclick="(function(){const w=document.getElementById('gantt-wrap');if(w)w.scrollBy({left:300,behavior:'smooth'});})()"
+              style="position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:30;
+                     width:30px;height:50px;background:rgba(15,23,42,0.85);border:1px solid var(--border2);
+                     border-radius:8px 0 0 8px;color:var(--text);font-size:16px;cursor:pointer;
+                     display:flex;align-items:center;justify-content:center;opacity:0.8;">▶</button>
+      <!-- Gantt container - drag enabled -->
+      <div id="gantt-wrap"
+           style="overflow:hidden;max-height:calc(100vh - 320px);
+                  border:1px solid var(--border);border-radius:var(--radius);
+                  background:var(--surface);cursor:grab;user-select:none;"
+           onmousedown="ganttDragStart(event)"
+           onmousemove="ganttDragMove(event)"
+           onmouseup="ganttDragEnd(event)"
+           onmouseleave="ganttDragEnd(event)">
+        <div class="empty-state"><div class="spinner lg"></div></div>
+      </div>
     </div>
     <div id="gantt-tooltip" style="display:none;position:fixed;z-index:9000;width:310px;
          background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
@@ -3366,7 +3395,7 @@ function ganttScrollToToday(){
   const rangeEl=document.getElementById('gantt-range');
   const totalDays=parseInt(rangeEl?.value||90);
   const pastDays=Math.floor(totalDays*0.33);
-  const CAR_COL=230;
+  const CAR_COL=240;
   const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2)+100;
   wrap.scrollTo({left:Math.max(0,todayPx),behavior:'smooth'});
 }
@@ -3383,6 +3412,8 @@ async function renderGantt(){
        wrap.innerHTML='<div class="empty-state"><p>No fleet data available.</p></div>';
        return;
     }
+    // Rebuild filter bar now that fleet data is ready (counts will be accurate)
+    buildFleetFilterBar('fleet-filter-bar-gantt','renderGantt');
 
     // Ensure our single source of truth is ready
     if(!G.activeBookings) G.activeBookings = G.bookings || [];
@@ -3404,7 +3435,7 @@ async function renderGantt(){
     ganttStart.setDate(ganttStart.getDate()-pastDays);
 
     const DAY_PX=14;
-    const CAR_COL=230;
+    const CAR_COL=240;
     const ASSIGN_COL=230;
     const ROW_H=38;
     const HEADER_H=46;
@@ -3537,18 +3568,18 @@ async function renderGantt(){
           <!-- Car label - sticky left - clickable -->
           <div style="position:sticky;left:0;z-index:15;background:${rowBg};
                       width:${CAR_COL}px;min-width:${CAR_COL}px;
-                      height:${numRows*ROW_H}px;padding:0 10px;
+                      height:${Math.max(52,numRows*ROW_H)}px;padding:0 10px;
                       border-right:1px solid var(--border2);
                       display:flex;align-items:center;cursor:pointer;"
                onclick="openCarDetailModal('${carIdStr}')"
                onmouseover="this.style.background='var(--glass2)'"
                onmouseout="this.style.background='${rowBg}'">
-            <div style="padding:6px 8px;max-width:230px;overflow:hidden;">
+            <div style="padding:4px 6px;max-width:${CAR_COL-4}px;overflow:hidden;">
               <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
                 <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
-                <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;" title="${getCarLabel(car,'en')}">${getCarLabel(car,'en')}</div>
+                <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-26}px;" title="${getCarLabel(car,'en')}">${getCarLabel(car,'en')}</div>
               </div>
-              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;direction:rtl;text-align:right;" title="${getCarLabel(car,'ar')}">${getCarLabel(car,'ar')}</div>
+              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-12}px;direction:rtl;text-align:right;" title="${getCarLabel(car,'ar')}">${getCarLabel(car,'ar')}</div>
               <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
                 <span class="pill pill-${statusKey}" style="font-size:8px;padding:1px 5px;">${statusLabel}</span>
                 <span style="font-size:9px;color:var(--text3);">${orderCount} orders</span>
@@ -3752,10 +3783,22 @@ async function renderGantt(){
           </div>
           <div style="position:sticky;right:0;z-index:22;background:var(--surface3);
                       width:${ASSIGN_COL}px;min-width:${ASSIGN_COL}px;height:${HEADER_H}px;
-                      display:flex;align-items:center;padding:0 12px;
+                      display:flex;flex-direction:column;justify-content:center;padding:0 10px;
                       border-left:1px solid var(--border2);">
-            <span style="font-size:10px;font-weight:800;color:var(--text3);
+            <span style="font-size:9px;font-weight:800;color:var(--text3);
                          text-transform:uppercase;letter-spacing:0.1em;">Assignment</span>
+            <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;">${(()=>{
+              const avail={HRG:0,ALX:0,CAI:0,RSH:0};
+              const branchKeys={HRG:['hurghada','الغردقة'],ALX:['alexandria','اسكندرية'],CAI:['cairo','قاهرة'],RSH:['rashid','رشيد']};
+              G.fleet.forEach(c=>{
+                if(getCarStatusCategory(c)!=='available')return;
+                const b=(c.Branch||c.City||c['المحافظة']||'').toLowerCase();
+                for(const[code,terms]of Object.entries(branchKeys)){
+                  if(terms.some(t=>b.includes(t))){avail[code]++;break;}
+                }
+              });
+              return Object.entries(avail).map(([code,n])=>`<span style="font-size:8px;color:var(--success);font-weight:700;">${code}:${n}</span>`).join('');
+            })()}</div>
           </div>
         </div>
         <!-- Rows -->
@@ -13565,7 +13608,7 @@ function getOrderStatus(order){
   const paid=parseAmount(order['المدفوع EGP']);
   const{start,end}=getOrderDates(order);
   const today=new Date();
-  if(total>0&&paid>=total&&end&&today>end)return 'Closed';
+  if(total>0&&paid>=total)return 'Closed'; // fully paid = always closed regardless of date
   if(end&&today>end&&!order.closed)return 'Overdue';
   if(start&&today<start)return 'Future';
   return 'Active';
@@ -14588,10 +14631,14 @@ async function _renderVehicle360Full(){
   const renderCarGrid=()=>{
     const gridEl=document.getElementById('v360-car-grid');if(!gridEl)return;
     let cars=G.fleet;
-    if(v360Tab==='active')cars=G.fleet.filter(c=>c.is_active===true||(!c.archived&&c.is_active!==false));
+    if(v360Tab==='active')cars=G.fleet.filter(c=>c.is_active===true||c.Contract==='Valid'||c['حاله التعاقد']==='ساري'||(!c.archived&&c.is_active!==false));
     else if(v360Tab==='archived')cars=G.fleet.filter(c=>c.archived===true||c.is_active===false);
+    if(!cars.length){
+      gridEl.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text3);">No cars in this category</div>`;
+      return;
+    }
     const statusColors={available:'#22c55e',rented:'#3b82f6',overdue:'#ef4444',future:'#f59e0b',maintenance:'#f59e0b',accident:'#ef4444',archived:'#64748b'};
-    gridEl.innerHTML=cars.length?cars.map(c=>{
+    const cardHTML=(c)=>{
       const cat=getCarStatusCategory(c);
       const dot=statusColors[cat]||'#64748b';
       const en=getCarLabel(c,'en');
@@ -14612,7 +14659,25 @@ async function _renderVehicle360Full(){
         <div style="font-size:10px;color:var(--text3);margin-top:4px;">🔢 ${c.plate||'No plate'}</div>
         ${fee?`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 ${fee}/mo</div>`:''}
       </div>`;
-    }).join(''):`<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text3);">No cars in this category</div>`;
+    };
+    // Group by type (col_C = English type)
+    const groups={};
+    cars.forEach(c=>{
+      const type=(c.col_C||c['النوع']||c.Type||'Other').toString().trim()||'Other';
+      if(!groups[type])groups[type]=[];
+      groups[type].push(c);
+    });
+    const sortedTypes=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+    let html='';
+    sortedTypes.forEach(type=>{
+      html+=`<div style="grid-column:1/-1;font-size:11px;font-weight:800;color:var(--accent);
+        text-transform:uppercase;letter-spacing:0.08em;padding:6px 0 4px;
+        border-bottom:1px solid var(--border);margin-bottom:2px;">
+        ${type} <span style="font-size:9px;color:var(--text3);font-weight:400;">(${groups[type].length})</span>
+      </div>`;
+      html+=groups[type].map(cardHTML).join('');
+    });
+    gridEl.innerHTML=html;
   };
 
   el.innerHTML=`

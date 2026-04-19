@@ -3,6 +3,10 @@
  * Reads 6 Google Sheets and upserts (merge) them to Firestore.
  * Protected collections (receipts, payment_log, tasks, approvals, proposals,
  * notifications, logs) are NEVER touched by this script.
+ *
+ * NOTE: This script runs LOCALLY only (node sync-sheets.js).
+ * It is NOT executed via GitHub Actions or any CI/CD pipeline.
+ * Run it manually whenever you want to push Sheet data to Firestore.
  */
 
 'use strict';
