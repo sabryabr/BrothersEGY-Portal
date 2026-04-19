@@ -910,12 +910,12 @@ function getOrderStatus(order){
   const raw=order['حالة الطلب']||order['order_status']||order['Status']||'';
   if(raw==='Accident'||raw==='Cancelled')return raw;
   if(raw==='Closed'||order.closed===true)return 'Closed';
-  const total=getOrderTotal(order);
-  const paid=getOrderPaid(order);
+  const total=typeof getOrderTotal==='function'?getOrderTotal(order):parseAmount(order['إجمالي المستحق (Total)']||0);
+  const paid=typeof getOrderPaid==='function'?getOrderPaid(order):parseAmount(order['المدفوع EGP']||0);
+  if(total>0&&paid>=total)return 'Closed'; // fully paid = always Closed
   const{start,end}=getOrderDates(order);
   const today=new Date();
   const todayStart=new Date();todayStart.setHours(0,0,0,0);
-  if(total>0&&paid>=total&&end&&today>end)return 'Closed';
   if(start&&end&&start<=today&&end>=todayStart&&!order.closed)return 'Active';
   if(end&&end<todayStart&&!order.closed)return 'Overdue';
   if(start&&today<start)return 'Future';
@@ -1928,6 +1928,40 @@ async function loadDashboard(){
   ]);
   // Chart renders after all others complete
   setTimeout(()=>loadDashFleetChart(),300);
+  // Final KPI refresh pass — ensures cards are never stuck at '--'
+  setTimeout(()=>refreshDashboardKPIs(),600);
+}
+
+/* ---- refreshDashboardKPIs — fallback to ensure cards never stay at '--' ---- */
+async function refreshDashboardKPIs(){
+  try{
+    const orders=G.bookings||[];
+    const today=new Date();
+    const todayStart=new Date();todayStart.setHours(0,0,0,0);
+    const setKPI=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+
+    const active=orders.filter(o=>{
+      const{start,end}=getOrderDates(o);
+      const total=getOrderTotal(o);const paid=getOrderPaid(o);
+      if(total>0&&paid>=total)return false;
+      if(o.closed)return false;
+      return start&&end&&start<=today&&end>=todayStart;
+    }).length;
+
+    const overdue=orders.filter(o=>{
+      const{end}=getOrderDates(o);
+      const total=getOrderTotal(o);const paid=getOrderPaid(o);
+      if(total>0&&paid>=total)return false;
+      if(o.closed)return false;
+      return end&&end<todayStart;
+    }).length;
+
+    const available=G.fleet.filter(c=>!c.archived&&getCarStatusCategory(c)==='available').length;
+
+    setKPI('kpi-active',active);
+    setKPI('kpi-overdue',overdue);
+    setKPI('kpi-avail',available);
+  }catch(e){console.warn('refreshDashboardKPIs error:',e.message);}
 }
 
 /* ---- Activity Feed ---- */
@@ -2328,7 +2362,7 @@ async function loadDashKPIs(){
 
     document.getElementById('kpi-proposals').textContent=G.proposals.filter(p=>p.status==='Draft').length;
 
-    // Revenue with period filter
+    // Revenue with period filter — multi-strategy date parsing
     try{
       const colSnap=await db.collection('collections').get();
       let revenue=0;
@@ -2338,10 +2372,21 @@ async function loadDashKPIs(){
           const b=data['موقع الفرع']||data.Branch||'';
           if(!b.toLowerCase().includes((BRANCH_MAP[G.user.branch]||'').toLowerCase())&&!b.includes(BRANCH_AR[G.user.branch]||''))return;
         }
-        const recMonth=String(data['شهر']||'').replace(/^0+/,'');
-        const recYear=String(data['سنة']||'');
-        if(period.month===null||(recMonth===period.month&&recYear===period.year)){
-          revenue+=parseAmount(data['قيمة التحصيل']);
+        if(period.month===null){revenue+=parseAmount(data['قيمة التحصيل']);return;}
+        // Strategy 1: explicit month/year fields
+        const recMonth=String(data['شهر']||data.col_G||'').replace(/^0+/,'');
+        const recYear=String(data['سنة']||data.col_H||'');
+        if(recMonth&&recYear&&recMonth===period.month&&recYear===period.year){
+          revenue+=parseAmount(data['قيمة التحصيل']);return;
+        }
+        // Strategy 2: parse from any date field
+        const dateRaw=data['تاريخ التحصيل']||data['Date']||data.col_A||data.col_B||'';
+        if(dateRaw){
+          const parsed=parseDBDate(dateRaw);
+          if(parsed&&!isNaN(parsed)){
+            const m=String(parsed.getMonth()+1);const y=String(parsed.getFullYear());
+            if(m===period.month&&y===period.year)revenue+=parseAmount(data['قيمة التحصيل']);
+          }
         }
       });
       document.getElementById('kpi-revenue').textContent=fmtMoney(revenue);
@@ -3315,29 +3360,16 @@ async function loadFleetRadar(){
         ${l.label}
       </div>`).join('')}
     </div>
-    <!-- Scroll arrows + Gantt container -->
-    <div style="position:relative;">
-      <button onclick="(function(){const w=document.getElementById('gantt-wrap');if(w)w.scrollBy({left:-300,behavior:'smooth'});})()"
-              style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;
-                     width:30px;height:50px;background:rgba(15,23,42,0.85);border:1px solid var(--border2);
-                     border-radius:0 8px 8px 0;color:var(--text);font-size:16px;cursor:pointer;
-                     display:flex;align-items:center;justify-content:center;opacity:0.8;">◀</button>
-      <button onclick="(function(){const w=document.getElementById('gantt-wrap');if(w)w.scrollBy({left:300,behavior:'smooth'});})()"
-              style="position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:30;
-                     width:30px;height:50px;background:rgba(15,23,42,0.85);border:1px solid var(--border2);
-                     border-radius:8px 0 0 8px;color:var(--text);font-size:16px;cursor:pointer;
-                     display:flex;align-items:center;justify-content:center;opacity:0.8;">▶</button>
-      <!-- Gantt container - drag enabled -->
-      <div id="gantt-wrap"
-           style="overflow:hidden;max-height:calc(100vh - 320px);
-                  border:1px solid var(--border);border-radius:var(--radius);
-                  background:var(--surface);cursor:grab;user-select:none;"
-           onmousedown="ganttDragStart(event)"
-           onmousemove="ganttDragMove(event)"
-           onmouseup="ganttDragEnd(event)"
-           onmouseleave="ganttDragEnd(event)">
-        <div class="empty-state"><div class="spinner lg"></div></div>
-      </div>
+    <!-- Gantt container - drag to scroll -->
+    <div id="gantt-wrap"
+         style="overflow:hidden;max-height:calc(100vh - 320px);
+                border:1px solid var(--border);border-radius:var(--radius);
+                background:var(--surface);cursor:grab;user-select:none;"
+         onmousedown="ganttDragStart(event)"
+         onmousemove="ganttDragMove(event)"
+         onmouseup="ganttDragEnd(event)"
+         onmouseleave="ganttDragEnd(event)">
+      <div class="empty-state"><div class="spinner lg"></div></div>
     </div>
     <div id="gantt-tooltip" style="display:none;position:fixed;z-index:9000;width:310px;
          background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
@@ -3394,7 +3426,7 @@ function ganttScrollToToday(){
   const DAY_PX=14;
   const rangeEl=document.getElementById('gantt-range');
   const totalDays=parseInt(rangeEl?.value||90);
-  const pastDays=Math.floor(totalDays*0.33);
+  const pastDays=Math.floor(totalDays/2);
   const CAR_COL=240;
   const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2)+100;
   wrap.scrollTo({left:Math.max(0,todayPx),behavior:'smooth'});
@@ -3430,7 +3462,7 @@ async function renderGantt(){
 
     const today=new Date();today.setHours(0,0,0,0);
     const totalDays=window._ganttDays||90;
-    const pastDays=Math.floor(totalDays*0.33);
+    const pastDays=Math.floor(totalDays/2);
     const ganttStart=new Date(today);
     ganttStart.setDate(ganttStart.getDate()-pastDays);
 
@@ -3565,15 +3597,17 @@ async function renderGantt(){
 
       rowsHTML+=`
         <div style="display:flex;background:${rowBg};border-bottom:1px solid var(--border);">
-          <!-- Car label - sticky left - clickable -->
-          <div style="position:sticky;left:0;z-index:15;background:${rowBg};
+          <!-- Car label - sticky left - always opaque so bars don't bleed through -->
+          <div style="position:sticky;left:0;z-index:15;
+                      background:${ci%2===0?'var(--surface)':'var(--surface2)'};
                       width:${CAR_COL}px;min-width:${CAR_COL}px;
                       height:${Math.max(52,numRows*ROW_H)}px;padding:0 10px;
                       border-right:1px solid var(--border2);
                       display:flex;align-items:center;cursor:pointer;"
                onclick="openCarDetailModal('${carIdStr}')"
                onmouseover="this.style.background='var(--glass2)'"
-               onmouseout="this.style.background='${rowBg}'">
+               onmouseout="this.style.background='${ci%2===0?'var(--surface)':'var(--surface2)'}'"
+               >
             <div style="padding:4px 6px;max-width:${CAR_COL-4}px;overflow:hidden;">
               <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
                 <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
@@ -13601,15 +13635,16 @@ window.addEventListener('error',e=>{
 function getOrderStatus(order){
   if(!order)return 'Active';
   const raw=order['حالة الطلب']||order['order_status']||order['Status']||'';
-  if(raw==='Accident')return 'Accident';
-  if(raw==='Cancelled')return 'Cancelled';
+  if(raw==='Accident'||raw==='Cancelled')return raw;
   if(raw==='Closed'||order.closed===true)return 'Closed';
-  const total=parseAmount(order['إجمالي المستحق (Total)']);
-  const paid=parseAmount(order['المدفوع EGP']);
+  const total=typeof getOrderTotal==='function'?getOrderTotal(order):parseAmount(order['إجمالي المستحق (Total)']||0);
+  const paid=typeof getOrderPaid==='function'?getOrderPaid(order):parseAmount(order['المدفوع EGP']||0);
+  if(total>0&&paid>=total)return 'Closed'; // fully paid = always Closed
   const{start,end}=getOrderDates(order);
   const today=new Date();
-  if(total>0&&paid>=total)return 'Closed'; // fully paid = always closed regardless of date
-  if(end&&today>end&&!order.closed)return 'Overdue';
+  const todayStart=new Date();todayStart.setHours(0,0,0,0);
+  if(start&&end&&start<=today&&end>=todayStart&&!order.closed)return 'Active';
+  if(end&&end<todayStart&&!order.closed)return 'Overdue';
   if(start&&today<start)return 'Future';
   return 'Active';
 }
@@ -14779,19 +14814,7 @@ async function _loadDashKPIsRevenue(period,isPriv){
   }catch(e){console.warn('Revenue load error:',e.message);return 0;}
 }
 
-// Override loadDashKPIs to use improved revenue function
-const _origLoadDashKPIs=loadDashKPIs;
-async function loadDashKPIs(){
-  await _origLoadDashKPIs();
-  // Re-run revenue with improved multi-strategy parsing
-  try{
-    const isPriv=['Admin','Executive'].includes(G.user?.role);
-    const period=getPeriodFilter();
-    const revenue=await _loadDashKPIsRevenue(period,isPriv);
-    const el=document.getElementById('kpi-revenue');
-    if(el)el.textContent=fmtMoney(revenue);
-  }catch(e){}
-}
+// _loadDashKPIsRevenue is now inlined directly into loadDashKPIs above (multi-strategy revenue).
 
 
 </script>
