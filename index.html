@@ -1599,10 +1599,21 @@ function showPage(pageId,params={}){
 }
 
 function goBack(){
-  if(!NAV_HISTORY.length)return;
-  const prev=NAV_HISTORY.pop();
-  G._navGoingBack=true;
-  showPage(prev.page,prev.params);
+  if(MODAL_HISTORY.length>0){
+    MODAL_HISTORY.pop();
+    if(MODAL_HISTORY.length>0){
+      const prev=MODAL_HISTORY[MODAL_HISTORY.length-1];
+      _openModalDirect(prev.title,prev.content,prev.wide);
+    }else{
+      document.getElementById('global-modal')?.classList.remove('open');
+    }
+  }else if(NAV_HISTORY.length>0){
+    const prev=NAV_HISTORY.pop();
+    G._navGoingBack=true;
+    showPage(prev.page,prev.params);
+  }
+  const backBtn=document.getElementById('back-btn');
+  if(backBtn)backBtn.style.display=(MODAL_HISTORY.length+NAV_HISTORY.length)>0?'block':'none';
 }
 function renderPage(pageId){
   const renders={
@@ -1623,15 +1634,35 @@ function toggleSidebar(){
 }
 
 /* ============================================================
-   MODAL
+   MODAL + MODAL HISTORY STACK
    ============================================================ */
+let MODAL_HISTORY=[];
+
 function openModal(title,html,wide=false){
+  MODAL_HISTORY.push({title,content:html,wide});
+  _openModalDirect(title,html,wide);
+  const backBtn=document.getElementById('back-btn');
+  if(backBtn)backBtn.style.display='block';
+}
+
+function _openModalDirect(title,html,wide=false){
   document.getElementById('global-modal-title').textContent=title;
   document.getElementById('global-modal-body').innerHTML=html;
   document.getElementById('global-modal-box').className='modal-box'+(wide?' wide':'');
   document.getElementById('global-modal').classList.add('open');
 }
-function closeModal(){document.getElementById('global-modal').classList.remove('open');}
+
+function closeModal(){
+  MODAL_HISTORY.pop();
+  if(MODAL_HISTORY.length>0){
+    const prev=MODAL_HISTORY[MODAL_HISTORY.length-1];
+    _openModalDirect(prev.title,prev.content,prev.wide);
+  }else{
+    document.getElementById('global-modal').classList.remove('open');
+    const backBtn=document.getElementById('back-btn');
+    if(backBtn)backBtn.style.display=NAV_HISTORY.length>0?'block':'none';
+  }
+}
 
 /* ============================================================
    RETURN BANNER
@@ -1731,6 +1762,7 @@ async function doLogout(){
   await logAction('LOGOUT','Portal','Session ended');
   G.unsubscribers.forEach(u=>u());G.unsubscribers=[];
   window._orderSubActive=false;window._ordersUnsub=null;
+  MODAL_HISTORY=[];NAV_HISTORY=[];
   G.user=null;G.fleet=[];G.customers=[];
   clearTimeout(inactiveWarn);clearTimeout(inactiveLogout);
   document.getElementById('app').classList.add('hidden');
@@ -2724,6 +2756,8 @@ async function loadOrderBook(){
   if(!['Admin','Executive'].includes(G.user?.role)){
     const bw=document.getElementById('ob-branch-wrap');if(bw)bw.style.display='none';
   }
+  // Show cached data immediately while listener loads
+  if(G.bookings&&G.bookings.length){allOrders=G.bookings;filterOrders();}
   subscribeOrders();
 }
 
@@ -2758,6 +2792,7 @@ function subscribeOrders(){
 }
 
 function filterOrders(){
+  if(!allOrders||!allOrders.length){allOrders=G.bookings||[];}
   const search=(document.getElementById('ob-search')?.value||'').toLowerCase();
   const status=document.getElementById('ob-status')?.value||'all';
   const branch=document.getElementById('ob-branch')?.value||'all';
@@ -2786,6 +2821,7 @@ function filterOrders(){
     if(!sa&&!sb)return 0;if(!sa)return 1;if(!sb)return -1;
     return sb-sa;
   });
+  console.log('[FilterOrders] allOrders:',allOrders?.length,'status filter:',status,'result:',filtered?.length);
   renderOrdersTable(filtered);
   updateFilterPills(search,status,branch,from,to);
 }
@@ -2838,6 +2874,7 @@ function updateOrderSummaryBar(){
 }
 
 function renderOrdersTable(orders){
+  console.log('[RenderOrders] called with',orders?.length,'orders, first:',orders?.[0]?.id);
   const wrap=document.getElementById('ob-table-wrap');if(!wrap)return;
   if(!orders.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">📋</div><p>No orders match your filters</p></div>`;return;}
   const today=new Date();
@@ -5729,14 +5766,27 @@ async function generateProposal(){
   const kmPkg=document.getElementById('pr-km')?.value||'standard';
   const insPkg=document.getElementById('pr-ins')?.value||'basic';
   const proposalData={proposal_ref:ref,client_name:clientName,client_crm_id:window['_crm_pr_id']||'',client_phone:document.getElementById('pr-phone')?.value.trim()||'',client_email:document.getElementById('pr-email')?.value.trim()||'',car_id:String(carId),car_label:carLabel,pickup_date:pickup,dropoff_date:dropoff,pickup_location:document.getElementById('pr-ploc')?.value.trim()||'',dropoff_location:document.getElementById('pr-dloc')?.value.trim()||'',duration_days:days,daily_rate:daily,km_package:kmPkg,km_cost:kmCost,insurance_plan:insPkg,insurance_fee:insFee,pickup_fee:pfee,delivery_fee:dfee,deposit_amount:deposit,child_seat_days:seatD,extra_driver_days:drvD,total_estimate:total,status:'Draft',converted_to:'',issued_by:G.user?.username||'',branch:branchCode,timestamp:Date.now()};
+  const editingId=document.getElementById('page-proposals')?.dataset?.editingId||'';
   try{
-    await db.collection('proposals').doc(ref).set(proposalData);
-    G.proposals.unshift({id:ref,...proposalData});
-    renderProposalsList();
-    document.getElementById('pr-ref-preview').textContent=ref;
-    await logAction('GENERATE','Proposals',`Proposal ${ref} for ${clientName} | ${carLabel} | ${fmtMoney(total)}`);
-    toast(`Proposal ${ref} saved!`,'success');
-    buildProposalA4(ref,proposalData);
+    if(editingId){
+      await db.collection('proposals').doc(editingId).update({...proposalData,_sys_updated:firebase.firestore.FieldValue.serverTimestamp(),updated_by:G.user?.username||''});
+      const idx=G.proposals.findIndex(p=>p.id===editingId);
+      if(idx>-1)G.proposals[idx]={...G.proposals[idx],...proposalData};
+      document.getElementById('page-proposals').dataset.editingId='';
+      renderProposalsList();
+      document.getElementById('pr-ref-preview').textContent=proposalData.proposal_ref||editingId;
+      await logAction('EDIT','Proposals',`Proposal ${editingId} updated for ${clientName}`);
+      toast(`Proposal updated!`,'success');
+      buildProposalA4(proposalData.proposal_ref||editingId,proposalData);
+    }else{
+      await db.collection('proposals').doc(ref).set(proposalData);
+      G.proposals.unshift({id:ref,...proposalData});
+      renderProposalsList();
+      document.getElementById('pr-ref-preview').textContent=ref;
+      await logAction('GENERATE','Proposals',`Proposal ${ref} for ${clientName} | ${carLabel} | ${fmtMoney(total)}`);
+      toast(`Proposal ${ref} saved!`,'success');
+      buildProposalA4(ref,proposalData);
+    }
   }catch(e){toast('Failed to save proposal: '+e.message,'error');}
 }
 
@@ -5841,6 +5891,7 @@ function renderProposalsList(){
     <td><span class="pill pill-${(p.status||'draft').toLowerCase()}">${p.status||'Draft'}</span></td>
     <td>
       <div style="display:flex;gap:3px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-xs" onclick="editProposal('${p.id}')">✏️ Edit</button>
         ${p.status==='Draft'?`
           <button class="btn btn-success btn-xs" onclick="convertProposalToContract('${p.id}')">→ Contract</button>
           ${isPriv?`<button class="btn btn-warning btn-xs" onclick="updateProposalStatus('${p.id}','Accepted')">✓</button>
@@ -5863,8 +5914,19 @@ async function updateProposalStatus(id,status){
   }catch(e){toast('Update failed: '+e.message,'error');}
 }
 
-function convertProposalToContract(proposalId){
+async function convertProposalToContract(proposalId){
   const p=G.proposals.find(x=>x.id===proposalId);if(!p)return;
+  // Check if contract already exists for this proposal
+  try{
+    const existSnap=await db.collection('bookings').where('proposal_ref','==',p.proposal_ref||proposalId).limit(1).get();
+    if(!existSnap.empty){
+      const existing={id:existSnap.docs[0].id,...existSnap.docs[0].data()};
+      if(confirm(`A contract already exists for this proposal (#${existing['No.']||existing.id}).\n\nClick OK to view the existing contract.`)){
+        openOrderDetail(existing.id);
+      }
+      return;
+    }
+  }catch(e){}
   const choice=confirm('Convert to English Contract?\n\nClick OK for English Contract.\nClick Cancel for Arabic Contract.');
   const prefix=choice?'en':'ar';
   const targetPage=choice?'en-contract':'ar-contract';
@@ -14586,7 +14648,10 @@ async function viewOrderPayments(orderId, orderNo){
           <td style="font-size:11px;">${r.receipt_date||'—'}</td>
           <td style="font-weight:700;color:var(--success);">${fmtMoney(r.total_egp_equiv||r.amount_egp||0)}</td>
           <td style="font-size:11px;">${r.type||'—'}</td>
-          <td><button class="btn btn-ghost btn-xs" onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300);">🖨️</button></td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-xs" onclick="editReceipt('${r.id}')">✏️</button>
+            <button class="btn btn-ghost btn-xs" onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300);">🖨️</button>
+          </td>
         </tr>`).join('')}
       </tbody></table>`:
       `<div style="color:var(--text3);font-size:12px;padding:10px;">No receipts found for this order.</div>`}
@@ -14621,6 +14686,12 @@ function filterCRM(){
     c['رمز الدولة']||c.col_H,c['No.']||c.col_A,c['العنوان']
   ].join(' ').toLowerCase().includes(q));}
   if(nat!=='all')customers=customers.filter(c=>(c['رمز الدولة']||c.col_H)===nat);
+  // Sort newest first by numeric CRM ID
+  customers.sort((a,b)=>{
+    const na=parseInt(a['No.']||a.col_A||0);
+    const nb=parseInt(b['No.']||b.col_A||0);
+    return nb-na;
+  });
   const countEl=document.getElementById('crm-showing-count');
   if(countEl)countEl.textContent=Math.min(200,customers.length);
   if(!customers.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">👥</div><p>No customers match your search</p></div>`;return;}
@@ -14832,6 +14903,89 @@ async function _loadDashKPIsRevenue(period,isPriv){
 }
 
 // _loadDashKPIsRevenue is now inlined directly into loadDashKPIs above (multi-strategy revenue).
+
+/* ============================================================
+   EDIT PROPOSAL
+   ============================================================ */
+async function editProposal(proposalId){
+  const p=G.proposals.find(x=>x.id===proposalId)||await db.collection('proposals').doc(proposalId).get().then(d=>({id:d.id,...d.data()}));
+  if(!p){toast('Proposal not found','error');return;}
+  showPage('proposals');
+  setTimeout(()=>{
+    const page=document.getElementById('page-proposals');
+    if(page)page.dataset.editingId=proposalId;
+    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+    set('pr-fname',p.client_name?.split(' ')[0]||'');
+    set('pr-lname',p.client_name?.split(' ').slice(1).join(' ')||'');
+    set('pr-phone',p.client_phone||'');
+    set('pr-email',p.client_email||'');
+    set('pr-pickup',p.pickup_date||'');
+    set('pr-dropoff',p.dropoff_date||'');
+    set('pr-ploc',p.pickup_location||'');
+    set('pr-dloc',p.dropoff_location||'');
+    set('pr-daily',p.daily_rate||'0');
+    set('pr-km-cost',p.km_cost||'0');
+    set('pr-ins-fee',p.insurance_fee||'0');
+    set('pr-pfee',p.pickup_fee||'0');
+    set('pr-dfee',p.delivery_fee||'0');
+    set('pr-deposit',p.deposit_amount||'0');
+    set('pr-seat-days',p.child_seat_days||'0');
+    set('pr-driver-days',p.extra_driver_days||'0');
+    const carSel=document.getElementById('pr-car');
+    if(carSel&&p.car_id){carSel.value=p.car_id;if(typeof showCarInfoBadge==='function')showCarInfoBadge(p.car_id,'pr-car-badge');}
+    document.getElementById('pr-ref-preview').textContent=p.proposal_ref||proposalId;
+    if(typeof prCalc==='function')prCalc();
+    toast('Editing proposal — make changes and click Generate to update','info',5000);
+  },400);
+}
+
+/* ============================================================
+   EDIT & SAVE RECEIPT
+   ============================================================ */
+async function editReceipt(receiptId){
+  let r=(window._receiptsCache||[]).find(x=>x.id===receiptId);
+  if(!r){
+    try{const d=await db.collection('receipts').doc(receiptId).get();r={id:d.id,...d.data()};}
+    catch(e){toast('Receipt not found','error');return;}
+  }
+  const html=`
+    <div style="display:grid;gap:10px;">
+      <div><label style="font-size:11px;color:var(--text3);">Receipt Ref</label>
+        <div style="font-weight:700;color:var(--accent);">${r.receipt_ref||receiptId}</div></div>
+      <div><label style="font-size:11px;color:var(--text3);">Amount (EGP)</label>
+        <input id="edit-rc-amount" class="form-input" type="number" value="${r.amount_egp||r.total_egp_equiv||0}" style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"></div>
+      <div><label style="font-size:11px;color:var(--text3);">Date</label>
+        <input id="edit-rc-date" class="form-input" type="date" value="${r.receipt_date||''}" style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"></div>
+      <div><label style="font-size:11px;color:var(--text3);">Note</label>
+        <input id="edit-rc-note" class="form-input" value="${(r.note||'').replace(/"/g,'&quot;')}" style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveEditReceipt('${receiptId}')">💾 Save</button>
+        <button class="btn btn-ghost" onclick="saveEditReceipt('${receiptId}',true)">💾🖨️ Save & Reprint</button>
+      </div>
+    </div>`;
+  openModal(`✏️ Edit Receipt — ${r.receipt_ref||receiptId}`,html);
+}
+
+async function saveEditReceipt(receiptId,andPrint=false){
+  const amount=parseFloat(document.getElementById('edit-rc-amount')?.value||0);
+  const date=document.getElementById('edit-rc-date')?.value||'';
+  const note=document.getElementById('edit-rc-note')?.value||'';
+  try{
+    await db.collection('receipts').doc(receiptId).update({
+      amount_egp:amount,total_egp_equiv:amount,
+      receipt_date:date,note,
+      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // Update cache
+    if(window._receiptsCache){
+      const idx=window._receiptsCache.findIndex(x=>x.id===receiptId);
+      if(idx>-1){window._receiptsCache[idx].amount_egp=amount;window._receiptsCache[idx].total_egp_equiv=amount;window._receiptsCache[idx].receipt_date=date;window._receiptsCache[idx].note=note;}
+    }
+    toast('Receipt updated','success');
+    if(andPrint){closeModal();showPage('receipts');setTimeout(()=>reprintReceipt(receiptId),300);}
+    else closeModal();
+  }catch(e){toast('Update failed: '+e.message,'error');}
+}
 
 /* ============================================================
    AUTO-RECEIPT on contract creation
