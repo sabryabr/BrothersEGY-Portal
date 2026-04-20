@@ -479,7 +479,18 @@ button{cursor:pointer;}
     flex-direction: column;
     align-items: flex-start;
   }
+  /* 8. KPI grid 2-column on tablet */
+  [style*="grid-template-columns:repeat(auto-fill,minmax(148px"] {
+    grid-template-columns: repeat(2,1fr) !important;
+  }
 }
+@media(max-width:600px){
+  .modal-box{width:98vw!important;margin:4px!important;max-height:98vh!important;}
+  h2{font-size:15px!important;}
+  [style*="grid-template-columns:repeat(auto-fill,minmax(148px"]{grid-template-columns:repeat(2,1fr)!important;}
+  .btn{padding:6px 10px!important;font-size:11px!important;}
+}
+html,body{overflow-x:hidden;}
 
 </style>
 </head>
@@ -2931,6 +2942,8 @@ function renderOrdersTable(orders){
     <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">
       Showing ${orders.length} order${orders.length!==1?'s':''}
     </div>`;
+  // Force visibility (guard against any CSS hiding the container)
+  wrap.style.display='block';wrap.style.visibility='visible';wrap.style.opacity='1';
 }
 
 function refreshOrderBook(){
@@ -3429,12 +3442,20 @@ async function loadFleetRadar(){
 let _ganttDays=90;
 function setGanttRange(days){
   _ganttDays=days;
+  // Zoom: more days = smaller pixels per day
+  const zoom=days<=30?40:days<=60?32:days<=90?28:days<=180?18:10;
+  window.GANTT_PX_PER_DAY=zoom;
   document.querySelectorAll('.gantt-range-btn').forEach(b=>{
     b.style.background=parseInt(b.dataset.days)===days?'var(--accent)':'var(--glass)';
     b.style.color=parseInt(b.dataset.days)===days?'#fff':'var(--text2)';
     b.style.borderColor=parseInt(b.dataset.days)===days?'var(--accent)':'var(--border)';
   });
-  triggerGlobalRender();
+  renderGantt();
+  // Scroll to today after render
+  setTimeout(()=>{
+    const el=document.getElementById('gantt-wrap');
+    if(el)el.scrollLeft=182*zoom-el.clientWidth/2;
+  },250);
 }
 
 /* ---- Drag to scroll ---- */
@@ -3506,12 +3527,12 @@ async function renderGantt(){
     });
 
     const today=new Date();today.setHours(0,0,0,0);
-    const totalDays=window._ganttDays||90;
-    const pastDays=Math.floor(totalDays/2);
+    const totalDays=365;
+    const pastDays=182;
     const ganttStart=new Date(today);
     ganttStart.setDate(ganttStart.getDate()-pastDays);
 
-    const DAY_PX=14;
+    const DAY_PX=window.GANTT_PX_PER_DAY||14;
     const CAR_COL=240;
     const ASSIGN_COL=230;
     const ROW_H=38;
@@ -3679,8 +3700,21 @@ async function renderGantt(){
           </div>`;
       }else{
         rows.forEach((row,ri)=>{
-          let barsHTML=`
-            <div style="position:absolute;left:${todayPxBase}px;top:0;bottom:0;width:2px;
+          // Month shading strips
+          let barsHTML='';
+          {let md=new Date(ganttStart);
+          while(md<new Date(ganttStart.getTime()+totalDays*86400000)){
+            const mS=new Date(md.getFullYear(),md.getMonth(),1);
+            const mE=new Date(md.getFullYear(),md.getMonth()+1,0);
+            const mLeft=Math.max(0,Math.floor((mS-ganttStart)/86400000))*DAY_PX;
+            const mRight=Math.min(totalDays,Math.ceil((mE-ganttStart)/86400000)+1)*DAY_PX;
+            const mW=Math.max(0,mRight-mLeft);
+            const isCurM=md.getMonth()===today.getMonth()&&md.getFullYear()===today.getFullYear();
+            const isEven=md.getMonth()%2===0;
+            barsHTML+=`<div style="position:absolute;left:${mLeft}px;top:0;width:${mW}px;height:100%;background:${isCurM?'rgba(99,102,241,0.05)':isEven?'rgba(255,255,255,0.01)':'rgba(255,255,255,0.025)'};border-left:1px solid ${isCurM?'rgba(99,102,241,0.25)':'rgba(255,255,255,0.05)'};pointer-events:none;z-index:1;"></div>`;
+            md.setMonth(md.getMonth()+1);
+          }}
+          barsHTML+=`<div style="position:absolute;left:${todayPxBase}px;top:0;bottom:0;width:2px;
                         background:rgba(59,130,246,0.5);z-index:4;pointer-events:none;"></div>`;
 
           // Weekend stripes
@@ -3887,8 +3921,18 @@ async function renderGantt(){
         </div>`}
       </div>`;
 
-    // Scroll to today
-    setTimeout(()=>ganttScrollToToday(),200);
+    // Scroll to today + touch drag setup
+    setTimeout(()=>{
+      const el=document.getElementById('gantt-wrap');if(!el)return;
+      el.scrollLeft=182*DAY_PX-el.clientWidth/2;
+      if(el._drag)return;el._drag=true;
+      let dn=false,sx=0,sl=0,sy=0,st=0;
+      el.addEventListener('mousedown',e=>{if(e.button)return;dn=true;sx=e.clientX;sl=el.scrollLeft;sy=e.clientY;st=el.scrollTop;el.style.cursor='grabbing';e.preventDefault();});
+      window.addEventListener('mouseup',()=>{dn=false;if(el)el.style.cursor='grab';});
+      window.addEventListener('mousemove',e=>{if(!dn)return;el.scrollLeft=sl-(e.clientX-sx);el.scrollTop=st-(e.clientY-sy);});
+      el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sl=el.scrollLeft;sy=e.touches[0].clientY;st=el.scrollTop;},{passive:true});
+      el.addEventListener('touchmove',e=>{el.scrollLeft=sl-(e.touches[0].clientX-sx);el.scrollTop=st-(e.touches[0].clientY-sy);},{passive:true});
+    },200);
 
     // If no order bars appeared, log diagnostic
     if(G.activeBookings.length > 0 && cars.length > 0){
@@ -4878,7 +4922,20 @@ async function saveNewCustomer(){
     const ref=await db.collection('customers').add(newCust);
     newCust.id=ref.id;G.customers.unshift(newCust);
     await logAction('ADD','CRM Hub',`New customer: ${fname} ${lname} | ID: ${passport||natid}`);
-    toast(`Customer ${fname} ${lname} added!`,'success');closeModal();filterCRM();
+    closeModal();
+    if(G.currentPage==='crm')filterCRM();
+    const action=confirm(`Customer ${fname} ${lname} added!\n\nCreate a proposal for this customer now?`);
+    if(action){
+      showPage('proposals');
+      setTimeout(()=>{
+        const searchEl=document.getElementById('pr-client-search');
+        if(searchEl){searchEl.value=fname+' '+lname;searchEl.dispatchEvent(new Event('input'));}
+        const setVal=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+        setVal('pr-fname',fname);setVal('pr-lname',lname);setVal('pr-phone',phone);
+      },400);
+    }else{
+      toast(`Customer ${fname} ${lname} added!`,'success');
+    }
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
 
@@ -4897,9 +4954,10 @@ function openEditCustomerModal(customerId){
       <div class="field"><label>Email</label><input type="text" id="ec-email" value="${c['عنوان البريد الإلكتروني']||''}"/></div>
       <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="ec-address" value="${c['العنوان']||''}"/></div>
     </div>
-    <div style="display:flex;gap:7px;margin-top:13px;">
+    <div style="display:flex;gap:7px;margin-top:13px;flex-wrap:wrap;">
       <button class="btn btn-success" onclick="updateCustomer('${customerId}')">💾 Save Changes</button>
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      ${G.user?.role==='Admin'?`<button class="btn btn-sm" style="background:var(--danger);color:#fff;margin-left:auto;" onclick="adminDeleteCustomer('${customerId}')">🗑️ Delete Customer</button>`:''}
     </div>`;
   openModal(`✏️ Edit Customer — ${((c['الاسم الأول']||c.col_C||'')+' '+(c['الاسم الأخير']||c.col_D||'')).trim()}`,html);
 }
@@ -14399,6 +14457,13 @@ async function openCRMProfile(customerId){
   const overdueOrders=orders.filter(o=>getOrderStatus(o)==='Overdue').length;
 
   const html=`
+  <!-- Quick Actions -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+    <button class="btn btn-primary btn-sm" onclick="closeModal();showPage('proposals');setTimeout(()=>prefillProposalClient('${c.id}','${name.replace(/'/g,"\\'")}'),400)">📋 New Proposal</button>
+    <button class="btn btn-ghost btn-sm" onclick="closeModal();showPage('en-contract');setTimeout(()=>fillCrmFields('en','${c.id}'),400)">📄 New Contract</button>
+    <button class="btn btn-ghost btn-sm" onclick="viewCustomerOrders('${clientNo}','${name.replace(/'/g,"\\'")}')">📦 View Orders</button>
+    <button class="btn btn-ghost btn-sm" onclick="closeModal();openEditCustomerModal('${c.id}')">✏️ Edit Profile</button>
+  </div>
   <!-- Profile Header -->
   <div style="display:flex;align-items:flex-start;gap:14px;padding:13px;
     background:var(--surface2);border-radius:var(--radius);margin-bottom:16px;">
@@ -14903,6 +14968,23 @@ async function _loadDashKPIsRevenue(period,isPriv){
 }
 
 // _loadDashKPIsRevenue is now inlined directly into loadDashKPIs above (multi-strategy revenue).
+
+/* ============================================================
+   PREFILL PROPOSAL FROM CLIENT PROFILE
+   ============================================================ */
+function prefillProposalClient(customerId,clientName){
+  const customer=G.customers.find(c=>c.id===customerId);
+  if(!customer)return;
+  const firstName=customer['الاسم الأول']||customer.col_C||'';
+  const lastName=customer['الاسم الأخير']||customer.col_D||'';
+  const phone=customer['رقم التليفون']||customer.col_F||'';
+  const setVal=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  setVal('pr-fname',firstName);setVal('pr-lname',lastName);setVal('pr-phone',phone);
+  const searchEl=document.getElementById('pr-client-search');
+  if(searchEl){searchEl.value=clientName;searchEl.dispatchEvent(new Event('input'));}
+  window['_crm_pr_id']=customerId;
+  toast('Client pre-filled: '+clientName,'success');
+}
 
 /* ============================================================
    EDIT PROPOSAL
