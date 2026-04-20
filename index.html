@@ -1730,6 +1730,7 @@ function renderSettings(){renderPageLoading('page-settings','⚙️','Settings')
 async function doLogout(){
   await logAction('LOGOUT','Portal','Session ended');
   G.unsubscribers.forEach(u=>u());G.unsubscribers=[];
+  window._orderSubActive=false;window._ordersUnsub=null;
   G.user=null;G.fleet=[];G.customers=[];
   clearTimeout(inactiveWarn);clearTimeout(inactiveLogout);
   document.getElementById('app').classList.add('hidden');
@@ -1758,8 +1759,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 async function loadDashboard(){
   const el=document.getElementById('page-dashboard');if(!el)return;
-  // Always re-fetch live data so KPIs don't use stale cache from previous tab visits
-  await loadSharedData();
+  if(!G.fleet.length||!G.bookings.length) await loadSharedData();
   if(!document.getElementById('dash-pulse-style')){
     const s=document.createElement('style');s.id='dash-pulse-style';
     s.textContent='@keyframes dashPulse{0%,100%{opacity:1;}50%{opacity:0.3;}}';
@@ -1935,6 +1935,7 @@ async function loadDashboard(){
 /* ---- refreshDashboardKPIs — fallback to ensure cards never stay at '--' ---- */
 async function refreshDashboardKPIs(){
   try{
+    console.log('[KPI] Elements found:',['kpi-active','kpi-overdue','kpi-avail','kpi-revenue'].map(id=>document.getElementById(id)?.id||'MISSING'));
     const orders=G.bookings||[];
     const today=new Date();
     const todayStart=new Date();todayStart.setHours(0,0,0,0);
@@ -2727,6 +2728,9 @@ async function loadOrderBook(){
 }
 
 function subscribeOrders(){
+  if(window._orderSubActive) return;
+  window._orderSubActive=true;
+  if(window._ordersUnsub){window._ordersUnsub();window._ordersUnsub=null;}
   const isPriv=['Admin','Executive'].includes(G.user?.role)||G.user?.access==='All';
   // Admin/All-access: fetch full collection (no branch filter, high limit)
   const query=isPriv
@@ -2750,6 +2754,7 @@ function subscribeOrders(){
       }
     });
   G.unsubscribers.push(unsub);
+  window._ordersUnsub=unsub;
 }
 
 function filterOrders(){
@@ -2894,6 +2899,7 @@ function renderOrdersTable(orders){
 function refreshOrderBook(){
   const wrap=document.getElementById('ob-table-wrap');
   if(wrap)wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
+  window._orderSubActive=false;
   subscribeOrders();
 }
 
@@ -2999,7 +3005,9 @@ async function openOrderDetail(orderId){
       <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('` + o.id + `')">📄 Contract</button>
       <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('` + o.id + `')">🧾 Receipt</button>
       <button class="btn btn-ghost" onclick="viewOrderPayments('` + o.id + `','` + (o['No.']||o.id) + `')">💳 Payments</button>
+      <button class="btn btn-ghost" onclick="viewOrderDocuments('` + o.id + `','` + (o['No.']||o.id) + `')">📁 Docs</button>
       <button class="btn btn-ghost" onclick="openReminderForm('` + o.id + `')">🔔 Set Reminder</button>
+      ${G.user?.role==='Admin'?`<button class="btn btn-sm" style="background:var(--danger);color:#fff;" onclick="if(confirm('DELETE order #${o['No.']} permanently? This cannot be undone.')) adminDeleteOrder('${o.id}')">🗑️ Delete</button>`:''}
     </div>`;
 
     openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`, html, true);
@@ -6245,8 +6253,12 @@ async function generateENContract(){
     const bookingData={'No.':ref,'اسم العميل':`${fname} ${lname}`,'اسم السيارة':carLabel,'كود السيارة':String(carId||''),'بداية التعاقد':pickup,'نهاية التعاقد':dropoff,'سعر السيارة اليومي بالجنيه المصري':fmtMoney(daily),'إجمالي المستحق (Total)':fmtMoney(total),'المدفوع EGP':String(pEGP),'المدفوع USD':String(pUSD),'المدفوع EUR':String(pEUR),'الوديعة المعلقة لدينا':fmtMoney(dEGP),'حالة الطلب':'Active','closed':false,'فرع الإصدار':branchCode,'assigned_user':G.user?.username||'','proposal_ref':propRef,'نوع التأمين':insPkg,'rental_days':String(days),'مكان الاستلام':`${document.getElementById('en-ploc-type')?.value} - ${document.getElementById('en-ploc-addr')?.value||''}`,'مكان التسليم':`${document.getElementById('en-dloc-type')?.value} - ${document.getElementById('en-dloc-addr')?.value||''}`,'_sys_updated':Date.now()};
     await db.collection('bookings').doc(ref).set(bookingData);
     if(propRef){await db.collection('proposals').doc(propRef).update({status:'Converted',converted_to:ref}).catch(()=>{});}
+    if(pEGP>0)await autoCreateReceipt(ref,ref,pEGP,'EGP',`${fname} ${lname}`,carLabel,branchCode);
+    if(pUSD>0)await autoCreateReceipt(ref,ref,pUSD*G.ratesUSD,'USD',`${fname} ${lname}`,carLabel,branchCode);
+    if(pEUR>0)await autoCreateReceipt(ref,ref,pEUR*G.ratesEUR,'EUR',`${fname} ${lname}`,carLabel,branchCode);
+    if(pCard>0)await autoCreateReceipt(ref,ref,pCard,'Card',`${fname} ${lname}`,carLabel,branchCode);
     await logAction('GENERATE','English Contract',`Contract ${ref} for ${fname} ${lname} | ${carLabel} | ${fmtMoney(total)} | Paid: ${fmtMoney(paidNow)}`);
-    toast(`Contract ${ref} saved to database!`,'success');
+    toast(`✅ Contract ${ref} saved! <button onclick="window.print()" style="margin-left:8px;padding:2px 8px;background:var(--accent);border:none;border-radius:4px;color:#fff;cursor:pointer;">🖨️ Print</button>`,'success',8000);
   }catch(e){toast('Warning: Could not save to database. '+e.message,'warning');}
   // Build A4
   const html=buildENContractA4(ref,{fname,lname,passport,license,carLabel,days,pickup,dropoff,daily,base,insT,kmCost,pickFee,delFee,drT,stT,fees,total,paidNow,depHeld,pending,pEGP,pUSD,pEUR,pCard,dEGP,dUSD,dEUR,dCard,reqDep,insPkg,kmPkg,kmPkgMap,insPkgMap,branchCode,propRef,addDr,drRate,addSt,stRate});
@@ -6698,8 +6710,12 @@ async function generateARContract(){
     const bookingData={'No.':ref,'اسم العميل':`${fname} ${lname}`,'اسم السيارة':carLabel,'كود السيارة':String(carId||''),'بداية التعاقد':pickup,'نهاية التعاقد':dropoff,'سعر السيارة اليومي بالجنيه المصري':fmtMoney(daily),'إجمالي المستحق (Total)':fmtMoney(total),'المدفوع EGP':String(pEGP),'المدفوع USD':String(pUSD),'المدفوع EUR':String(pEUR),'الوديعة المعلقة لدينا':fmtMoney(dEGP),'حالة الطلب':'Active','closed':false,'فرع الإصدار':branchCode,'assigned_user':G.user?.username||'','proposal_ref':propRef,'rental_days':String(days),'_sys_updated':Date.now()};
     await db.collection('bookings').doc(ref).set(bookingData);
     if(propRef)await db.collection('proposals').doc(propRef).update({status:'Converted',converted_to:ref}).catch(()=>{});
+    if(pEGP>0)await autoCreateReceipt(ref,ref,pEGP,'EGP',`${fname} ${lname}`,carLabel,branchCode);
+    if(pUSD>0)await autoCreateReceipt(ref,ref,pUSD*G.ratesUSD,'USD',`${fname} ${lname}`,carLabel,branchCode);
+    if(pEUR>0)await autoCreateReceipt(ref,ref,pEUR*G.ratesEUR,'EUR',`${fname} ${lname}`,carLabel,branchCode);
+    if(pCard>0)await autoCreateReceipt(ref,ref,pCard,'Card',`${fname} ${lname}`,carLabel,branchCode);
     await logAction('GENERATE','Arabic Contract',`Contract ${ref} for ${fname} ${lname} | ${carLabel} | ${fmtMoney(total)}`);
-    toast(`العقد ${ref} تم حفظه بنجاح!`,'success');
+    toast(`✅ العقد ${ref} تم حفظه! <button onclick="window.print()" style="margin-left:8px;padding:2px 8px;background:var(--accent);border:none;border-radius:4px;color:#fff;cursor:pointer;">🖨️ Print</button>`,'success',8000);
   }catch(e){toast('تحذير: فشل الحفظ. '+e.message,'warning');}
   // Build A4 Arabic
   const html=`
@@ -14645,6 +14661,7 @@ function filterCRM(){
               <button class="btn btn-ghost btn-xs" onclick="openClientProfile('${c.id}')">👁</button>
               <button class="btn btn-ghost btn-xs" onclick="openEditCustomerModal('${c.id}')">✏️</button>
               <button class="btn btn-primary btn-xs" onclick="viewCustomerOrders('${clientCode}','${name.replace(/'/g,'')}')">📋</button>
+              ${G.user?.role==='Admin'?`<button class="btn btn-xs" style="background:var(--danger);color:#fff;" onclick="event.stopPropagation();adminDeleteCustomer('${c.id}')">🗑️</button>`:''}
             </div>
           </td>
         </tr>`;
@@ -14816,6 +14833,100 @@ async function _loadDashKPIsRevenue(period,isPriv){
 
 // _loadDashKPIsRevenue is now inlined directly into loadDashKPIs above (multi-strategy revenue).
 
+/* ============================================================
+   AUTO-RECEIPT on contract creation
+   ============================================================ */
+async function autoCreateReceipt(orderId,orderNo,amount,currency,clientName,carLabel,branch){
+  if(!amount||amount<=0)return;
+  const now=new Date();
+  const dateStr=now.toISOString().slice(0,10);
+  const monthStr=String(now.getMonth()+1).padStart(2,'0');
+  const dayStr=String(now.getDate()).padStart(2,'0');
+  const branchCode=(branch||'HRG').toUpperCase().slice(0,3);
+  const rcSnap=await db.collection('receipts')
+    .where('branch_code','==',branchCode)
+    .where('receipt_date','==',dateStr).get();
+  const nextNum=String(rcSnap.size+1).padStart(3,'0');
+  const receiptRef=`RC-${branchCode}-${monthStr}${dayStr}-${nextNum}`;
+  const receipt={
+    receipt_ref:receiptRef,
+    contract_no:String(orderNo),
+    order_id:orderId,
+    client_name:clientName,
+    car_label:carLabel,
+    branch:branch||'',
+    branch_code:branchCode,
+    receipt_date:dateStr,
+    type:'Income',
+    currency:currency||'EGP',
+    amount_egp:parseFloat(amount)||0,
+    total_egp_equiv:parseFloat(amount)||0,
+    collected_by:G.user?.username||'',
+    note:'Auto-generated on contract creation',
+    timestamp:Date.now(),
+    _sys_created:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  await db.collection('receipts').add(receipt);
+  console.log('[AutoReceipt] Created:',receiptRef,'for order',orderNo,'amount',amount);
+  return receiptRef;
+}
+
+/* ============================================================
+   ADMIN DELETE — Orders & Customers
+   ============================================================ */
+async function adminDeleteOrder(orderId){
+  if(G.user?.role!=='Admin')return;
+  try{
+    await db.collection('bookings').doc(orderId).delete();
+    closeModal();
+    toast('Order deleted');
+    window._orderSubActive=false;
+    filterOrders();
+  }catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+async function adminDeleteCustomer(customerId){
+  if(G.user?.role!=='Admin')return;
+  if(!confirm('Delete this customer permanently?'))return;
+  try{
+    await db.collection('customers').doc(customerId).delete();
+    G.customers=G.customers.filter(c=>c.id!==customerId);
+    filterCRM();
+    toast('Customer deleted');
+  }catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+/* ============================================================
+   VIEW ORDER DOCUMENTS (receipts + proposals)
+   ============================================================ */
+async function viewOrderDocuments(orderId,orderNo){
+  try{
+    const[rcSnap,propSnap]=await Promise.all([
+      db.collection('receipts').where('contract_no','==',String(orderNo)).get(),
+      db.collection('proposals').where('order_id','==',orderId).get().catch(()=>({docs:[]}))
+    ]);
+    const receipts=rcSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const proposals=propSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const html=`
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:800;color:var(--accent);margin-bottom:8px;">🧾 Receipts (${receipts.length})</div>
+        ${receipts.length?receipts.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="color:var(--accent);font-size:11px;">${r.receipt_ref||r.id}</span>
+          <span style="font-size:11px;">${r.receipt_date||'—'}</span>
+          <span style="color:var(--success);font-weight:700;">${fmtMoney(r.total_egp_equiv||0)}</span>
+          <button class="btn btn-ghost btn-xs" onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300)">🖨️</button>
+        </div>`).join(''):'<p style="color:var(--text3);font-size:12px;">No receipts</p>'}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:800;color:var(--accent);margin-bottom:8px;">📋 Proposals (${proposals.length})</div>
+        ${proposals.length?proposals.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="color:var(--accent);font-size:11px;">${p.ref||p.id}</span>
+          <span style="font-size:11px;">${p.status||'—'}</span>
+        </div>`).join(''):'<p style="color:var(--text3);font-size:12px;">No proposals</p>'}
+      </div>`;
+    openModal(`📁 Documents — Order #${orderNo}`,html,true);
+  }catch(e){toast('Failed to load documents: '+e.message,'error');}
+}
 
 </script>
 </body>
