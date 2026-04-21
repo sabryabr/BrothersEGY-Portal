@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>برازرز إيجي – منشئ العقد بالعربية</title>
+<link rel="icon" href="https://brothersegy.com/wp-content/uploads/2026/02/12345.png"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
+<style>
+:root{--primary:#1e40af;--bg:#f1f5f9;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--success:#166534;--warning:#854d0e;--danger:#dc2626;--accent:#3b82f6;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.topbar{background:var(--primary);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.topbar-brand{display:flex;align-items:center;gap:10px;}
+.topbar-brand img{height:36px;}
+.topbar-title{font-size:16px;font-weight:800;letter-spacing:.05em;}
+.topbar-actions{display:flex;gap:8px;}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;transition:.2s;}
+.btn-white{background:#fff;color:var(--primary);}
+.btn-white:hover{background:#e0e7ff;}
+.btn-green{background:#22c55e;color:#fff;}
+.btn-green:hover{background:#16a34a;}
+.btn-gray{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);}
+.btn-gray:hover{background:rgba(255,255,255,0.25);}
+.container{max-width:1200px;margin:0 auto;padding:16px;}
+.layout{display:grid;grid-template-columns:400px 1fr;gap:16px;align-items:start;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:sticky;top:16px;max-height:calc(100vh - 90px);overflow-y:auto;direction:rtl;}
+.panel::-webkit-scrollbar{width:4px;} .panel::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px;}
+.section-title{font-size:10px;font-weight:800;color:var(--primary);text-transform:uppercase;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #e0e7ff;}
+.section-title:first-child{margin-top:0;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}
+.form-grid.g3{grid-template-columns:1fr 1fr 1fr;}
+.field{display:flex;flex-direction:column;gap:3px;}
+label{font-size:10px;font-weight:700;color:var(--text2);}
+input,select{padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text);background:#fff;outline:none;transition:.2s;direction:rtl;}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.estimate-box{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:12px;}
+.est-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;}
+.est-total{display:flex;justify-content:space-between;font-weight:800;font-size:14px;color:var(--primary);border-top:1px solid var(--border);margin-top:8px;padding-top:8px;}
+.btn-generate{width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;margin-top:10px;transition:.2s;}
+.btn-generate:hover{background:#1d4ed8;transform:translateY(-1px);}
+.btn-clear{width:100%;padding:9px;background:#f1f5f9;color:var(--text2);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;}
+.output-area{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.output-actions{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.btn-print{padding:9px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;}
+.btn-save-erp{padding:9px 18px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;}
+.a4-page{width:210mm;min-height:296mm;padding:12mm 14mm;margin:0 auto;background:#fff;font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;line-height:1.4;color:#000;box-shadow:0 4px 24px rgba(0,0,0,.12);}
+.placeholder{text-align:center;padding:80px 20px;color:var(--text2);}
+.placeholder .icon{font-size:48px;margin-bottom:12px;}
+.alert{padding:10px 14px;border-radius:8px;font-size:11px;font-weight:700;margin-bottom:12px;}
+.alert-info{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;}
+@media print{
+  body{background:#fff;}
+  .topbar,.panel,.output-actions,.alert{display:none!important;}
+  .layout{display:block;}
+  .output-area{border:none;padding:0;box-shadow:none;}
+  .a4-page{box-shadow:none;margin:0;width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="topbar" style="direction:rtl;">
+  <div class="topbar-brand">
+    <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Logo"/>
+    <div>
+      <div class="topbar-title">برازرز إيجي</div>
+      <div style="font-size:10px;opacity:.8;">منشئ العقد بالعربية</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-green" onclick="saveContractToERP()">💾 حفظ في النظام</button>
+    <button class="btn btn-white" onclick="window.print()">🖨️ طباعة / PDF</button>
+    <button class="btn btn-gray" onclick="window.close()">✕ إغلاق</button>
+  </div>
+</div>
+
+<div class="container">
+  <div id="prefill-notice" class="alert alert-info" style="display:none;direction:rtl;">
+    ✅ تم تعبئة النموذج مسبقاً من بيانات الطلب. راجع وعدّل إذا لزم الأمر، ثم انقر على إنشاء العقد.
+  </div>
+  <div class="layout">
+    <!-- Control Panel -->
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="font-size:14px;font-weight:800;">📝 عقد إيجار جديد</h3>
+        <span id="ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+      </div>
+
+      <div class="section-title">① معلومات العقد</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>فرع الإصدار</label>
+          <select id="ar-branch">
+            <option value="HRG">فرع الغردقة</option>
+            <option value="ALX">الإسكندرية (المركز الرئيسي)</option>
+            <option value="CAI">فرع القاهرة</option>
+            <option value="RSH">فرع رشيد</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>نظام الإيجار</label>
+          <select id="ar-mode" onchange="calc()">
+            <option value="daily">يومي (قصير الأمد)</option>
+            <option value="monthly">شهري (طويل الأمد)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>نوع الاتفاقية</label>
+          <select id="ar-agr" onchange="togglePrev()">
+            <option value="new">اتفاقية جديدة</option>
+            <option value="extension">تمديد</option>
+          </select>
+        </div>
+        <div class="field" id="prev-wrap" style="display:none;">
+          <label>رقم العقد السابق</label>
+          <input type="text" id="ar-prev-con" placeholder="رقم العقد السابق"/>
+        </div>
+      </div>
+
+      <div class="section-title">② تفاصيل المركبة</div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>اختر من الأسطول</label>
+        <select id="ar-car" onchange="selectCar()">
+          <option value="">-- اختر السيارة --</option>
+        </select>
+      </div>
+      <div id="car-badge" style="font-size:11px;color:var(--text2);margin-bottom:8px;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:7px;min-height:32px;"></div>
+      <div class="form-grid">
+        <div class="field"><label>عداد الخروج</label><input type="number" id="ar-km-out" placeholder="52747"/></div>
+        <div class="field">
+          <label>مستوى الوقود</label>
+          <select id="ar-fuel">
+            <option>ممتلئ (8/8)</option><option>3/4</option><option>1/2</option><option>1/4</option><option>احتياطي</option>
+          </select>
+        </div>
+        <div class="field"><label>الإيجار اليومي (ج.م)</label><input type="number" id="ar-daily" placeholder="0" oninput="calc()"/></div>
+        <div class="field"><label>رسوم التأمين (يومي)</label><input type="number" id="ar-ins-fee" value="0" oninput="calc()"/></div>
+      </div>
+
+      <div class="section-title">③ بيانات المستأجر</div>
+      <div class="form-grid">
+        <div class="field"><label>الاسم الأول *</label><input type="text" id="ar-fname" placeholder="الاسم الأول"/></div>
+        <div class="field"><label>اللقب *</label><input type="text" id="ar-lname" placeholder="اسم العائلة"/></div>
+        <div class="field"><label>جواز السفر / الهوية *</label><input type="text" id="ar-passport" placeholder="رقم الهوية"/></div>
+        <div class="field"><label>الجنسية</label><input type="text" id="ar-nationality" placeholder="الجنسية"/></div>
+        <div class="field"><label>رقم الهاتف</label><input type="text" id="ar-phone" placeholder="رقم الهاتف"/></div>
+        <div class="field"><label>البريد الإلكتروني</label><input type="text" id="ar-email" placeholder="البريد الإلكتروني"/></div>
+        <div class="field"><label>رخصة القيادة *</label><input type="text" id="ar-license" placeholder="رقم الرخصة"/></div>
+        <div class="field"><label>العنوان</label><input type="text" id="ar-address" placeholder="العنوان"/></div>
+        <div class="field"><label>اسم السائق الإضافي</label><input type="text" id="ar-add-dr-name" placeholder="اختياري"/></div>
+        <div class="field"><label>رخصة السائق الإضافي</label><input type="text" id="ar-add-dr-lic" placeholder="اختياري"/></div>
+      </div>
+
+      <div class="section-title">④ التواريخ والمواقع</div>
+      <div class="form-grid">
+        <div class="field"><label>تاريخ ووقت الاستلام</label><input type="datetime-local" id="ar-pickup" onchange="calc()"/></div>
+        <div class="field"><label>تاريخ ووقت التسليم</label><input type="datetime-local" id="ar-dropoff" onchange="calc()"/></div>
+        <div class="field">
+          <label>نوع موقع الاستلام</label>
+          <select id="ar-ploc-type"><option>مكتب</option><option>مطار</option><option>فندق</option></select>
+        </div>
+        <div class="field"><label>عنوان الاستلام</label><input type="text" id="ar-ploc-addr" placeholder="العنوان التفصيلي"/></div>
+        <div class="field">
+          <label>نوع موقع التسليم</label>
+          <select id="ar-dloc-type"><option>مكتب</option><option>مطار</option><option>فندق</option></select>
+        </div>
+        <div class="field"><label>عنوان التسليم</label><input type="text" id="ar-dloc-addr" placeholder="العنوان التفصيلي"/></div>
+      </div>
+
+      <div class="section-title">⑤ المدفوعات</div>
+      <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:5px;">الإيجار المدفوع الآن</div>
+      <div class="form-grid g3" style="margin-bottom:8px;">
+        <div class="field"><label>جنيه مصري</label><input type="number" id="ar-paid-egp" value="0" oninput="calc()"/></div>
+        <div class="field"><label>دولار أمريكي</label><input type="number" id="ar-paid-usd" value="0" oninput="calc()"/></div>
+        <div class="field"><label>يورو</label><input type="number" id="ar-paid-eur" value="0" oninput="calc()"/></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="field"><label>بطاقة (ج.م)</label><input type="number" id="ar-paid-card" value="0" oninput="calc()"/></div>
+        <div class="field"><label>رسوم التوصيل</label><input type="number" id="ar-del-fee" value="0" oninput="calc()"/></div>
+        <div class="field"><label>رسوم الاستلام</label><input type="number" id="ar-pick-fee" value="0" oninput="calc()"/></div>
+        <div class="field"><label>التأمين المطلوب</label><input type="number" id="ar-req-dep" value="0" oninput="calc()"/></div>
+      </div>
+      <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:5px;">التأمين المحتجز</div>
+      <div class="form-grid g3" style="margin-bottom:8px;">
+        <div class="field"><label>جنيه مصري</label><input type="number" id="ar-dep-egp" value="0" oninput="calc()"/></div>
+        <div class="field"><label>دولار أمريكي</label><input type="number" id="ar-dep-usd" value="0" oninput="calc()"/></div>
+        <div class="field"><label>يورو</label><input type="number" id="ar-dep-eur" value="0" oninput="calc()"/></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="field"><label>بطاقة (ج.م)</label><input type="number" id="ar-dep-card" value="0" oninput="calc()"/></div>
+      </div>
+
+      <div class="section-title">⑥ الباقات والإضافات</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>باقة التأمين</label>
+          <select id="ar-ins-pkg">
+            <option value="basic">أساسي – مسؤولية العميل 100%</option>
+            <option value="intermediate">متوسط – العميل 70% / الشركة 30%</option>
+            <option value="full">حماية كاملة – مسؤولية صفر</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>باقة الكيلومترات</label>
+          <select id="ar-km-pkg" onchange="calc()">
+            <option value="standard">قياسي 120 كم/يوم</option>
+            <option value="500">500 كم إضافي</option>
+            <option value="750">750 كم إضافي</option>
+            <option value="1000">1000 كم إضافي</option>
+            <option value="1500">باقة 1500 كم</option>
+            <option value="2000">باقة 2000 كم</option>
+            <option value="3000">باقة 3000 كم</option>
+            <option value="unlimited">كيلومتر مفتوح</option>
+          </select>
+        </div>
+        <div class="field"><label>تكلفة باقة الكيلومترات (ج.م)</label><input type="number" id="ar-km-cost" value="0" oninput="calc()"/></div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;margin-top:4px;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;font-weight:600;">
+          <input type="checkbox" id="ar-add-driver" onchange="calc()" style="width:14px;height:14px;"/>
+          سائق إضافي
+          <input type="number" id="ar-dr-rate" value="500" oninput="calc()" style="width:60px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;"/>
+          ج.م/يوم
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;font-weight:600;">
+          <input type="checkbox" id="ar-add-seat" onchange="calc()" style="width:14px;height:14px;"/>
+          كرسي طفل
+          <input type="number" id="ar-seat-rate" value="250" oninput="calc()" style="width:60px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;font-size:11px;"/>
+          ج.م/يوم
+        </label>
+      </div>
+
+      <!-- Live Estimate -->
+      <div class="estimate-box">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:8px;">تقدير الإيجار</div>
+        <div class="est-row"><span>الأساس:</span><span id="est-base">£0.00</span></div>
+        <div class="est-row"><span>الأيام:</span><span id="est-days">0</span></div>
+        <div class="est-row"><span>رسوم إضافية:</span><span id="est-fees">£0.00</span></div>
+        <div class="est-total"><span>الإجمالي</span><span id="est-total">£0.00</span></div>
+        <div style="margin-top:8px;font-size:11px;">
+          <div class="est-row"><span style="color:var(--text2);">المدفوع:</span><span id="est-paid" style="color:#166534;font-weight:700;">£0.00</span></div>
+          <div class="est-row"><span style="color:var(--text2);">المتبقي:</span><span id="est-pending" style="color:#d97706;font-weight:700;">£0.00</span></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text2);text-align:center;margin-bottom:6px;">أسعار الصرف: دولار <span id="usd-rate">—</span> | يورو <span id="eur-rate">—</span></div>
+
+      <button class="btn-generate" onclick="generateContract()">📝 إنشاء معاينة العقد</button>
+      <button class="btn-clear" onclick="clearForm()">✕ مسح النموذج</button>
+    </div>
+
+    <!-- Output Area -->
+    <div class="output-area" style="direction:ltr;">
+      <div id="output-actions" class="output-actions" style="display:none;">
+        <button class="btn-print" onclick="window.print()">🖨️ طباعة / PDF</button>
+        <button class="btn-save-erp" onclick="saveContractToERP()">💾 حفظ في النظام</button>
+        <button style="padding:9px 18px;background:#f1f5f9;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;" onclick="document.getElementById('output-actions').style.display='none';document.getElementById('a4-output').style.display='none';document.getElementById('placeholder').style.display='block';">✕ إغلاق</button>
+      </div>
+      <div class="a4-page" id="a4-output" style="display:none;"></div>
+      <div class="placeholder" id="placeholder">
+        <div class="icon">📝</div>
+        <p style="font-size:14px;font-weight:700;">أكمل النموذج وانقر على<br>إنشاء معاينة العقد</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+  authDomain:"brothers-egy-portal.firebaseapp.com",
+  projectId:"brothers-egy-portal",
+  storageBucket:"brothers-egy-portal.firebasestorage.app",
+  messagingSenderId:"673531280760",
+  appId:"1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+const BRANCH_AR={HRG:'الغردقة',ALX:'الإسكندرية',CAI:'القاهرة',RSH:'رشيد'};
+const KM_PKG_AR={standard:'قياسي 120 كم/يوم',500:'500 كم إضافي',750:'750 كم إضافي',1000:'1000 كم إضافي',1500:'باقة 1500 كم',2000:'باقة 2000 كم',3000:'باقة 3000 كم',unlimited:'كيلومتر مفتوح يوميًا'};
+const INS_PKG_AR={none:'بدون تأمين',basic:'أساسي – مسؤولية العميل 100%',intermediate:'متوسط – العميل 70% / الشركة 30%',full:'حماية كاملة – مسؤولية صفر'};
+
+let ratesUSD=55,ratesEUR=60,fleetData=[],currentRef=null,currentOrderId=null;
+
+async function init(){
+  try{const snap=await db.collection('settings').doc('exchange_rates').get();if(snap.exists){const d=snap.data();ratesUSD=d.USD||55;ratesEUR=d.EUR||60;}}catch(e){}
+  document.getElementById('usd-rate').textContent=ratesUSD.toFixed(2);
+  document.getElementById('eur-rate').textContent=ratesEUR.toFixed(2);
+
+  try{
+    const snap=await db.collection('fleet').where('status','!=','deleted').get();
+    fleetData=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const sel=document.getElementById('ar-car');
+    fleetData.forEach(c=>{const opt=document.createElement('option');opt.value=c.id;opt.textContent=c.car_label||c.model||c.id;sel.appendChild(opt);});
+  }catch(e){}
+
+  const P=new URLSearchParams(window.location.search);
+  currentOrderId=P.get('orderId')||P.get('order_id')||null;
+
+  const prefill=(id,key,keys)=>{const el=document.getElementById(id);if(!el)return;const val=[key,...(keys||[])].map(k=>P.get(k)).find(v=>v);if(val)el.value=val;};
+  const hasPrefill=P.has('fname')||P.has('first_name')||P.has('carId');
+  if(hasPrefill){
+    document.getElementById('prefill-notice').style.display='block';
+    prefill('ar-fname','fname','first_name');
+    prefill('ar-lname','lname','last_name');
+    prefill('ar-passport','passport');
+    prefill('ar-phone','phone');
+    prefill('ar-nationality','nationality');
+    prefill('ar-email','email');
+    prefill('ar-license','license');
+    prefill('ar-address','address');
+    prefill('ar-pickup','pickup');
+    prefill('ar-dropoff','dropoff');
+    prefill('ar-daily','daily_rate');
+    prefill('ar-ins-fee','ins_fee');
+    prefill('ar-req-dep','deposit');
+    prefill('ar-paid-egp','paid_egp');
+    prefill('ar-paid-usd','paid_usd');
+    prefill('ar-paid-eur','paid_eur');
+    prefill('ar-dep-egp','dep_egp');
+    if(P.get('branch')){const sel=document.getElementById('ar-branch');if(sel){const code=P.get('branch').toUpperCase().slice(0,3);[...sel.options].forEach(o=>{if(o.value===code)o.selected=true;});}}
+    if(P.get('carId')){const sel=document.getElementById('ar-car');if(sel){sel.value=P.get('carId');selectCar();}}
+    calc();
+  }
+}
+
+function togglePrev(){const v=document.getElementById('ar-agr')?.value;document.getElementById('prev-wrap').style.display=v==='extension'?'flex':'none';}
+
+function selectCar(){
+  const id=document.getElementById('ar-car')?.value;
+  const car=fleetData.find(c=>String(c.id)===String(id));
+  const badge=document.getElementById('car-badge');
+  if(car&&badge)badge.innerHTML=`<strong>${car.car_label||car.model||id}</strong> &nbsp;|&nbsp; لوحة: ${car.plate||'—'} &nbsp;|&nbsp; سنة: ${car.year||'—'}`;
+  else if(badge)badge.innerHTML='';
+  calc();
+}
+
+function fmtMoney(n){const v=parseFloat(n)||0;return'£'+v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function calc(){
+  const pickup=document.getElementById('ar-pickup')?.value;
+  const dropoff=document.getElementById('ar-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('ar-daily')?.value)||0;
+  const insFee=parseFloat(document.getElementById('ar-ins-fee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('ar-km-cost')?.value)||0;
+  const delFee=parseFloat(document.getElementById('ar-del-fee')?.value)||0;
+  const pickFee=parseFloat(document.getElementById('ar-pick-fee')?.value)||0;
+  const addDr=document.getElementById('ar-add-driver')?.checked;
+  const drRate=parseFloat(document.getElementById('ar-dr-rate')?.value)||500;
+  const addSt=document.getElementById('ar-add-seat')?.checked;
+  const stRate=parseFloat(document.getElementById('ar-seat-rate')?.value)||250;
+  const pEGP=parseFloat(document.getElementById('ar-paid-egp')?.value)||0;
+  const pUSD=parseFloat(document.getElementById('ar-paid-usd')?.value)||0;
+  const pEUR=parseFloat(document.getElementById('ar-paid-eur')?.value)||0;
+  const pCard=parseFloat(document.getElementById('ar-paid-card')?.value)||0;
+  let days=0;if(pickup&&dropoff)days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));
+  const base=daily*days;const insT=insFee*days;
+  const drT=addDr?drRate*days:0;const stT=addSt?stRate*days:0;
+  const fees=delFee+pickFee+kmCost+drT+stT+insT;const total=base+fees;
+  const paidNow=pEGP+(pUSD*ratesUSD)+(pEUR*ratesEUR)+pCard;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  s('est-base',fmtMoney(base));s('est-days',String(days));s('est-fees',fmtMoney(fees));
+  s('est-total',fmtMoney(total));s('est-paid',fmtMoney(paidNow));s('est-pending',fmtMoney(Math.max(0,total-paidNow)));
+}
+
+async function generateDocRef(type,branchCode){
+  const n=new Date();const ddmm=String(n.getDate()).padStart(2,'0')+String(n.getMonth()+1).padStart(2,'0');
+  const key=`${type}-${branchCode||'GEN'}-${ddmm}`;
+  try{const seq=await db.runTransaction(async tx=>{const ref=db.collection('_counters').doc(key);const doc=await tx.get(ref);const next=doc.exists?(doc.data().seq||0)+1:1;tx.set(ref,{seq:next,updated:Date.now()},{merge:true});return next;});
+  return`${type}-${branchCode||'GEN'}-${ddmm}-${String(seq).padStart(3,'0')}`;}
+  catch(e){return`${type}-${branchCode||'GEN'}-${ddmm}-${Date.now().toString().slice(-4)}`;}
+}
+
+async function generateContract(){
+  const fname=document.getElementById('ar-fname')?.value.trim();
+  const lname=document.getElementById('ar-lname')?.value.trim();
+  const carId=document.getElementById('ar-car')?.value;
+  const pickup=document.getElementById('ar-pickup')?.value;
+  const dropoff=document.getElementById('ar-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('ar-daily')?.value)||0;
+  if(!fname||!lname){alert('اسم العميل مطلوب.');return;}
+  if(!pickup||!dropoff){alert('تواريخ الاستلام والتسليم مطلوبة.');return;}
+  if(daily<=0){alert('الإيجار اليومي يجب أن يكون أكبر من صفر.');return;}
+
+  const branchCode=document.getElementById('ar-branch')?.value||'HRG';
+  const ref=await generateDocRef('CN',branchCode);
+  currentRef=ref;
+  document.getElementById('ref-preview').textContent=ref;
+
+  const car=fleetData.find(c=>String(c.id)===String(carId));
+  const carLabel=car?(car.car_label||car.model||carId):(carId||'-');
+  const days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));
+
+  const insFee=parseFloat(document.getElementById('ar-ins-fee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('ar-km-cost')?.value)||0;
+  const delFee=parseFloat(document.getElementById('ar-del-fee')?.value)||0;
+  const pickFee=parseFloat(document.getElementById('ar-pick-fee')?.value)||0;
+  const addDr=document.getElementById('ar-add-driver')?.checked;
+  const drRate=parseFloat(document.getElementById('ar-dr-rate')?.value)||500;
+  const addSt=document.getElementById('ar-add-seat')?.checked;
+  const stRate=parseFloat(document.getElementById('ar-seat-rate')?.value)||250;
+  const insPkg=document.getElementById('ar-ins-pkg')?.value||'basic';
+  const kmPkg=document.getElementById('ar-km-pkg')?.value||'standard';
+  const pEGP=parseFloat(document.getElementById('ar-paid-egp')?.value)||0;
+  const pUSD=parseFloat(document.getElementById('ar-paid-usd')?.value)||0;
+  const pEUR=parseFloat(document.getElementById('ar-paid-eur')?.value)||0;
+  const pCard=parseFloat(document.getElementById('ar-paid-card')?.value)||0;
+  const dEGP=parseFloat(document.getElementById('ar-dep-egp')?.value)||0;
+  const dUSD=parseFloat(document.getElementById('ar-dep-usd')?.value)||0;
+  const dEUR=parseFloat(document.getElementById('ar-dep-eur')?.value)||0;
+  const dCard=parseFloat(document.getElementById('ar-dep-card')?.value)||0;
+  const reqDep=parseFloat(document.getElementById('ar-req-dep')?.value)||0;
+
+  const drT=addDr?drRate*days:0;const stT=addSt?stRate*days:0;
+  const base=daily*days;const insT=insFee*days;
+  const fees=delFee+pickFee+kmCost+drT+stT+insT;const total=base+fees;
+  const paidNow=pEGP+(pUSD*ratesUSD)+(pEUR*ratesEUR)+pCard;
+  const depHeld=dEGP+(dUSD*ratesUSD)+(dEUR*ratesEUR)+dCard;
+  const pending=Math.max(0,total-paidNow);
+
+  const nationality=document.getElementById('ar-nationality')?.value||'-';
+  const phone=document.getElementById('ar-phone')?.value||'-';
+  const email=document.getElementById('ar-email')?.value||'-';
+  const license=document.getElementById('ar-license')?.value||'─────────────';
+  const passport=document.getElementById('ar-passport')?.value||'─────────────';
+  const address=document.getElementById('ar-address')?.value||'-';
+  const addDrName=document.getElementById('ar-add-dr-name')?.value||'';
+  const kmOut=document.getElementById('ar-km-out')?.value||'-';
+  const fuel=document.getElementById('ar-fuel')?.value||'-';
+  const plocType=document.getElementById('ar-ploc-type')?.value||'مكتب';
+  const plocAddr=document.getElementById('ar-ploc-addr')?.value||'-';
+  const dlocType=document.getElementById('ar-dloc-type')?.value||'مكتب';
+  const dlocAddr=document.getElementById('ar-dloc-addr')?.value||'-';
+
+  try{
+    const bookingData={'No.':ref,'اسم العميل':`${fname} ${lname}`,'اسم السيارة':carLabel,'كود السيارة':String(carId||''),'بداية التعاقد':pickup,'نهاية التعاقد':dropoff,'سعر السيارة اليومي بالجنيه المصري':String(daily),'إجمالي المستحق (Total)':fmtMoney(total),'المدفوع EGP':String(pEGP),'المدفوع USD':String(pUSD),'المدفوع EUR':String(pEUR),'الوديعة المعلقة لدينا':fmtMoney(dEGP),'حالة الطلب':'Active','closed':false,'فرع الإصدار':branchCode,'rental_days':String(days),'_sys_updated':Date.now(),'_source':'contract-ar'};
+    if(currentOrderId)bookingData['source_order_id']=currentOrderId;
+    await db.collection('bookings').doc(ref).set(bookingData);
+    if(currentOrderId){await db.collection('bookings').doc(currentOrderId).update({contract_ref_ar:ref,_last_printed:new Date().toISOString()}).catch(()=>{});}
+  }catch(e){console.warn('Save warning:',e.message);}
+
+  const qrId='qr-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+
+  const html=`
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:16px;direction:rtl;">
+    <div style="text-align:right;">
+      <div style="font-size:15px;font-weight:800;color:#1e40af;">عقد إيجار سيارة</div>
+      <div style="font-size:10px;color:#64748b;margin-top:3px;">رقم العقد: <strong>${ref}</strong></div>
+      <div style="font-size:10px;color:#64748b;">التاريخ: ${new Date().toLocaleDateString('ar-EG')}</div>
+      <div style="font-size:10px;color:#64748b;">الفرع: ${BRANCH_AR[branchCode]||branchCode}</div>
+      ${currentOrderId?`<div style="font-size:10px;color:#3b82f6;">رقم الطلب: ${currentOrderId}</div>`:''}
+    </div>
+    <div style="text-align:left;">
+      <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:38px;margin-bottom:5px;" alt="Brothers EGY"/>
+      <div style="font-size:17px;font-weight:900;color:#1e40af;">برازرز إيجي</div>
+      <div style="font-size:9px;color:#64748b;">خدمات تأجير السيارات • www.brothersegy.com</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:14px;direction:rtl;">
+    <div>
+      <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">بيانات المستأجر</div>
+      <div style="font-size:11px;font-weight:700;">${fname} ${lname}</div>
+      <div style="font-size:10px;color:#475569;margin-top:3px;">جواز السفر/الهوية: ${passport}</div>
+      <div style="font-size:10px;color:#475569;">الجنسية: ${nationality}</div>
+      <div style="font-size:10px;color:#475569;">الهاتف: ${phone}</div>
+      <div style="font-size:10px;color:#475569;">البريد: ${email}</div>
+      <div style="font-size:10px;color:#475569;">رخصة القيادة: ${license}</div>
+      <div style="font-size:10px;color:#475569;">العنوان: ${address}</div>
+      ${addDrName?`<div style="font-size:10px;color:#475569;margin-top:3px;">سائق إضافي: ${addDrName}</div>`:''}
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">بيانات المركبة</div>
+      <div style="font-size:11px;font-weight:700;">${carLabel}</div>
+      <div style="font-size:10px;color:#475569;margin-top:3px;">عداد الخروج: ${kmOut}</div>
+      <div style="font-size:10px;color:#475569;">مستوى الوقود: ${fuel}</div>
+      <div style="font-size:10px;color:#475569;margin-top:5px;">الاستلام: ${new Date(pickup||'').toLocaleString('ar-EG')}</div>
+      <div style="font-size:10px;color:#475569;">التسليم: ${new Date(dropoff||'').toLocaleString('ar-EG')}</div>
+      <div style="font-size:10px;color:#475569;font-weight:700;">المدة: ${days} يوم</div>
+      <div style="font-size:10px;color:#475569;">مكان الاستلام: ${plocType} – ${plocAddr}</div>
+      <div style="font-size:10px;color:#475569;">مكان التسليم: ${dlocType} – ${dlocAddr}</div>
+      <div style="font-size:10px;color:#475569;">باقة الكيلومترات: ${KM_PKG_AR[kmPkg]||kmPkg}</div>
+      <div style="font-size:10px;color:#475569;">التأمين: ${INS_PKG_AR[insPkg]||insPkg}</div>
+    </div>
+  </div>
+  <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;direction:rtl;">الملخص المالي</div>
+  <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:11px;direction:rtl;">
+    <thead><tr style="background:#1e40af;color:#fff;">
+      <th style="padding:6px 9px;text-align:right;">البيان</th>
+      <th style="padding:6px 9px;text-align:right;">الحساب</th>
+      <th style="padding:6px 9px;text-align:left;">المبلغ (ج.م)</th>
+    </tr></thead>
+    <tbody>
+      <tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">الإيجار الأساسي</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(daily)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:700;">${fmtMoney(base)}</td></tr>
+      ${insT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">رسوم التأمين</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(insFee)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(insT)}</td></tr>`:''}
+      ${kmCost>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">باقة الكيلومترات</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${KM_PKG_AR[kmPkg]||kmPkg}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(kmCost)}</td></tr>`:''}
+      ${pickFee>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">رسوم الاستلام</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">─</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(pickFee)}</td></tr>`:''}
+      ${delFee>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">رسوم التوصيل</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">─</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(delFee)}</td></tr>`:''}
+      ${drT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">سائق إضافي</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(drRate)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(drT)}</td></tr>`:''}
+      ${stT>0?`<tr><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;">كرسي طفل</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;color:#64748b;">${days} يوم × ${fmtMoney(stRate)}</td><td style="padding:5px 9px;border-bottom:1px solid #e2e8f0;text-align:left;">${fmtMoney(stT)}</td></tr>`:''}
+    </tbody>
+  </table>
+  <div style="background:#1e40af;color:#fff;padding:9px 12px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;direction:rtl;">
+    <span style="font-weight:800;font-size:12px;">إجمالي قيمة العقد</span>
+    <span style="font-size:16px;font-weight:900;">${fmtMoney(total)}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px;font-size:10px;direction:rtl;">
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:9px;">
+      <div style="font-weight:800;color:#166534;margin-bottom:5px;">الإيجار المدفوع</div>
+      ${pEGP>0?`<div>نقداً ج.م: ${fmtMoney(pEGP)}</div>`:''}
+      ${pUSD>0?`<div>دولار: $${pUSD} = ${fmtMoney(pUSD*ratesUSD)}</div>`:''}
+      ${pEUR>0?`<div>يورو: €${pEUR} = ${fmtMoney(pEUR*ratesEUR)}</div>`:''}
+      ${pCard>0?`<div>بطاقة: ${fmtMoney(pCard)}</div>`:''}
+      <div style="border-top:1px solid #86efac;margin-top:4px;padding-top:4px;font-weight:700;color:#166534;">إجمالي المدفوع: ${fmtMoney(paidNow)}</div>
+      <div style="color:${pending>0?'#dc2626':'#166534'};font-weight:700;">المتبقي: ${fmtMoney(pending)}</div>
+    </div>
+    <div style="background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:9px;">
+      <div style="font-weight:800;color:#854d0e;margin-bottom:5px;">التأمين المحتجز</div>
+      ${dEGP>0?`<div>ج.م: ${fmtMoney(dEGP)}</div>`:''}
+      ${dUSD>0?`<div>دولار: $${dUSD}</div>`:''}
+      ${dEUR>0?`<div>يورو: €${dEUR}</div>`:''}
+      ${dCard>0?`<div>بطاقة: ${fmtMoney(dCard)}</div>`:''}
+      <div style="border-top:1px solid #fde047;margin-top:4px;padding-top:4px;font-weight:700;color:#854d0e;">إجمالي المحتجز: ${fmtMoney(depHeld)}</div>
+      <div style="color:#64748b;">المطلوب: ${fmtMoney(reqDep)}</div>
+    </div>
+  </div>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:9px 11px;font-size:9px;color:#475569;line-height:1.6;margin-bottom:11px;direction:rtl;">
+    <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:4px;">الشروط والأحكام</div>
+    <strong>1. الأهلية:</strong> الحد الأدنى للسن 21 عامًا. رخصة قيادة وهوية سارية إلزامية.<br>
+    <strong>2. دورة الإيجار:</strong> وحدات 24 ساعة. تجاوز 5 ساعات = يوم كامل إضافي.<br>
+    <strong>3. الكيلومترات:</strong> 120 كم/يوم مشمولة. الزائد يُحتسب عند الإرجاع.<br>
+    <strong>4. الوقود:</strong> سياسة المثل بالمثل.<br>
+    <strong>5. التأمين:</strong> يُلغى في حالة عدم تقديم محضر شرطي فوري.<br>
+    <strong>6. التأمين الأمني:</strong> يُرد عند الإرجاع السليم.<br>
+    <strong>7. المسؤولية:</strong> المستأجر يتحمل كامل المسؤولية القانونية خلال فترة الإيجار.
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:11px;direction:rtl;">
+    <div style="text-align:center;"><div style="width:150px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">توقيع المستأجر</div><div style="font-size:9px;">${fname} ${lname}</div></div>
+    <div style="text-align:center;"><div style="width:150px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:9px;color:#64748b;">توقيع المؤجر</div><div style="font-size:9px;">برازرز إيجي – ${BRANCH_AR[branchCode]||branchCode}</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 13px;margin-top:14px;">
+    <div id="${qrId}" style="flex-shrink:0;width:80px;height:80px;"></div>
+    <div style="flex:1;">
+      <div style="font-size:11px;font-weight:800;color:#1e40af;">برازرز إيجي – عقد إيجار سيارة</div>
+      <div style="font-size:9px;color:#64748b;margin-top:2px;">المرجع: ${ref}</div>
+      <div style="font-size:9px;color:#64748b;">التاريخ: ${new Date().toLocaleString('ar-EG')}</div>
+      <canvas id="${bcId}" style="max-width:180px;height:45px;display:block;margin-top:4px;"></canvas>
+    </div>
+    <div style="border:3px solid #1e40af;border-radius:50%;width:68px;height:68px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(30,64,175,0.06);">
+      <div style="font-size:7px;font-weight:900;color:#1e40af;text-align:center;">برازرز إيجي</div>
+      <div style="font-size:7px;color:#64748b;text-align:center;">${BRANCH_AR[branchCode]||branchCode}</div>
+      <div style="font-size:6px;color:#94a3b8;text-align:center;">${new Date().toLocaleDateString('ar-EG')}</div>
+    </div>
+  </div>`;
+
+  document.getElementById('a4-output').innerHTML=html;
+  document.getElementById('a4-output').style.display='block';
+  document.getElementById('placeholder').style.display='none';
+  document.getElementById('output-actions').style.display='flex';
+
+  // QR + barcode
+  setTimeout(()=>{
+    const qrEl=document.getElementById(qrId);
+    if(qrEl){qrEl.innerHTML='';try{new QRCode(qrEl,{text:`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`,width:80,height:80,colorDark:'#1e40af',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){qrEl.textContent=ref;}}
+    const bcEl=document.getElementById(bcId);
+    if(bcEl){try{JsBarcode('#'+bcId,ref,{format:'CODE128',lineColor:'#1e40af',width:1.5,height:35,displayValue:true,fontSize:8,margin:2,background:'#f8fafc'});}catch(e){}}
+  },150);
+}
+
+async function saveContractToERP(){
+  if(!currentRef){alert('الرجاء إنشاء العقد أولاً.');return;}
+  if(!currentOrderId){alert('لا يوجد طلب مرتبط. تم حفظ العقد برقم: '+currentRef);return;}
+  try{
+    await db.collection('bookings').doc(currentOrderId).update({contract_ref_ar:currentRef,_last_printed:new Date().toISOString()});
+    alert('✅ تم الحفظ في النظام!\nرقم العقد: '+currentRef+'\nمرتبط بالطلب: '+currentOrderId);
+  }catch(e){alert('خطأ في الحفظ: '+e.message);}
+}
+
+function clearForm(){
+  ['ar-fname','ar-lname','ar-passport','ar-nationality','ar-phone','ar-email','ar-license','ar-address','ar-add-dr-name','ar-add-dr-lic','ar-pickup','ar-dropoff','ar-km-out','ar-ploc-addr','ar-dloc-addr'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['ar-daily','ar-ins-fee','ar-km-cost','ar-del-fee','ar-pick-fee','ar-req-dep','ar-paid-egp','ar-paid-usd','ar-paid-eur','ar-paid-card','ar-dep-egp','ar-dep-usd','ar-dep-eur','ar-dep-card'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+  document.getElementById('ar-car').value='';document.getElementById('car-badge').innerHTML='';currentRef=null;calc();
+}
+
+init();
+</script>
+</body>
+</html>

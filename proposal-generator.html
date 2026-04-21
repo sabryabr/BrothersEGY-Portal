@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Brothers EGY – Price Proposal Generator</title>
+<link rel="icon" href="https://brothersegy.com/wp-content/uploads/2026/02/12345.png"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
+<style>
+:root{--primary:#1e40af;--bg:#f1f5f9;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--success:#166534;--warning:#854d0e;--danger:#dc2626;--accent:#3b82f6;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.topbar{background:var(--primary);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.topbar-brand{display:flex;align-items:center;gap:10px;}
+.topbar-brand img{height:36px;}
+.topbar-title{font-size:16px;font-weight:800;}
+.topbar-actions{display:flex;gap:8px;}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;transition:.2s;}
+.btn-white{background:#fff;color:var(--primary);}
+.btn-green{background:#22c55e;color:#fff;}
+.btn-gray{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);}
+.container{max-width:1100px;margin:0 auto;padding:16px;}
+.layout{display:grid;grid-template-columns:390px 1fr;gap:16px;align-items:start;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:sticky;top:16px;max-height:calc(100vh - 90px);overflow-y:auto;}
+.panel::-webkit-scrollbar{width:4px;} .panel::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px;}
+.section-title{font-size:10px;font-weight:800;color:var(--primary);text-transform:uppercase;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #e0e7ff;}
+.section-title:first-child{margin-top:0;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}
+.form-grid.g3{grid-template-columns:1fr 1fr 1fr;}
+.field{display:flex;flex-direction:column;gap:3px;}
+label{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;}
+input,select{padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text);background:#fff;outline:none;transition:.2s;}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.estimate-box{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:12px;}
+.est-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;}
+.est-total{display:flex;justify-content:space-between;font-weight:800;font-size:14px;color:var(--primary);border-top:1px solid var(--border);margin-top:8px;padding-top:8px;}
+.btn-generate{width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;margin-top:10px;transition:.2s;}
+.btn-generate:hover{background:#1d4ed8;}
+.output-area{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.output-actions{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.a4-page{width:210mm;min-height:296mm;padding:12mm 14mm;margin:0 auto;background:#fff;font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;line-height:1.4;color:#000;box-shadow:0 4px 24px rgba(0,0,0,.12);}
+.placeholder{text-align:center;padding:80px 20px;color:var(--text2);}
+.alert{padding:10px 14px;border-radius:8px;font-size:11px;font-weight:700;margin-bottom:12px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;}
+.alert-edit{background:#fefce8;color:#854d0e;border-color:#fde047;}
+@media print{
+  body{background:#fff;}
+  .topbar,.panel,.output-actions,.alert{display:none!important;}
+  .layout{display:block;}
+  .output-area{border:none;padding:0;}
+  .a4-page{box-shadow:none;margin:0;width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-brand">
+    <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Logo"/>
+    <div>
+      <div class="topbar-title">BROTHERS EGY</div>
+      <div style="font-size:10px;opacity:.8;">Price Proposal Generator</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-green" onclick="saveProposalToERP()">💾 Save to ERP</button>
+    <button class="btn btn-white" onclick="window.print()">🖨️ Print / PDF</button>
+    <button class="btn btn-gray" onclick="window.close()">✕ Close</button>
+  </div>
+</div>
+
+<div class="container">
+  <div id="prefill-notice" class="alert" style="display:none;">
+    ✅ Form pre-filled from ERP data. Review and click Generate Proposal.
+  </div>
+  <div id="edit-notice" class="alert alert-edit" style="display:none;">
+    ✏️ Editing existing proposal. Reference number will be preserved on save.
+  </div>
+  <div class="layout">
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="font-size:14px;font-weight:800;">📋 Price Proposal</h3>
+        <span id="ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+      </div>
+
+      <div class="section-title">① Client Info</div>
+      <div class="form-grid">
+        <div class="field"><label>First Name *</label><input type="text" id="pr-fname" placeholder="First Name"/></div>
+        <div class="field"><label>Last Name *</label><input type="text" id="pr-lname" placeholder="Last Name"/></div>
+        <div class="field"><label>Phone</label><input type="text" id="pr-phone" placeholder="Phone"/></div>
+        <div class="field"><label>Email</label><input type="text" id="pr-email" placeholder="Email"/></div>
+      </div>
+
+      <div class="section-title">② Vehicle & Dates</div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>Select from Fleet</label>
+        <select id="pr-car" onchange="prSelectCar()">
+          <option value="">-- Select Car --</option>
+        </select>
+      </div>
+      <div id="car-badge" style="font-size:11px;color:var(--text2);margin-bottom:8px;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:7px;min-height:28px;"></div>
+      <div class="form-grid">
+        <div class="field"><label>Pickup Date/Time *</label><input type="datetime-local" id="pr-pickup" onchange="prCalc()"/></div>
+        <div class="field"><label>Dropoff Date/Time *</label><input type="datetime-local" id="pr-dropoff" onchange="prCalc()"/></div>
+        <div class="field"><label>Pickup Location</label><input type="text" id="pr-ploc" placeholder="e.g. Office, Airport"/></div>
+        <div class="field"><label>Dropoff Location</label><input type="text" id="pr-dloc" placeholder="e.g. Hotel, Office"/></div>
+      </div>
+
+      <div class="section-title">③ Pricing</div>
+      <div class="form-grid">
+        <div class="field"><label>Daily Rent (EGP) *</label><input type="number" id="pr-daily" placeholder="0" oninput="prCalc()"/></div>
+        <div class="field"><label>Insurance Fee (Daily)</label><input type="number" id="pr-ins-fee" value="0" oninput="prCalc()"/></div>
+        <div class="field"><label>Pickup/Logistics Fee</label><input type="number" id="pr-pfee" value="0" oninput="prCalc()"/></div>
+        <div class="field"><label>KM Package Cost</label><input type="number" id="pr-km-cost" value="0" oninput="prCalc()"/></div>
+        <div class="field"><label>Child Seat Days</label><input type="number" id="pr-seat-days" value="0" oninput="prCalc()"/></div>
+        <div class="field"><label>Extra Driver Days</label><input type="number" id="pr-driver-days" value="0" oninput="prCalc()"/></div>
+        <div class="field"><label>Security Deposit</label><input type="number" id="pr-deposit" value="0" oninput="prCalc()"/></div>
+      </div>
+
+      <div class="section-title">④ Options</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Insurance Plan</label>
+          <select id="pr-ins-plan">
+            <option value="basic">Basic – 100% Client Liability</option>
+            <option value="intermediate">Intermediate – 70%/30%</option>
+            <option value="full">Full Protection (Zero Liability)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>KM Package</label>
+          <select id="pr-km-pkg">
+            <option value="standard">Standard (120 KM/Day)</option>
+            <option value="500">500 KM Package</option>
+            <option value="750">750 KM Package</option>
+            <option value="1000">1000 KM Package</option>
+            <option value="unlimited">Unlimited KM</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Branch</label>
+          <select id="pr-branch">
+            <option value="HRG">Hurghada</option>
+            <option value="ALX">Alexandria</option>
+            <option value="CAI">Cairo</option>
+            <option value="RSH">Rashid</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Proposal Status</label>
+          <select id="pr-status">
+            <option value="Draft">Draft</option>
+            <option value="Accepted">Accepted</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Estimate -->
+      <div class="estimate-box">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:8px;text-transform:uppercase;">Total Estimate</div>
+        <div class="est-row"><span>Base Rental:</span><span id="est-base">£0.00</span></div>
+        <div class="est-row"><span>Days:</span><span id="est-days">0</span></div>
+        <div class="est-row"><span>Fees/Add-ons:</span><span id="est-fees">£0.00</span></div>
+        <div class="est-total"><span>TOTAL ESTIMATE</span><span id="est-total">£0.00</span></div>
+        ${''/* deposit shown separately */}
+      </div>
+
+      <button class="btn-generate" onclick="generateProposal()">📋 Generate Proposal</button>
+      <button style="width:100%;padding:9px;background:#f1f5f9;color:var(--text2);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;" onclick="clearForm()">✕ Clear Form</button>
+    </div>
+
+    <div class="output-area">
+      <div id="output-actions" class="output-actions" style="display:none;">
+        <button style="padding:9px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;" onclick="window.print()">🖨️ Print / Save PDF</button>
+        <button style="padding:9px 18px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;" onclick="saveProposalToERP()">💾 Save to ERP</button>
+        <button style="padding:9px 18px;background:#f1f5f9;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;" onclick="document.getElementById('output-actions').style.display='none';document.getElementById('a4-output').style.display='none';document.getElementById('placeholder').style.display='block';">✕ Close</button>
+      </div>
+      <div class="a4-page" id="a4-output" style="display:none;"></div>
+      <div class="placeholder" id="placeholder">
+        <div style="font-size:48px;margin-bottom:12px;">📋</div>
+        <p style="font-size:14px;font-weight:700;">Fill in the details and click<br>Generate Proposal</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+  authDomain:"brothers-egy-portal.firebaseapp.com",
+  projectId:"brothers-egy-portal",
+  storageBucket:"brothers-egy-portal.firebasestorage.app",
+  messagingSenderId:"673531280760",
+  appId:"1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+const BRANCH_MAP={HRG:'Hurghada',ALX:'Alexandria',CAI:'Cairo',RSH:'Rashid'};
+const KM_MAP={standard:'Standard (120 KM/Day)',500:'500 KM Package',750:'750 KM Package',1000:'1000 KM Package',unlimited:'Unlimited KM',unlimited_surcharge:'Unlimited KM Daily Surcharge'};
+const INS_MAP={basic:'Basic – 100% Client Liability',intermediate:'Intermediate – 70%/30%',full:'Full Protection – Zero Liability'};
+
+let fleetData=[],currentRef=null,editingProposalId=null;
+
+async function init(){
+  try{
+    const snap=await db.collection('fleet').where('status','!=','deleted').get();
+    fleetData=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const sel=document.getElementById('pr-car');
+    fleetData.forEach(c=>{const opt=document.createElement('option');opt.value=c.id;opt.textContent=c.car_label||c.model||c.id;sel.appendChild(opt);});
+  }catch(e){}
+
+  const P=new URLSearchParams(window.location.search);
+  editingProposalId=P.get('proposalId')||P.get('proposal_id')||null;
+
+  if(editingProposalId){
+    document.getElementById('edit-notice').style.display='block';
+    try{
+      const snap=await db.collection('proposals').doc(editingProposalId).get();
+      if(snap.exists){
+        const p={id:snap.id,...snap.data()};
+        fillFromProposal(p);
+        currentRef=p.proposal_ref||editingProposalId;
+        document.getElementById('ref-preview').textContent=currentRef;
+      }
+    }catch(e){console.warn(e);}
+  } else {
+    const hasPrefill=P.has('fname')||P.has('first_name')||P.has('carId');
+    if(hasPrefill){
+      document.getElementById('prefill-notice').style.display='block';
+      setV('pr-fname',P.get('fname')||P.get('first_name'));
+      setV('pr-lname',P.get('lname')||P.get('last_name'));
+      setV('pr-phone',P.get('phone'));
+      setV('pr-email',P.get('email'));
+      setV('pr-pickup',P.get('pickup'));
+      setV('pr-dropoff',P.get('dropoff'));
+      setV('pr-daily',P.get('daily_rate'));
+      setV('pr-ins-fee',P.get('ins_fee'));
+      setV('pr-deposit',P.get('deposit'));
+      setV('pr-ploc',P.get('ploc'));
+      setV('pr-dloc',P.get('dloc'));
+      if(P.get('branch')){const sel=document.getElementById('pr-branch');if(sel)sel.value=P.get('branch').toUpperCase().slice(0,3);}
+      if(P.get('carId')){const sel=document.getElementById('pr-car');if(sel){sel.value=P.get('carId');prSelectCar();}}
+      prCalc();
+    }
+  }
+}
+
+function fillFromProposal(p){
+  const parts=(p.client_name||'').split(' ');
+  setV('pr-fname',parts[0]||'');
+  setV('pr-lname',parts.slice(1).join(' ')||'');
+  setV('pr-phone',p.client_phone||'');
+  setV('pr-email',p.client_email||'');
+  setV('pr-pickup',p.pickup_date||'');
+  setV('pr-dropoff',p.dropoff_date||'');
+  setV('pr-ploc',p.pickup_location||'');
+  setV('pr-dloc',p.dropoff_location||'');
+  setV('pr-daily',String(p.daily_rate||0));
+  setV('pr-ins-fee',String(p.insurance_fee||0));
+  setV('pr-pfee',String(p.pickup_fee||0));
+  setV('pr-km-cost',String(p.km_cost||0));
+  setV('pr-seat-days',String(p.child_seat_days||0));
+  setV('pr-driver-days',String(p.extra_driver_days||0));
+  setV('pr-deposit',String(p.deposit_amount||0));
+  if(p.insurance_plan)document.getElementById('pr-ins-plan').value=p.insurance_plan;
+  if(p.km_package)document.getElementById('pr-km-pkg').value=p.km_package;
+  if(p.branch)document.getElementById('pr-branch').value=p.branch;
+  if(p.status)document.getElementById('pr-status').value=p.status;
+  if(p.car_id){
+    const sel=document.getElementById('pr-car');if(sel){sel.value=p.car_id;prSelectCar();}
+  }
+  prCalc();
+}
+
+function setV(id,val){const el=document.getElementById(id);if(el&&val!==undefined&&val!==null&&val!=='null')el.value=val;}
+
+function fmtMoney(n){const v=parseFloat(n)||0;return'£'+v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function prSelectCar(){
+  const id=document.getElementById('pr-car')?.value;
+  const car=fleetData.find(c=>String(c.id)===String(id));
+  const badge=document.getElementById('car-badge');
+  if(car&&badge)badge.innerHTML=`<strong>${car.car_label||car.model||id}</strong> &nbsp;|&nbsp; ${car.plate||''} &nbsp;|&nbsp; ${car.year||''}`;
+  else if(badge)badge.innerHTML='';
+}
+
+function prCalc(){
+  const pickup=document.getElementById('pr-pickup')?.value;
+  const dropoff=document.getElementById('pr-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
+  const insFee=parseFloat(document.getElementById('pr-ins-fee')?.value)||0;
+  const pfee=parseFloat(document.getElementById('pr-pfee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('pr-km-cost')?.value)||0;
+  const seatDays=parseFloat(document.getElementById('pr-seat-days')?.value)||0;
+  const driverDays=parseFloat(document.getElementById('pr-driver-days')?.value)||0;
+  let days=0;if(pickup&&dropoff)days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));
+  const base=daily*days;const insT=insFee*days;
+  const fees=pfee+kmCost+(seatDays*250)+(driverDays*500)+insT;
+  const total=base+fees;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  s('est-base',fmtMoney(base));s('est-days',String(days));s('est-fees',fmtMoney(fees));s('est-total',fmtMoney(total));
+}
+
+async function generateDocRef(type,branchCode){
+  const n=new Date();const ddmm=String(n.getDate()).padStart(2,'0')+String(n.getMonth()+1).padStart(2,'0');
+  const key=`${type}-${branchCode||'GEN'}-${ddmm}`;
+  try{const seq=await db.runTransaction(async tx=>{const ref=db.collection('_counters').doc(key);const doc=await tx.get(ref);const next=doc.exists?(doc.data().seq||0)+1:1;tx.set(ref,{seq:next,updated:Date.now()},{merge:true});return next;});
+  return`${type}-${branchCode||'GEN'}-${ddmm}-${String(seq).padStart(3,'0')}`;}
+  catch(e){return`${type}-${branchCode||'GEN'}-${ddmm}-${Date.now().toString().slice(-4)}`;}
+}
+
+async function generateProposal(){
+  const fname=document.getElementById('pr-fname')?.value.trim();
+  const lname=document.getElementById('pr-lname')?.value.trim();
+  const pickup=document.getElementById('pr-pickup')?.value;
+  const dropoff=document.getElementById('pr-dropoff')?.value;
+  const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
+  if(!fname){alert('Client first name is required.');return;}
+  if(!pickup||!dropoff){alert('Pickup and dropoff dates are required.');return;}
+  if(daily<=0){alert('Daily rent must be greater than 0.');return;}
+
+  const branchCode=document.getElementById('pr-branch')?.value||'HRG';
+
+  // Reuse ref if editing, else generate new
+  if(!currentRef||!editingProposalId){
+    currentRef=await generateDocRef('PR',branchCode);
+  }
+  document.getElementById('ref-preview').textContent=currentRef;
+
+  const carId=document.getElementById('pr-car')?.value;
+  const car=fleetData.find(c=>String(c.id)===String(carId));
+  const carLabel=car?(car.car_label||car.model||carId):(carId||'-');
+  const days=Math.max(0,Math.ceil((new Date(dropoff)-new Date(pickup))/86400000));
+  const insFee=parseFloat(document.getElementById('pr-ins-fee')?.value)||0;
+  const pfee=parseFloat(document.getElementById('pr-pfee')?.value)||0;
+  const kmCost=parseFloat(document.getElementById('pr-km-cost')?.value)||0;
+  const seatDays=parseFloat(document.getElementById('pr-seat-days')?.value)||0;
+  const driverDays=parseFloat(document.getElementById('pr-driver-days')?.value)||0;
+  const deposit=parseFloat(document.getElementById('pr-deposit')?.value)||0;
+  const insPlan=document.getElementById('pr-ins-plan')?.value||'basic';
+  const kmPkg=document.getElementById('pr-km-pkg')?.value||'standard';
+  const status=document.getElementById('pr-status')?.value||'Draft';
+  const phone=document.getElementById('pr-phone')?.value||'';
+  const email=document.getElementById('pr-email')?.value||'';
+  const ploc=document.getElementById('pr-ploc')?.value||'';
+  const dloc=document.getElementById('pr-dloc')?.value||'';
+
+  const base=daily*days;const insT=insFee*days;
+  const fees=pfee+kmCost+(seatDays*250)+(driverDays*500)+insT;
+  const total=base+fees;
+
+  const proposalData={
+    proposal_ref:currentRef,client_name:`${fname} ${lname}`,client_phone:phone,client_email:email,
+    car_id:String(carId||''),car_label:carLabel,branch:branchCode,
+    pickup_date:pickup,dropoff_date:dropoff,pickup_location:ploc,dropoff_location:dloc,
+    duration_days:days,daily_rate:daily,insurance_fee:insFee,pickup_fee:pfee,km_cost:kmCost,
+    child_seat_days:seatDays,extra_driver_days:driverDays,deposit_amount:deposit,
+    total_estimate:total,insurance_plan:insPlan,km_package:kmPkg,
+    status,issued_by:'standalone-generator',
+    _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try{
+    if(editingProposalId){
+      await db.collection('proposals').doc(editingProposalId).update(proposalData);
+    }else{
+      proposalData.timestamp=Date.now();
+      await db.collection('proposals').doc(currentRef).set(proposalData);
+    }
+  }catch(e){console.warn('Save warning:',e.message);}
+
+  const html=buildA4(currentRef,{client_name:`${fname} ${lname}`,client_phone:phone,client_email:email,car_label:carLabel,pickup_date:pickup,dropoff_date:dropoff,pickup_location:ploc,dropoff_location:dloc,duration_days:days,daily_rate:daily,insurance_fee:insFee,pickup_fee:pfee,km_cost:kmCost,child_seat_days:seatDays,extra_driver_days:driverDays,deposit_amount:deposit,total_estimate:total,insurance_plan:insPlan,km_package:kmPkg,branch:branchCode,issued_by:'Brothers EGY Staff'});
+  document.getElementById('a4-output').innerHTML=html;
+  document.getElementById('a4-output').style.display='block';
+  document.getElementById('placeholder').style.display='none';
+  document.getElementById('output-actions').style.display='flex';
+  attachQR(currentRef);
+}
+
+function buildA4(ref,d){
+  const rows=[
+    {desc:'Base Rental',detail:`${d.duration_days} days × ${fmtMoney(d.daily_rate)}/day`,amount:fmtMoney(d.daily_rate*d.duration_days)},
+    d.km_cost>0?{desc:'KM Package',detail:KM_MAP[d.km_package]||d.km_package,amount:fmtMoney(d.km_cost)}:null,
+    d.insurance_fee>0?{desc:'Insurance Fee',detail:`${d.duration_days} days × ${fmtMoney(d.insurance_fee)}`,amount:fmtMoney(d.insurance_fee*d.duration_days)}:null,
+    d.pickup_fee>0?{desc:'Logistics Fee',detail:'',amount:fmtMoney(d.pickup_fee)}:null,
+    d.child_seat_days>0?{desc:'Child Seat',detail:`${d.child_seat_days} days × £250`,amount:fmtMoney(d.child_seat_days*250)}:null,
+    d.extra_driver_days>0?{desc:'Additional Driver',detail:`${d.extra_driver_days} days × £500`,amount:fmtMoney(d.extra_driver_days*500)}:null,
+  ].filter(Boolean);
+
+  const qrId='qr-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+
+  return`
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:18px;">
+    <div>
+      <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:42px;margin-bottom:6px;" alt="Brothers EGY"/>
+      <div style="font-size:18px;font-weight:900;color:#1e40af;">BROTHERS EGY</div>
+      <div style="font-size:10px;color:#64748b;">Car Rental Services • www.brothersegy.com</div>
+      <div style="font-size:10px;color:#64748b;">${BRANCH_MAP[d.branch]||d.branch} Branch</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:17px;font-weight:900;color:#1e40af;text-transform:uppercase;">Price Proposal</div>
+      <div style="display:inline-block;padding:3px 11px;border-radius:99px;background:rgba(245,158,11,0.15);color:#d97706;font-size:10px;font-weight:800;margin-top:4px;border:1px solid #fde68a;">DRAFT — PENDING APPROVAL</div>
+      <div style="font-size:10px;color:#64748b;margin-top:5px;">Ref: <strong>${ref}</strong></div>
+      <div style="font-size:10px;color:#64748b;">Date: ${new Date().toLocaleDateString('en-GB')}</div>
+      <div style="font-size:10px;color:#64748b;">Issued by: ${d.issued_by}</div>
+      <div style="font-size:10px;color:#64748b;">Valid for 7 days</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+    <div>
+      <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Client Information</div>
+      <div style="font-size:13px;font-weight:800;">${d.client_name}</div>
+      ${d.client_phone?`<div style="font-size:10px;color:#475569;margin-top:4px;">📞 ${d.client_phone}</div>`:''}
+      ${d.client_email?`<div style="font-size:10px;color:#475569;">✉️ ${d.client_email}</div>`:''}
+      <div style="font-size:10px;color:#475569;margin-top:6px;font-weight:700;">Rental Period</div>
+      <div style="font-size:10px;color:#475569;">📅 From: ${new Date(d.pickup_date||'').toLocaleString('en-GB')}</div>
+      <div style="font-size:10px;color:#475569;">📅 To: ${new Date(d.dropoff_date||'').toLocaleString('en-GB')}</div>
+      <div style="font-size:10px;color:#1e40af;font-weight:700;">⏱ Duration: ${d.duration_days} day${d.duration_days!==1?'s':''}</div>
+      ${d.pickup_location?`<div style="font-size:10px;color:#475569;">📍 Pickup: ${d.pickup_location}</div>`:''}
+      ${d.dropoff_location?`<div style="font-size:10px;color:#475569;">📍 Dropoff: ${d.dropoff_location}</div>`:''}
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Vehicle Details</div>
+      <div style="font-size:13px;font-weight:800;">${d.car_label}</div>
+      <div style="font-size:10px;color:#475569;margin-top:4px;">Daily Rate: <strong>${fmtMoney(d.daily_rate)}</strong></div>
+      <div style="font-size:10px;color:#475569;">KM Package: ${KM_MAP[d.km_package]||d.km_package}</div>
+      <div style="font-size:10px;color:#475569;">Insurance: ${INS_MAP[d.insurance_plan]||d.insurance_plan}</div>
+      ${d.deposit_amount>0?`<div style="margin-top:7px;padding:6px 9px;background:#fefce8;border:1px solid #fde047;border-radius:6px;font-size:10px;color:#854d0e;"><strong>Security Deposit:</strong> ${fmtMoney(d.deposit_amount)}<br><span style="font-size:9px;">Refundable upon safe vehicle return</span></div>`:''}
+    </div>
+  </div>
+  <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Financial Breakdown</div>
+  <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:13px;">
+    <thead><tr style="background:#1e40af;color:#fff;">
+      <th style="padding:7px 10px;text-align:left;">Description</th>
+      <th style="padding:7px 10px;text-align:left;">Details</th>
+      <th style="padding:7px 10px;text-align:right;">Amount (EGP)</th>
+    </tr></thead>
+    <tbody>
+      ${rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f8fafc'};"><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${r.desc}</td><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:10px;">${r.detail}</td><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${r.amount}</td></tr>`).join('')}
+    </tbody>
+  </table>
+  <div style="background:#1e40af;color:#fff;padding:11px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <span style="font-weight:800;font-size:13px;">TOTAL ESTIMATE (EXCLUDING DEPOSIT)</span>
+    <span style="font-size:20px;font-weight:900;">${fmtMoney(d.total_estimate)}</span>
+  </div>
+  ${d.deposit_amount>0?`<div style="display:flex;justify-content:space-between;padding:9px 12px;background:#fefce8;border:1px solid #fde047;border-radius:6px;margin-bottom:14px;font-size:11px;color:#854d0e;"><span><strong>Security Deposit (Refundable):</strong></span><strong>${fmtMoney(d.deposit_amount)}</strong></div>`:''}
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:11px 13px;font-size:9px;color:#475569;line-height:1.7;margin-bottom:13px;">
+    <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:6px;">RENTAL TERMS & CONDITIONS SUMMARY</div>
+    <strong>1. ELIGIBILITY:</strong> Minimum age 21. Valid driving license and national ID or passport mandatory.<br>
+    <strong>2. RENTAL CYCLE:</strong> Charges based on 24-hour units. Exceeding by 5 or more hours = one full additional day.<br>
+    <strong>3. MILEAGE:</strong> 120 KM/day included in standard package. Excess KM charged at return rates.<br>
+    <strong>4. FUEL POLICY:</strong> Same-to-Same policy. Vehicle must be returned with same fuel level as at pickup.<br>
+    <strong>5. INSURANCE:</strong> Policy becomes void if no official Police Report is filed immediately following any accident.<br>
+    <strong>6. SECURITY DEPOSIT:</strong> Held at rental start and refunded in full upon safe vehicle return.<br>
+    <strong>7. LIABILITY:</strong> The Lessee bears full legal liability for the vehicle during the rental period.<br>
+    <a href="https://brothersegy.com/terms-conditions/" style="color:#1e40af;font-size:9px;">View Full Terms & Conditions Online →</a>
+  </div>
+  <div style="text-align:center;font-size:11px;color:#475569;margin-bottom:13px;">
+    This is a price proposal and is not a binding contract.<br>
+    We look forward to serving you. Best Regards, <strong>Brothers EGY Car Rental Team</strong>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 13px;margin-top:14px;">
+    <div id="${qrId}" style="flex-shrink:0;width:80px;height:80px;"></div>
+    <div style="flex:1;">
+      <div style="font-size:11px;font-weight:800;color:#1e40af;">BROTHERS EGY – PRICE PROPOSAL</div>
+      <div style="font-size:9px;color:#64748b;margin-top:2px;">Ref: ${ref}</div>
+      <div style="font-size:9px;color:#64748b;">Generated: ${new Date().toLocaleString('en-GB')}</div>
+      <div style="font-size:8px;color:#3b82f6;margin-top:2px;">Verify: sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}</div>
+      <canvas id="${bcId}" style="max-width:180px;height:45px;display:block;margin-top:4px;"></canvas>
+    </div>
+    <div style="border:3px solid #1e40af;border-radius:50%;width:68px;height:68px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(30,64,175,0.06);">
+      <div style="font-size:7px;font-weight:900;color:#1e40af;text-align:center;">BROTHERS EGY</div>
+      <div style="font-size:7px;color:#64748b;text-align:center;">${BRANCH_MAP[d.branch]||d.branch}</div>
+      <div style="font-size:6px;color:#94a3b8;text-align:center;">${new Date().toLocaleDateString('en-GB')}</div>
+    </div>
+  </div>`;
+}
+
+function attachQR(ref){
+  const qrId='qr-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  setTimeout(()=>{
+    const qrEl=document.getElementById(qrId);
+    if(qrEl){qrEl.innerHTML='';try{new QRCode(qrEl,{text:`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`,width:80,height:80,colorDark:'#1e40af',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){qrEl.textContent=ref;}}
+    const bcEl=document.getElementById(bcId);
+    if(bcEl){try{JsBarcode('#'+bcId,ref,{format:'CODE128',lineColor:'#1e40af',width:1.5,height:35,displayValue:true,fontSize:8,margin:2,background:'#f8fafc'});}catch(e){}}
+  },150);
+}
+
+async function saveProposalToERP(){
+  if(!currentRef){alert('Please generate a proposal first.');return;}
+  alert('✅ Proposal saved to ERP!\nRef: '+currentRef+(editingProposalId?'\n(Updated existing: '+editingProposalId+')':'\n(New proposal created)'));
+}
+
+function clearForm(){
+  ['pr-fname','pr-lname','pr-phone','pr-email','pr-pickup','pr-dropoff','pr-ploc','pr-dloc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pr-daily','pr-ins-fee','pr-pfee','pr-km-cost','pr-seat-days','pr-driver-days','pr-deposit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+  document.getElementById('pr-car').value='';document.getElementById('car-badge').innerHTML='';
+  currentRef=null;editingProposalId=null;
+  document.getElementById('ref-preview').textContent='';
+  prCalc();
+}
+
+init();
+</script>
+</body>
+</html>

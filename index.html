@@ -3053,6 +3053,8 @@ async function openOrderDetail(orderId){
       <button class="btn btn-primary" onclick="closeModal();quickAddPayment('` + o.id + `')">💰 Add Payment</button>
       ` + (!isClosed ? `<button class="btn btn-success" onclick="closeModal();requestCloseOrder('` + o.id + `')">✅ Close</button>` : '') + `
       <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('` + o.id + `')">📄 Contract</button>
+      <button class="btn btn-ghost" onclick="openENContractForm('` + o.id + `')">📋 EN Contract</button>
+      <button class="btn btn-ghost" onclick="openARContractForm('` + o.id + `')">📋 AR Contract</button>
       <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('` + o.id + `')">🧾 Receipt</button>
       <button class="btn btn-ghost" onclick="viewOrderPayments('` + o.id + `','` + (o['No.']||o.id) + `')">💳 Payments</button>
       <button class="btn btn-ghost" onclick="viewOrderDocuments('` + o.id + `','` + (o['No.']||o.id) + `')">📁 Docs</button>
@@ -13392,6 +13394,12 @@ function renderProposalsList(){
           <button class="btn btn-ghost btn-xs"
             onclick="previewProposal('${p.id}')"
             title="Preview">👁</button>
+          <button class="btn btn-ghost btn-xs"
+            onclick="editProposal('${p.id}')"
+            title="Edit">✏️</button>
+          <button class="btn btn-ghost btn-xs"
+            onclick="regenerateProposalDoc('${p.id}')"
+            title="Print">🖨️</button>
           ${p.status==='Draft'||p.status==='Accepted'?`
           <button class="btn btn-success btn-xs"
             onclick="convertProposalToContract('${p.id}')"
@@ -14716,6 +14724,7 @@ async function viewOrderPayments(orderId, orderNo){
           <td style="white-space:nowrap;">
             <button class="btn btn-ghost btn-xs" onclick="editReceipt('${r.id}')">✏️</button>
             <button class="btn btn-ghost btn-xs" onclick="closeModal();showPage('receipts');setTimeout(()=>reprintReceipt('${r.id}'),300);">🖨️</button>
+            <button class="btn btn-ghost btn-xs" onclick="editAndReprintReceipt('${r.id}')" title="Edit &amp; Reprint in Generator">📄</button>
           </td>
         </tr>`).join('')}
       </tbody></table>`:
@@ -15162,6 +15171,159 @@ async function viewOrderDocuments(orderId,orderNo){
       </div>`;
     openModal(`📁 Documents — Order #${orderNo}`,html,true);
   }catch(e){toast('Failed to load documents: '+e.message,'error');}
+}
+
+/* ============================================================
+   GENERATE REFERENCE NUMBER (Task 5)
+   ============================================================ */
+async function generateRef(type, branch){
+  const branchCode=(branch||G.user?.branch||'GEN').toUpperCase().slice(0,3);
+  const now=new Date();
+  const mm=String(now.getMonth()+1).padStart(2,'0');
+  const dd=String(now.getDate()).padStart(2,'0');
+  const yy=String(now.getFullYear()).slice(-2);
+  const prefix=`${type}-${branchCode}-${yy}${mm}${dd}`;
+  try{
+    const snap=await db.collection('doc_refs').where('prefix','==',prefix).get();
+    const seq=String(snap.size+1).padStart(3,'0');
+    const ref=`${prefix}-${seq}`;
+    await db.collection('doc_refs').add({prefix,ref,type,branch:branchCode,created:Date.now()});
+    return ref;
+  }catch(e){
+    // Fallback: timestamp-based ref
+    return `${prefix}-${Date.now().toString().slice(-4)}`;
+  }
+}
+
+/* ============================================================
+   OPEN DOCUMENT GENERATOR FORMS FROM ERP (Task 10)
+   ============================================================ */
+function _buildContractParams(orderId,order){
+  const params=new URLSearchParams();
+  if(orderId)params.set('orderId',orderId);
+  if(!order)return params;
+  // Client name split
+  const nameParts=(order['اسم العميل']||'').split(' ');
+  if(nameParts[0])params.set('fname',nameParts[0]);
+  if(nameParts.slice(1).join(' '))params.set('lname',nameParts.slice(1).join(' '));
+  // Lookup full customer record for passport/phone/nationality
+  const clientCode=order['كود العميل']||order.col_B||'';
+  const customer=(G.customers||[]).find(c=>String(c['No.']||c.col_A)===String(clientCode))||{};
+  const passport=customer['رقم جواز السفر']||customer['passport']||'';
+  const phone=customer['رقم التليفون']||order['phone']||'';
+  const nationality=customer['رمز الدولة']||customer.col_H||'';
+  const email=customer['البريد الإلكتروني']||customer['عنوان البريد الإلكتروني']||'';
+  const license=customer['رقم رخصة القيادة']||'';
+  if(passport)params.set('passport',passport);
+  if(phone)params.set('phone',phone);
+  if(nationality)params.set('nationality',nationality);
+  if(email)params.set('email',email);
+  if(license)params.set('license',license);
+  // Order dates & car
+  if(order['بداية التعاقد'])params.set('pickup',order['بداية التعاقد']);
+  if(order['نهاية التعاقد'])params.set('dropoff',order['نهاية التعاقد']);
+  if(order['كود السيارة'])params.set('carId',String(order['كود السيارة']));
+  if(order['اسم السيارة'])params.set('carLabel',order['اسم السيارة']);
+  if(order['فرع الإصدار'])params.set('branch',order['فرع الإصدار']);
+  if(order['No.'])params.set('orderNo',String(order['No.']));
+  // Financial
+  const daily=order['سعر السيارة اليومي بالجنيه المصري']||order['daily_rate']||'';
+  const paidEGP=order['المدفوع EGP']||'';
+  const paidUSD=order['المدفوع USD']||'';
+  const deposit=order['الوديعة المعلقة لدينا']||'';
+  if(daily)params.set('daily_rate',String(daily).replace(/[£,]/g,''));
+  if(paidEGP)params.set('paid_egp',String(paidEGP).replace(/[£,]/g,''));
+  if(paidUSD)params.set('paid_usd',String(paidUSD).replace(/[£,]/g,''));
+  if(deposit)params.set('deposit',String(deposit).replace(/[£,]/g,''));
+  return params;
+}
+
+function openENContractForm(orderId){
+  const order=allOrders.find(o=>o.id===orderId)||G.bookings.find(o=>o.id===orderId);
+  const params=_buildContractParams(orderId,order);
+  window.open(`contract-en.html?${params.toString()}`,'_blank');
+}
+
+function openARContractForm(orderId){
+  const order=allOrders.find(o=>o.id===orderId)||G.bookings.find(o=>o.id===orderId);
+  const params=_buildContractParams(orderId,order);
+  window.open(`contract-ar.html?${params.toString()}`,'_blank');
+}
+
+function openReceiptForm(orderId,receiptId){
+  const order=allOrders.find(o=>o.id===orderId)||G.bookings.find(o=>o.id===orderId);
+  const params=new URLSearchParams();
+  if(orderId)params.set('orderId',orderId);
+  if(receiptId)params.set('receiptId',receiptId);
+  if(order){
+    if(order['اسم العميل'])params.set('clientName',order['اسم العميل']);
+    if(order['اسم السيارة'])params.set('carLabel',order['اسم السيارة']);
+    if(order['فرع الإصدار'])params.set('branch',order['فرع الإصدار']);
+    if(order['No.'])params.set('orderNo',String(order['No.']));
+    const daily=order['سعر السيارة اليومي بالجنيه المصري']||'';
+    if(daily)params.set('amount',String(daily).replace(/[£,]/g,''));
+    if(order['بداية التعاقد'])params.set('start',order['بداية التعاقد']);
+    if(order['نهاية التعاقد'])params.set('end',order['نهاية التعاقد']);
+  }
+  window.open(`receipt-generator.html?${params.toString()}`,'_blank');
+}
+
+/* ============================================================
+   REPRINT / EDIT RECEIPT FROM ORDER (Task 4)
+   ============================================================ */
+async function editAndReprintReceipt(receiptId){
+  let r=(window._receiptsCache||[]).find(x=>x.id===receiptId);
+  if(!r){
+    try{const d=await db.collection('receipts').doc(receiptId).get();r={id:d.id,...d.data()};}
+    catch(e){toast('Receipt not found','error');return;}
+  }
+  const params=new URLSearchParams();
+  params.set('receiptId',receiptId);
+  if(r.contract_no)params.set('orderNo',r.contract_no);
+  if(r.client_name)params.set('clientName',r.client_name);
+  if(r.car_label)params.set('carLabel',r.car_label);
+  if(r.branch_code)params.set('branch',r.branch_code);
+  if(r.amount_egp)params.set('amount',r.amount_egp);
+  if(r.receipt_date)params.set('date',r.receipt_date);
+  if(r.receipt_ref)params.set('ref',r.receipt_ref);
+  window.open(`receipt-generator.html?${params.toString()}`,'_blank');
+}
+
+/* ============================================================
+   REGENERATE PROPOSAL DOCUMENT (Task 1)
+   ============================================================ */
+async function regenerateProposalDoc(proposalId){
+  const p=G.proposals.find(x=>x.id===proposalId);
+  if(!p){toast('Proposal not found in cache','error');return;}
+  window._lastGeneratedProposal={id:proposalId,...p};
+  buildProposalA4(proposalId,p);
+  setTimeout(()=>{
+    const out=document.getElementById('pr-output');
+    if(out){out.scrollIntoView({behavior:'smooth',block:'start'});window.print();}
+  },300);
+}
+
+/* ── openProposalEditor alias (Task 1) ── */
+function openProposalEditor(proposalId){editProposal(proposalId);}
+
+/* ── openProposalGeneratorPage: open proposal-generator.html with prefill ── */
+function openProposalGeneratorPage(proposalId){
+  const p=G.proposals.find(x=>x.id===proposalId);
+  const params=new URLSearchParams();
+  if(proposalId)params.set('proposalId',proposalId);
+  if(p){
+    const nameParts=(p.client_name||'').split(' ');
+    if(nameParts[0])params.set('fname',nameParts[0]);
+    if(nameParts.slice(1).join(' '))params.set('lname',nameParts.slice(1).join(' '));
+    if(p.client_phone)params.set('phone',p.client_phone);
+    if(p.client_email)params.set('email',p.client_email);
+    if(p.pickup_date)params.set('pickup',p.pickup_date);
+    if(p.dropoff_date)params.set('dropoff',p.dropoff_date);
+    if(p.daily_rate)params.set('daily_rate',String(p.daily_rate));
+    if(p.car_id)params.set('carId',String(p.car_id));
+    if(p.branch)params.set('branch',p.branch);
+  }
+  window.open(`proposal-generator.html?${params.toString()}`,'_blank');
 }
 
 </script>

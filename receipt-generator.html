@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Brothers EGY – Receipt Generator</title>
+<link rel="icon" href="https://brothersegy.com/wp-content/uploads/2026/02/12345.png"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
+<style>
+:root{--primary:#1e40af;--bg:#f1f5f9;--surface:#fff;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--success:#166534;--warning:#854d0e;--danger:#dc2626;--accent:#3b82f6;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.topbar{background:var(--primary);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.topbar-brand{display:flex;align-items:center;gap:10px;}
+.topbar-brand img{height:36px;}
+.topbar-title{font-size:16px;font-weight:800;}
+.topbar-actions{display:flex;gap:8px;}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;transition:.2s;}
+.btn-white{background:#fff;color:var(--primary);}
+.btn-green{background:#22c55e;color:#fff;}
+.btn-gray{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);}
+.container{max-width:1100px;margin:0 auto;padding:16px;}
+.layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:sticky;top:16px;max-height:calc(100vh - 90px);overflow-y:auto;}
+.panel::-webkit-scrollbar{width:4px;} .panel::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px;}
+.section-title{font-size:10px;font-weight:800;color:var(--primary);text-transform:uppercase;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #e0e7ff;}
+.section-title:first-child{margin-top:0;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}
+.form-grid.g3{grid-template-columns:1fr 1fr 1fr;}
+.field{display:flex;flex-direction:column;gap:3px;}
+label{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;}
+input,select{padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text);background:#fff;outline:none;transition:.2s;}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+input[readonly]{background:#f8fafc;color:var(--text2);}
+.summary-box{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:12px;}
+.sum-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;}
+.btn-generate{width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;margin-top:10px;transition:.2s;}
+.btn-generate:hover{background:#1d4ed8;}
+.output-area{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.output-actions{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.a4-page{width:210mm;min-height:296mm;padding:10mm 14mm;margin:0 auto;background:#fff;font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;line-height:1.35;color:#000;box-shadow:0 4px 24px rgba(0,0,0,.12);}
+.placeholder{text-align:center;padding:80px 20px;color:var(--text2);}
+.alert{padding:10px 14px;border-radius:8px;font-size:11px;font-weight:700;margin-bottom:12px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;}
+@media print{
+  body{background:#fff;}
+  .topbar,.panel,.output-actions,.alert{display:none!important;}
+  .layout{display:block;}
+  .output-area{border:none;padding:0;}
+  .a4-page{box-shadow:none;margin:0;width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-brand">
+    <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" alt="Logo"/>
+    <div>
+      <div class="topbar-title">BROTHERS EGY</div>
+      <div style="font-size:10px;opacity:.8;">Receipt Generator</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-green" onclick="saveReceiptToERP()">💾 Save to ERP</button>
+    <button class="btn btn-white" onclick="window.print()">🖨️ Print / PDF</button>
+    <button class="btn btn-gray" onclick="window.close()">✕ Close</button>
+  </div>
+</div>
+
+<div class="container">
+  <div id="prefill-notice" class="alert" style="display:none;">
+    ✅ Form pre-filled from ERP data. Review amounts and click Generate Receipt.
+  </div>
+  <div id="edit-notice" class="alert" style="display:none;background:#fefce8;color:#854d0e;border-color:#fde047;">
+    ✏️ Editing existing receipt. Reference number will be preserved.
+  </div>
+  <div class="layout">
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="font-size:14px;font-weight:800;">🧾 Receipt</h3>
+        <span id="ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <div style="flex:1;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:7px;text-align:center;">
+          <div style="font-size:9px;color:var(--text2);">USD</div>
+          <div id="usd-rate" style="font-weight:800;color:#166534;font-size:12px;">—</div>
+        </div>
+        <div style="flex:1;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:7px;text-align:center;">
+          <div style="font-size:9px;color:var(--text2);">EUR</div>
+          <div id="eur-rate" style="font-weight:800;color:#166534;font-size:12px;">—</div>
+        </div>
+      </div>
+
+      <div class="section-title">① Document Info</div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>Contract / Order No.</label>
+        <input type="text" id="rc-contract-no" placeholder="e.g. 578 or CN-HRG-0402-001"/>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Receipt Date</label><input type="date" id="rc-date"/></div>
+        <div class="field"><label>Receipt Title</label><input type="text" id="rc-title" placeholder="Rental Payment"/></div>
+        <div class="field" style="grid-column:1/-1;">
+          <label>Receipt Type</label>
+          <select id="rc-type">
+            <option value="Income">Rental Payment</option>
+            <option value="Deposit">Deposit Collected</option>
+            <option value="Deposit Return">Deposit Returned</option>
+            <option value="Overdue Settlement">Overdue Settlement</option>
+            <option value="Accident Settlement">Accident Settlement</option>
+            <option value="Partial Payment">Partial Payment</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-title">② Client & Vehicle</div>
+      <div class="form-grid">
+        <div class="field"><label>Client Name</label><input type="text" id="rc-client-name" placeholder="Client name"/></div>
+        <div class="field"><label>Passport / ID</label><input type="text" id="rc-client-id" placeholder="ID Number"/></div>
+        <div class="field"><label>Phone</label><input type="text" id="rc-phone" placeholder="Phone"/></div>
+        <div class="field"><label>Vehicle</label><input type="text" id="rc-vehicle" placeholder="Vehicle"/></div>
+        <div class="field"><label>Rental Start</label><input type="text" id="rc-start" placeholder="Start date"/></div>
+        <div class="field"><label>Rental End</label><input type="text" id="rc-end" placeholder="End date"/></div>
+        <div class="field"><label>Branch</label>
+          <select id="rc-branch">
+            <option value="HRG">Hurghada</option>
+            <option value="ALX">Alexandria</option>
+            <option value="CAI">Cairo</option>
+            <option value="RSH">Rashid</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-title">③ Payment Received</div>
+      <div class="form-grid g3" style="margin-bottom:8px;">
+        <div class="field"><label>EGP</label><input type="number" id="rc-egp" value="0" oninput="rcCalc()"/></div>
+        <div class="field"><label>USD</label><input type="number" id="rc-usd" value="0" oninput="rcCalc()"/></div>
+        <div class="field"><label>EUR</label><input type="number" id="rc-eur" value="0" oninput="rcCalc()"/></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div class="field"><label>Card (EGP)</label><input type="number" id="rc-card" value="0" oninput="rcCalc()"/></div>
+      </div>
+
+      <div class="summary-box">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:8px;text-transform:uppercase;">Payment Summary</div>
+        <div class="sum-row"><span>This Payment (EGP equiv.):</span><span id="sum-payment" style="color:#166534;font-weight:700;">£0.00</span></div>
+        <div class="sum-row"><span>Total Due:</span><span id="sum-due">£0.00</span></div>
+      </div>
+
+      <div class="field" style="margin-bottom:8px;">
+        <label>Additional Notes</label>
+        <input type="text" id="rc-note" placeholder="Optional note"/>
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;cursor:pointer;margin-bottom:12px;">
+        <input type="checkbox" id="rc-autosign" style="width:14px;height:14px;" checked/>
+        Include auto-signature
+      </label>
+
+      <button class="btn-generate" onclick="generateReceipt()">🧾 Generate Receipt</button>
+      <button style="width:100%;padding:9px;background:#f1f5f9;color:var(--text2);border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;" onclick="clearForm()">✕ Clear Form</button>
+    </div>
+
+    <div class="output-area">
+      <div id="output-actions" class="output-actions" style="display:none;">
+        <button style="padding:9px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;" onclick="window.print()">🖨️ Print / Save PDF</button>
+        <button style="padding:9px 18px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;" onclick="saveReceiptToERP()">💾 Save to ERP</button>
+        <button style="padding:9px 18px;background:#f1f5f9;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;" onclick="document.getElementById('output-actions').style.display='none';document.getElementById('a4-output').style.display='none';document.getElementById('placeholder').style.display='block';">✕ Close</button>
+      </div>
+      <div class="a4-page" id="a4-output" style="display:none;"></div>
+      <div class="placeholder" id="placeholder">
+        <div style="font-size:48px;margin-bottom:12px;">🧾</div>
+        <p style="font-size:14px;font-weight:700;">Fill in details and click<br>Generate Receipt</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyDNY5lqsr_EoWQxhK7WN4WCJP2_V7IcwFc",
+  authDomain:"brothers-egy-portal.firebaseapp.com",
+  projectId:"brothers-egy-portal",
+  storageBucket:"brothers-egy-portal.firebasestorage.app",
+  messagingSenderId:"673531280760",
+  appId:"1:673531280760:web:f0d5484c0e8eabc1dd9c8d"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+const BRANCH_MAP={HRG:'Hurghada',ALX:'Alexandria',CAI:'Cairo',RSH:'Rashid'};
+let ratesUSD=55,ratesEUR=60,currentRef=null,currentOrderId=null,editingReceiptId=null;
+
+async function init(){
+  try{const snap=await db.collection('settings').doc('exchange_rates').get();if(snap.exists){const d=snap.data();ratesUSD=d.USD||55;ratesEUR=d.EUR||60;}}catch(e){}
+  document.getElementById('usd-rate').textContent=ratesUSD.toFixed(2);
+  document.getElementById('eur-rate').textContent=ratesEUR.toFixed(2);
+
+  // Default today
+  document.getElementById('rc-date').value=new Date().toISOString().slice(0,10);
+
+  const P=new URLSearchParams(window.location.search);
+  currentOrderId=P.get('orderId')||P.get('order_id')||null;
+  editingReceiptId=P.get('receiptId')||P.get('receipt_id')||null;
+
+  if(editingReceiptId){
+    document.getElementById('edit-notice').style.display='block';
+    // Load existing receipt
+    try{
+      const snap=await db.collection('receipts').doc(editingReceiptId).get();
+      if(snap.exists){
+        const r={id:snap.id,...snap.data()};
+        setV('rc-contract-no',r.contract_no||'');
+        setV('rc-client-name',r.client_name||'');
+        setV('rc-client-id',r.client_id||'');
+        setV('rc-phone',r.phone||'');
+        setV('rc-vehicle',r.car_label||'');
+        setV('rc-start',r.rental_start||'');
+        setV('rc-end',r.rental_end||'');
+        setV('rc-date',r.receipt_date||'');
+        setV('rc-title',r.receipt_title||'Payment Receipt');
+        setV('rc-note',r.note||'');
+        setV('rc-egp',String(r.amount_egp||0));
+        setV('rc-usd',String(r.amount_usd||0));
+        setV('rc-eur',String(r.amount_eur||0));
+        setV('rc-card',String(r.amount_card||0));
+        if(r.type){document.getElementById('rc-type').value=r.type;}
+        if(r.branch_code||r.branch){const sel=document.getElementById('rc-branch');if(sel)sel.value=r.branch_code||r.branch;}
+        currentRef=r.receipt_ref||editingReceiptId;
+        document.getElementById('ref-preview').textContent=currentRef;
+        rcCalc();
+      }
+    }catch(e){console.warn(e);}
+  } else {
+    const hasPrefill=P.has('orderNo')||P.has('clientName')||P.has('carLabel');
+    if(hasPrefill){
+      document.getElementById('prefill-notice').style.display='block';
+      if(P.get('orderNo'))setV('rc-contract-no',P.get('orderNo'));
+      if(P.get('clientName'))setV('rc-client-name',P.get('clientName'));
+      if(P.get('carLabel'))setV('rc-vehicle',P.get('carLabel'));
+      if(P.get('amount'))setV('rc-egp',P.get('amount'));
+      if(P.get('date'))setV('rc-date',P.get('date'));
+      if(P.get('ref')){currentRef=P.get('ref');document.getElementById('ref-preview').textContent=currentRef;}
+      if(P.get('branch')){const sel=document.getElementById('rc-branch');if(sel)sel.value=P.get('branch').toUpperCase().slice(0,3);}
+      rcCalc();
+    }
+  }
+}
+
+function setV(id,val){const el=document.getElementById(id);if(el&&val!==undefined&&val!==null)el.value=val;}
+
+function fmtMoney(n){const v=parseFloat(n)||0;return'£'+v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function rcCalc(){
+  const egp=parseFloat(document.getElementById('rc-egp')?.value)||0;
+  const usd=parseFloat(document.getElementById('rc-usd')?.value)||0;
+  const eur=parseFloat(document.getElementById('rc-eur')?.value)||0;
+  const card=parseFloat(document.getElementById('rc-card')?.value)||0;
+  const total=egp+(usd*ratesUSD)+(eur*ratesEUR)+card;
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  s('sum-payment',fmtMoney(total));
+}
+
+async function generateDocRef(type,branchCode){
+  const n=new Date();const ddmm=String(n.getDate()).padStart(2,'0')+String(n.getMonth()+1).padStart(2,'0');
+  const key=`${type}-${branchCode||'GEN'}-${ddmm}`;
+  try{const seq=await db.runTransaction(async tx=>{const ref=db.collection('_counters').doc(key);const doc=await tx.get(ref);const next=doc.exists?(doc.data().seq||0)+1:1;tx.set(ref,{seq:next,updated:Date.now()},{merge:true});return next;});
+  return`${type}-${branchCode||'GEN'}-${ddmm}-${String(seq).padStart(3,'0')}`;}
+  catch(e){return`${type}-${branchCode||'GEN'}-${ddmm}-${Date.now().toString().slice(-4)}`;}
+}
+
+async function generateReceipt(){
+  const contractNo=document.getElementById('rc-contract-no')?.value.trim();
+  const clientName=document.getElementById('rc-client-name')?.value.trim();
+  const rcDate=document.getElementById('rc-date')?.value;
+  const rcTitle=document.getElementById('rc-title')?.value.trim()||'Payment Receipt';
+  const rcType=document.getElementById('rc-type')?.value||'Income';
+  const egp=parseFloat(document.getElementById('rc-egp')?.value)||0;
+  const usd=parseFloat(document.getElementById('rc-usd')?.value)||0;
+  const eur=parseFloat(document.getElementById('rc-eur')?.value)||0;
+  const card=parseFloat(document.getElementById('rc-card')?.value)||0;
+  const note=document.getElementById('rc-note')?.value||'';
+  const autoSign=document.getElementById('rc-autosign')?.checked;
+  const totalThisPayment=egp+(usd*ratesUSD)+(eur*ratesEUR)+card;
+
+  if(!contractNo){alert('Contract number is required.');return;}
+  if(!clientName){alert('Client name is required.');return;}
+  if(totalThisPayment<=0){alert('Payment amount must be greater than 0.');return;}
+
+  const branchCode=document.getElementById('rc-branch')?.value||'HRG';
+
+  // Reuse ref if editing, otherwise generate new
+  if(!currentRef||!editingReceiptId){
+    currentRef=await generateDocRef('RC',branchCode);
+  }
+  document.getElementById('ref-preview').textContent=currentRef;
+
+  const clientId=document.getElementById('rc-client-id')?.value||'';
+  const phone=document.getElementById('rc-phone')?.value||'';
+  const vehicle=document.getElementById('rc-vehicle')?.value||'';
+  const rentalStart=document.getElementById('rc-start')?.value||'';
+  const rentalEnd=document.getElementById('rc-end')?.value||'';
+
+  // Save to Firestore
+  try{
+    const receiptData={
+      receipt_ref:currentRef,contract_no:contractNo,client_name:clientName,
+      client_id:clientId,car_label:vehicle,branch:branchCode,branch_code:branchCode,
+      receipt_title:rcTitle,receipt_date:rcDate,type:rcType,
+      amount_egp:egp,amount_usd:usd,amount_eur:eur,amount_card:card,
+      total_egp_equiv:totalThisPayment,phone,rental_start:rentalStart,rental_end:rentalEnd,
+      note,_sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if(editingReceiptId){
+      await db.collection('receipts').doc(editingReceiptId).update(receiptData);
+    }else{
+      receiptData.timestamp=Date.now();
+      await db.collection('receipts').doc(currentRef).set(receiptData);
+    }
+    if(currentOrderId){
+      await db.collection('bookings').doc(currentOrderId).update({last_receipt_ref:currentRef,_last_printed:new Date().toISOString()}).catch(()=>{});
+    }
+  }catch(e){console.warn('Save warning:',e.message);}
+
+  const payRows=[
+    egp>0?['Cash – EGP',fmtMoney(egp)]:null,
+    usd>0?['Cash – USD',`$${usd} × ${ratesUSD.toFixed(2)} = ${fmtMoney(usd*ratesUSD)}`]:null,
+    eur>0?['Cash – EUR',`€${eur} × ${ratesEUR.toFixed(2)} = ${fmtMoney(eur*ratesEUR)}`]:null,
+    card>0?['Card Payment – EGP',fmtMoney(card)]:null
+  ].filter(Boolean);
+
+  const html=buildReceiptA4({ref:currentRef,rcTitle,contractNo,rcDate,rcType,branchCode,clientName,clientId,phone,vehicle,rentalStart,rentalEnd,payRows,totalThisPayment,note,autoSign});
+  document.getElementById('a4-output').innerHTML=html;
+  document.getElementById('a4-output').style.display='block';
+  document.getElementById('placeholder').style.display='none';
+  document.getElementById('output-actions').style.display='flex';
+  attachQR(currentRef);
+}
+
+const typeColors={Income:'#166534',Deposit:'#854d0e','Deposit Return':'#166534','Overdue Settlement':'#7f1d1d','Accident Settlement':'#7c2d12','Partial Payment':'#1e3a5f'};
+const typeBgMap={Income:'#f0fdf4',Deposit:'#fefce8','Deposit Return':'#f0fdf4','Overdue Settlement':'#fff1f2','Accident Settlement':'#fff7ed','Partial Payment':'#eff6ff'};
+
+function buildReceiptA4(d){
+  const hdrColor=typeColors[d.rcType]||'#1e40af';
+  const bg=typeBgMap[d.rcType]||'#f0fdf4';
+  const qrId='qr-'+d.ref.replace(/[^a-zA-Z0-9]/g,'');
+  const bcId='bc-'+d.ref.replace(/[^a-zA-Z0-9]/g,'');
+
+  const receiptHalf=(copy)=>`
+  <div style="border:2px solid #1e40af;padding:13px;margin-bottom:4px;position:relative;background:#fff;">
+    <div style="position:absolute;top:8px;right:10px;font-size:8px;background:#1e40af;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;">${copy}</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e40af;padding-bottom:8px;margin-bottom:10px;">
+      <div>
+        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:36px;" alt="Logo"/>
+        <div style="font-size:10px;color:#64748b;margin-top:2px;">Car Rental Services • www.brothersegy.com</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:14pt;font-weight:bold;color:#1e40af;">PAYMENT RECEIPT</div>
+        <div style="background:${bg};color:${hdrColor};padding:2px 9px;border-radius:4px;font-size:9px;font-weight:800;display:inline-block;margin-top:3px;">${d.rcType}</div>
+        <div style="font-size:9px;color:#64748b;margin-top:3px;">Ref: <strong>${d.ref}</strong></div>
+        <div style="font-size:9px;color:#64748b;">Date: ${d.rcDate||new Date().toLocaleDateString('en-GB')}</div>
+        <div style="font-size:9px;color:#64748b;">Branch: ${BRANCH_MAP[d.branchCode]||d.branchCode}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:9.5pt;">
+      <div style="flex:1;">
+        <div style="font-weight:800;color:#1e40af;font-size:9px;text-transform:uppercase;margin-bottom:4px;">Client Information</div>
+        <div style="font-weight:700;">${d.clientName}</div>
+        ${d.clientId?`<div style="color:#64748b;">ID: ${d.clientId}</div>`:''}
+        ${d.phone?`<div style="color:#64748b;">📞 ${d.phone}</div>`:''}
+        <div style="margin-top:4px;font-weight:700;color:#1e40af;">Contract: ${d.contractNo}</div>
+      </div>
+      <div style="flex:1;">
+        <div style="font-weight:800;color:#1e40af;font-size:9px;text-transform:uppercase;margin-bottom:4px;">Rental Details</div>
+        ${d.vehicle?`<div style="font-weight:700;">${d.vehicle}</div>`:''}
+        ${d.rentalStart?`<div style="color:#64748b;font-size:9px;">From: ${d.rentalStart}</div>`:''}
+        ${d.rentalEnd?`<div style="color:#64748b;font-size:9px;">To: ${d.rentalEnd}</div>`:''}
+        <div style="font-weight:700;color:#1e40af;margin-top:4px;">${d.rcTitle}</div>
+      </div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:5px;padding:9px;margin-bottom:9px;font-size:9.5pt;">
+      ${d.payRows.map(([lbl,val])=>`
+      <div style="display:flex;justify-content:space-between;border-bottom:1px dotted #e2e8f0;padding:3px 0;">
+        <span style="font-weight:600;">${lbl}</span><span style="font-weight:700;">${val}</span>
+      </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:2px solid #1e40af;">
+        <span style="font-weight:800;font-size:11pt;color:#1e40af;">TOTAL</span>
+        <span style="font-weight:900;font-size:14pt;color:#1e40af;">${fmtMoney(d.totalThisPayment)}</span>
+      </div>
+    </div>
+    ${d.note?`<div style="font-size:9px;color:#64748b;margin-bottom:8px;font-style:italic;">Note: ${d.note}</div>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+      <div style="text-align:center;">
+        <div style="width:120px;border-top:1px solid #000;margin-bottom:2px;${d.autoSign?'margin-top:22px;':''}"></div>
+        <div style="font-size:8px;color:#64748b;">Client Signature</div>
+        <div style="font-size:8px;">${d.clientName}</div>
+      </div>
+      <div style="text-align:center;font-size:8px;color:#64748b;">
+        <div id="${copy==='COMPANY COPY'?qrId:'qr2-'+d.ref.replace(/[^a-zA-Z0-9]/g,'')}" style="width:60px;height:60px;margin:0 auto;"></div>
+        <div>Verify online</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="width:120px;border-top:1px solid #000;margin-bottom:2px;${d.autoSign?'margin-top:22px;':''}"></div>
+        <div style="font-size:8px;color:#64748b;">Cashier Signature</div>
+        <div style="font-size:8px;">Brothers EGY</div>
+      </div>
+    </div>
+  </div>`;
+
+  return`
+  <div style="display:flex;flex-direction:column;height:100%;gap:0;">
+    ${receiptHalf('CLIENT COPY')}
+    <div style="text-align:center;font-size:9px;color:#94a3b8;padding:3px 0;border-top:1px dashed #e2e8f0;border-bottom:1px dashed #e2e8f0;margin:3px 0;">✂ — — — — — — — CUT HERE — — — — — — —</div>
+    ${receiptHalf('COMPANY COPY')}
+    <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-top:8px;">
+      <canvas id="${bcId}" style="max-width:200px;height:40px;display:block;"></canvas>
+      <div style="flex:1;font-size:9px;color:#64748b;">
+        <div style="font-weight:800;color:#1e40af;">BROTHERS EGY OFFICIAL RECEIPT</div>
+        <div>Ref: ${d.ref} | ${d.contractNo}</div>
+        <div>Verify: sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${d.ref}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function attachQR(ref){
+  const ids=['qr-'+ref.replace(/[^a-zA-Z0-9]/g,''),'qr2-'+ref.replace(/[^a-zA-Z0-9]/g,'')];
+  const bcId='bc-'+ref.replace(/[^a-zA-Z0-9]/g,'');
+  setTimeout(()=>{
+    ids.forEach(qrId=>{
+      const qrEl=document.getElementById(qrId);
+      if(qrEl){qrEl.innerHTML='';try{new QRCode(qrEl,{text:`https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${ref}`,width:60,height:60,colorDark:'#1e40af',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){qrEl.textContent=ref;}}
+    });
+    const bcEl=document.getElementById(bcId);
+    if(bcEl){try{JsBarcode('#'+bcId,ref,{format:'CODE128',lineColor:'#1e40af',width:1.5,height:30,displayValue:true,fontSize:7,margin:2,background:'#f8fafc'});}catch(e){}}
+  },150);
+}
+
+async function saveReceiptToERP(){
+  if(!currentRef){alert('Please generate a receipt first.');return;}
+  try{
+    const updateData={_last_printed:new Date().toISOString()};
+    if(editingReceiptId){
+      await db.collection('receipts').doc(editingReceiptId).update(updateData);
+      alert('✅ Receipt updated in ERP!\nRef: '+currentRef);
+    }else{
+      if(currentOrderId){
+        await db.collection('bookings').doc(currentOrderId).update({last_receipt_ref:currentRef,...updateData}).catch(()=>{});
+      }
+      alert('✅ Receipt saved to ERP!\nRef: '+currentRef+(currentOrderId?'\nLinked to: '+currentOrderId:''));
+    }
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function clearForm(){
+  ['rc-contract-no','rc-client-name','rc-client-id','rc-phone','rc-vehicle','rc-start','rc-end','rc-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['rc-egp','rc-usd','rc-eur','rc-card'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+  setV('rc-date',new Date().toISOString().slice(0,10));
+  setV('rc-title','');
+  currentRef=null;editingReceiptId=null;
+  document.getElementById('ref-preview').textContent='';
+  rcCalc();
+}
+
+init();
+</script>
+</body>
+</html>
