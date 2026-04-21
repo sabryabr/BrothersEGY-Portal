@@ -492,6 +492,74 @@ button{cursor:pointer;}
 }
 html,body{overflow-x:hidden;}
 
+/* ============================================================
+   FIX: Cropped section titles & responsive headers
+   ============================================================ */
+.section-header,[class*="section-head"],.page-section h2,.page-section h1{
+  white-space:normal!important;overflow:visible!important;
+  text-overflow:unset!important;word-break:break-word!important;
+}
+@media(max-width:768px){
+  .section-header{
+    flex-direction:column!important;align-items:flex-start!important;gap:8px!important;
+  }
+  .section-header h2,.section-header h1{
+    font-size:15px!important;white-space:normal!important;
+  }
+  .section-header>div:last-child{
+    width:100%!important;display:flex!important;flex-wrap:wrap!important;gap:6px!important;
+  }
+  .kpi-grid,.kpi-row{grid-template-columns:repeat(2,1fr)!important;}
+  .kpi-card{min-width:0!important;padding:8px!important;}
+  .kpi-value{font-size:16px!important;}
+  .kpi-label{font-size:9px!important;white-space:normal!important;}
+  h2{font-size:15px!important;white-space:normal!important;overflow:visible!important;}
+  .nav-label{font-size:11px!important;}
+  .data-table{font-size:10px!important;}
+  .data-table th,.data-table td{padding:4px 5px!important;font-size:10px!important;}
+  .btn-row,[style*="display:flex"]{flex-wrap:wrap!important;}
+  .modal-box{
+    width:96vw!important;max-width:96vw!important;
+    margin:10px auto!important;max-height:90vh!important;overflow-y:auto!important;
+  }
+}
+@media(max-width:480px){
+  h2{font-size:13px!important;}
+  .kpi-value{font-size:14px!important;}
+  .btn{font-size:11px!important;padding:5px 8px!important;}
+}
+
+/* ============================================================
+   FIX: Fields hidden under fixed header / scroll issues
+   ============================================================ */
+html{scroll-padding-top:70px!important;}
+.page-section{
+  scroll-margin-top:70px!important;
+  padding-bottom:80px!important;
+}
+/* Topbar keeps its z-index above content */
+#topbar{z-index:200!important;}
+/* Gantt sticky left column */
+#gantt-left-col,[class*="gantt-left"]{
+  position:sticky!important;left:0!important;z-index:10!important;
+  background:var(--surface)!important;
+}
+@media(max-width:768px){
+  .page-section{padding-bottom:100px!important;}
+  #content{padding-bottom:100px!important;overflow-x:hidden!important;}
+  input:focus,select:focus,textarea:focus{
+    scroll-margin-top:80px!important;scroll-margin-bottom:200px!important;
+  }
+  .modal-box{max-height:88vh!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;}
+  #global-modal-body{
+    overflow-y:auto!important;max-height:calc(88vh - 80px)!important;padding-bottom:20px!important;
+  }
+  .table-wrap,[id*="wrap"],[class*="table-wrap"]{
+    max-height:calc(100vh - 160px)!important;overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+}
+
 </style>
 </head>
 <body>
