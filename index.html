@@ -3041,6 +3041,8 @@ async function openOrderDetail(orderId){
   if((isOverdue||isAccident)&&end&&!o.closed){lateDays=Math.max(0,Math.ceil((today-end)/86400000));latePenalty=lateDays*daily;}
   const totalDue=total+latePenalty;
   const debt=isClosed?0:Math.max(0,totalDue-paid);
+  const depositHeld=parseAmount(o['الوديعة المحتجزة']||o['deposit_held']||o['held_deposit']||0);
+  const depositReturned=parseAmount(o['الوديعة المردودة']||o['deposit_returned']||0);
   const customer=G.customers.find(c=>String(c['No.']||c.col_A)===String(o['كود العميل']));
   const carCode=getOrderCarCode(o);
   const carInFleet=G.fleet.find(c=>String(c.ID||c.id)===String(carCode));
@@ -3094,6 +3096,24 @@ async function openOrderDetail(orderId){
         <div style="margin-top:9px;padding:7px 11px;border-radius:8px;background:${debt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)'};display:flex;justify-content:space-between;align-items:center;">
           <span style="font-weight:700;">CURRENT DEBT</span>
           <span style="font-size:15px;font-weight:900;color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?fmtMoney(debt):'✅ CLEAR'}</span>
+        </div>
+      </div>
+      <!-- DEPOSIT SECTION -->
+      <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:12px;margin-top:10px;">
+        <div style="font-size:11px;font-weight:800;color:var(--accent);margin-bottom:8px;">🔒 DEPOSIT / SECURITY</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <div style="font-size:10px;color:var(--text3);">Deposit Held</div>
+            <div style="font-size:14px;font-weight:700;color:var(--warning);">${fmtMoney(depositHeld)}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);">Deposit Returned</div>
+            <div style="font-size:14px;font-weight:700;color:${depositReturned>0?'var(--success)':'var(--text3)'};">${fmtMoney(depositReturned)}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="addDepositPayment('${o.id}','collect')">💰 Collect Deposit</button>
+          <button class="btn btn-ghost btn-sm" onclick="addDepositPayment('${o.id}','return')">↩️ Return Deposit</button>
         </div>
       </div>
     </div>
@@ -3695,6 +3715,12 @@ async function renderGantt(){
     const carIdDisplay=car['No.']||car.ID||car.id||'-';
     const plateDisplay=car.plate||formatPlate(car);
 
+    // Proposals for this car
+    const carProposals=(G.proposals||[]).filter(p=>{
+      const pCarId=String(p.car_id||'').trim();
+      return pCarId&&possibleIds.has(pCarId)&&p.pickup_date&&p.dropoff_date&&p.status!=='Cancelled'&&p.status!=='Converted';
+    });
+
     // Instantly find orders using the Hash Map instead of a massive loop
     let carOrders = [];
     for (const pid of possibleIds) {
@@ -3795,6 +3821,35 @@ async function renderGantt(){
                 width:${DAY_PX}px;background:rgba(255,255,255,0.012);
                 pointer-events:none;z-index:0;"></div>`;
             }
+          }
+
+          // Proposal bars (only on first row to avoid duplicates)
+          if(ri===0&&carProposals.length>0){
+            const proposalColor='rgba(168,85,247,0.6)';
+            const reservationColor='rgba(234,179,8,0.7)';
+            carProposals.forEach(p=>{
+              const pStart=parseDBDate(p.pickup_date);
+              const pEnd=parseDBDate(p.dropoff_date);
+              if(!pStart||!pEnd)return;
+              const pStartDay=Math.floor((pStart-ganttStart)/86400000);
+              const pEndDay=Math.floor((pEnd-ganttStart)/86400000);
+              const pStartPx=Math.max(-DAY_PX,pStartDay*DAY_PX);
+              const pEndPx=Math.min(totalPx+DAY_PX,pEndDay*DAY_PX);
+              const pBarW=Math.max(4,pEndPx-Math.max(0,pStartPx));
+              if(pEndPx<0||pStartPx>totalPx)return;
+              const cPStartPx=Math.max(0,pStartPx);
+              const pBarTop=4;const pBarH=ROW_H-8;
+              const pBg=p.proposal_mode==='reservation'?reservationColor:proposalColor;
+              barsHTML+=`<div style="position:absolute;left:${cPStartPx}px;top:${pBarTop}px;
+                width:${pBarW}px;height:${pBarH}px;z-index:2;cursor:pointer;
+                background:${pBg};border-radius:3px;border:1px dashed rgba(255,255,255,0.4);"
+                onclick="previewProposal('${p.id}')"
+                title="Proposal: ${(p.client_name||'').replace(/'/g,'')}\n${p.status}">
+                <div style="padding:1px 4px;font-size:8px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  📋 ${p.client_name||'Proposal'}
+                </div>
+              </div>`;
+            });
           }
 
           row.orders.forEach(order=>{
@@ -5630,8 +5685,22 @@ async function loadProposalsPage(){
           <div class="form-grid">
             <div class="field"><label>Pickup Date/Time</label><input type="datetime-local" id="pr-pickup" onchange="prCalc()"/></div>
             <div class="field"><label>Dropoff Date/Time</label><input type="datetime-local" id="pr-dropoff" onchange="prCalc()"/></div>
-            <div class="field"><label>Pickup Location</label><input type="text" id="pr-ploc" placeholder="Office/Airport/Hotel"/></div>
-            <div class="field"><label>Dropoff Location</label><input type="text" id="pr-dloc" placeholder="Office/Airport/Hotel"/></div>
+            <div class="field"><label>Pickup Location</label>
+              <div style="display:flex;gap:6px;">
+                <select id="prop-pickup-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('pickup')">
+                  <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+                </select>
+                <input type="text" id="prop-pickup-detail" placeholder="Specific address / terminal..." style="flex:1;">
+              </div>
+            </div>
+            <div class="field"><label>Dropoff Location</label>
+              <div style="display:flex;gap:6px;">
+                <select id="prop-dropoff-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('dropoff')">
+                  <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+                </select>
+                <input type="text" id="prop-dropoff-detail" placeholder="Specific address / terminal..." style="flex:1;">
+              </div>
+            </div>
           </div>
         </div>
         <!-- Vehicle -->
@@ -5722,7 +5791,7 @@ async function loadProposalsPage(){
         <!-- Proposal A4 Output -->
         <div id="pr-output" style="display:none;">
           <div style="display:flex;gap:7px;margin-bottom:11px;">
-            <button class="btn btn-primary" onclick="printModule('pr-a4')">🖨️ Print / Save PDF</button>
+            <button class="btn btn-primary" onclick="printProposalWindow()">🖨️ Print / Save PDF</button>
             <button class="btn btn-ghost" onclick="document.getElementById('pr-output').style.display='none'">✕ Close Preview</button>
           </div>
           <div class="a4-page" id="pr-a4"></div>
@@ -5893,7 +5962,11 @@ async function generateProposal(){
   const total=base+insTotal+kmCost+extras;
   const kmPkg=document.getElementById('pr-km')?.value||'standard';
   const insPkg=document.getElementById('pr-ins')?.value||'basic';
-  const proposalData={proposal_ref:ref,client_name:clientName,client_crm_id:window['_crm_pr_id']||'',client_phone:document.getElementById('pr-phone')?.value.trim()||'',client_email:document.getElementById('pr-email')?.value.trim()||'',car_id:String(carId),car_label:carLabel,pickup_date:pickup,dropoff_date:dropoff,pickup_location:document.getElementById('pr-ploc')?.value.trim()||'',dropoff_location:document.getElementById('pr-dloc')?.value.trim()||'',duration_days:days,daily_rate:daily,km_package:kmPkg,km_cost:kmCost,insurance_plan:insPkg,insurance_fee:insFee,pickup_fee:pfee,delivery_fee:dfee,deposit_amount:deposit,child_seat_days:seatD,extra_driver_days:drvD,total_estimate:total,status:'Draft',converted_to:'',issued_by:G.user?.username||'',branch:branchCode,timestamp:Date.now()};
+  const _puType=document.getElementById('prop-pickup-type')?.value||'Office';
+  const _puDetail=document.getElementById('prop-pickup-detail')?.value.trim()||'';
+  const _doType=document.getElementById('prop-dropoff-type')?.value||'Office';
+  const _doDetail=document.getElementById('prop-dropoff-detail')?.value.trim()||'';
+  const proposalData={proposal_ref:ref,client_name:clientName,client_crm_id:window['_crm_pr_id']||'',client_phone:document.getElementById('pr-phone')?.value.trim()||'',client_email:document.getElementById('pr-email')?.value.trim()||'',car_id:String(carId),car_label:carLabel,pickup_date:pickup,dropoff_date:dropoff,pickup_location_type:_puType,pickup_location_detail:_puDetail,pickup_location:_puType+(_puDetail?' - '+_puDetail:''),dropoff_location_type:_doType,dropoff_location_detail:_doDetail,dropoff_location:_doType+(_doDetail?' - '+_doDetail:''),duration_days:days,daily_rate:daily,km_package:kmPkg,km_cost:kmCost,insurance_plan:insPkg,insurance_fee:insFee,pickup_fee:pfee,delivery_fee:dfee,deposit_amount:deposit,child_seat_days:seatD,extra_driver_days:drvD,total_estimate:total,status:'Draft',converted_to:'',issued_by:G.user?.username||'',branch:branchCode,timestamp:Date.now()};
   const editingId=document.getElementById('page-proposals')?.dataset?.editingId||'';
   try{
     if(editingId){
@@ -6087,7 +6160,8 @@ function fillContractFromProposal(prefix,p){
 }
 
 function clearProposalForm(){
-  ['pr-client-search','pr-fname','pr-lname','pr-phone','pr-email','pr-pickup','pr-dropoff','pr-ploc','pr-dloc','pr-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pr-client-search','pr-fname','pr-lname','pr-phone','pr-email','pr-pickup','pr-dropoff','prop-pickup-detail','prop-dropoff-detail','pr-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['prop-pickup-type','prop-dropoff-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='Office';});
   ['pr-daily','pr-km-cost','pr-ins-fee','pr-pfee','pr-dfee','pr-deposit','pr-seat-days','pr-driver-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
   document.getElementById('pr-car').value='';
   document.getElementById('pr-overlap-warn').style.display='none';
@@ -12636,11 +12710,21 @@ async function loadProposalsPage(){
           </div>
           <div class="field">
             <label>Pickup Location</label>
-            <input type="text" id="pr-ploc" placeholder="Office / Airport / Hotel"/>
+            <div style="display:flex;gap:6px;">
+              <select id="prop-pickup-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('pickup')">
+                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+              </select>
+              <input type="text" id="prop-pickup-detail" placeholder="Specific address / terminal..." style="flex:1;">
+            </div>
           </div>
           <div class="field">
             <label>Dropoff Location</label>
-            <input type="text" id="pr-dloc" placeholder="Office / Airport / Hotel"/>
+            <div style="display:flex;gap:6px;">
+              <select id="prop-dropoff-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('dropoff')">
+                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+              </select>
+              <input type="text" id="prop-dropoff-detail" placeholder="Specific address / terminal..." style="flex:1;">
+            </div>
           </div>
         </div>
       </div>
@@ -12838,7 +12922,7 @@ async function loadProposalsPage(){
       <!-- Proposal A4 Output -->
       <div id="pr-output" style="display:none;">
         <div style="display:flex;gap:7px;margin-bottom:11px;">
-          <button class="btn btn-primary" onclick="printModule('pr-a4')">
+          <button class="btn btn-primary" onclick="printProposalWindow()">
             🖨️ Print / Save PDF
           </button>
           <button class="btn btn-success"
@@ -13121,8 +13205,12 @@ async function generateProposal(){
     car_label:carLabel,
     pickup_date:pickup,
     dropoff_date:dropoff,
-    pickup_location:document.getElementById('pr-ploc')?.value.trim()||'',
-    dropoff_location:document.getElementById('pr-dloc')?.value.trim()||'',
+    pickup_location_type:(document.getElementById('prop-pickup-type')?.value)||'Office',
+    pickup_location_detail:(document.getElementById('prop-pickup-detail')?.value.trim()||''),
+    pickup_location:((document.getElementById('prop-pickup-type')?.value)||'Office')+((document.getElementById('prop-pickup-detail')?.value.trim())?(' - '+(document.getElementById('prop-pickup-detail')?.value.trim())):''),
+    dropoff_location_type:(document.getElementById('prop-dropoff-type')?.value)||'Office',
+    dropoff_location_detail:(document.getElementById('prop-dropoff-detail')?.value.trim()||''),
+    dropoff_location:((document.getElementById('prop-dropoff-type')?.value)||'Office')+((document.getElementById('prop-dropoff-detail')?.value.trim())?(' - '+(document.getElementById('prop-dropoff-detail')?.value.trim())):''),
     duration_days:days,
     daily_rate:daily,
     km_package:kmPkg,
@@ -13135,7 +13223,7 @@ async function generateProposal(){
     child_seat_days:seatD,
     extra_driver_days:drvD,
     total_estimate:total,
-    status:'Draft',
+    status:window._prMode==='reservation'?'Pending':'Draft',
     converted_to:'',
     issued_by:G.user?.username||'',
     branch:branchCode,
@@ -13453,8 +13541,9 @@ function renderProposalsList(){
         <span class="pill pill-${(p.status||'draft').toLowerCase()}">
           ${p.status||'Draft'}
         </span>
-        ${p.converted_to?`<div style="font-size:9px;color:var(--text3);">
-          → ${p.converted_to}</div>`:''}
+        ${p.converted_to?`<span style="color:var(--accent);cursor:pointer;font-size:10px;"
+          onclick="openOrderDetail('${p.converted_to_id||p.converted_to}')"
+          title="Open contract">→ ${p.converted_to}</span>`:''}
       </td>
       <td style="font-size:10px;color:var(--text3);">${p.issued_by||'—'}</td>
       <td>
@@ -13645,8 +13734,9 @@ function clearProposalForm(){
   [
     'pr-client-search','pr-fname','pr-lname','pr-phone','pr-email',
     'pr-passport','pr-license',
-    'pr-pickup','pr-dropoff','pr-ploc','pr-dloc','pr-days'
+    'pr-pickup','pr-dropoff','prop-pickup-detail','prop-dropoff-detail','pr-days'
   ].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['prop-pickup-type','prop-dropoff-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='Office';});
   prSetMode('quick');
 
   [
@@ -15080,8 +15170,10 @@ async function editProposal(proposalId){
     set('pr-email',p.client_email||'');
     set('pr-pickup',p.pickup_date||'');
     set('pr-dropoff',p.dropoff_date||'');
-    set('pr-ploc',p.pickup_location||'');
-    set('pr-dloc',p.dropoff_location||'');
+    const puTypeEl=document.getElementById('prop-pickup-type');if(puTypeEl)puTypeEl.value=p.pickup_location_type||'Office';
+    const puDetailEl=document.getElementById('prop-pickup-detail');if(puDetailEl)puDetailEl.value=p.pickup_location_detail||'';
+    const doTypeEl=document.getElementById('prop-dropoff-type');if(doTypeEl)doTypeEl.value=p.dropoff_location_type||'Office';
+    const doDetailEl=document.getElementById('prop-dropoff-detail');if(doDetailEl)doDetailEl.value=p.dropoff_location_detail||'';
     set('pr-daily',p.daily_rate||'0');
     set('pr-km-cost',p.km_cost||'0');
     set('pr-ins-fee',p.insurance_fee||'0');
@@ -15307,9 +15399,7 @@ function _buildContractParams(orderId,order){
 }
 
 function openENContractForm(orderId){
-  const order=allOrders.find(o=>o.id===orderId)||G.bookings.find(o=>o.id===orderId);
-  const params=_buildContractParams(orderId,order);
-  window.open(`contract-en.html?${params.toString()}`,'_blank');
+  printOrderContract(orderId);
 }
 
 function openARContractForm(orderId){
@@ -15367,7 +15457,7 @@ async function regenerateProposalDoc(proposalId){
   buildProposalA4(proposalId,p);
   setTimeout(()=>{
     const out=document.getElementById('pr-output');
-    if(out){out.scrollIntoView({behavior:'smooth',block:'start'});window.print();}
+    if(out){out.scrollIntoView({behavior:'smooth',block:'start'});printProposalWindow();}
   },300);
 }
 
@@ -15392,6 +15482,324 @@ function openProposalGeneratorPage(proposalId){
     if(p.branch)params.set('branch',p.branch);
   }
   window.open(`proposal-generator.html?${params.toString()}`,'_blank');
+}
+
+/* ============================================================
+   FIX 2 - Print proposal in new window
+   ============================================================ */
+function printProposalWindow(){
+  const content=document.getElementById('pr-a4')?.innerHTML;
+  if(!content){showToast?showToast('Generate the proposal first'):toast('Generate the proposal first','warning');return;}
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <style>
+      body{font-family:Arial,sans-serif;margin:0;padding:0;}
+      @page{size:A4;margin:10mm 15mm;}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+    </style>
+  </head><body>${content}</body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),500);
+}
+
+/* ============================================================
+   FIX 4 - Update proposal location placeholder
+   ============================================================ */
+function updatePropLocation(type){
+  const sel=document.getElementById('prop-'+type+'-type')?.value;
+  const detail=document.getElementById('prop-'+type+'-detail');
+  if(!detail)return;
+  if(sel==='Office')detail.placeholder='Branch office address...';
+  else if(sel==='Airport')detail.placeholder='Terminal / flight details...';
+  else if(sel==='Hotel')detail.placeholder='Hotel name / room...';
+  else detail.placeholder='Specific address / terminal...';
+}
+
+/* ============================================================
+   FIX 7 - Add deposit payment
+   ============================================================ */
+async function addDepositPayment(orderId,type){
+  const amount=prompt(`Enter deposit ${type==='collect'?'collected':'returned'} amount (EGP):`);
+  if(!amount||isNaN(amount))return;
+  const currency=prompt('Currency? (EGP/USD/EUR)','EGP');
+  const field=type==='collect'?'deposit_held':'deposit_returned';
+  try{
+    const snap=await db.collection('bookings').doc(orderId).get();
+    const current=parseFloat(snap.data()[field]||0);
+    await db.collection('bookings').doc(orderId).update({
+      [field]:current+parseFloat(amount),
+      [`${field}_currency`]:currency||'EGP',
+      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('payment_log').add({
+      order_id:orderId,
+      type:'deposit_'+type,
+      amount:parseFloat(amount),
+      currency:currency||'EGP',
+      date:new Date().toISOString().slice(0,10),
+      collected_by:G.user?.username||'',
+      timestamp:Date.now()
+    });
+    toast(`✅ Deposit ${type==='collect'?'collected':'returned'}: ${fmtMoney(parseFloat(amount))}`,'success');
+    openOrderDetail(orderId);
+  }catch(e){toast('Failed: '+e.message,'error');}
+}
+
+/* ============================================================
+   FIX 8 - Internal contract generation
+   ============================================================ */
+async function printOrderContract(orderId){
+  let o=allOrders.find(x=>x.id===orderId);
+  if(!o){
+    try{const snap=await db.collection('bookings').doc(orderId).get();if(!snap.exists){toast('Order not found','error');return;}o={id:snap.id,...snap.data()};}
+    catch(e){toast('Could not load order','error');return;}
+  }
+  const{start,end}=getOrderDates(o);
+  const carCode=String(o['كود السيارة']||o.col_D||'');
+  const car=G.fleet.find(c=>String(c.ID||c.id)===carCode)||{};
+  const clientCode=String(o['كود العميل']||o.col_B||'');
+  const customer=G.customers.find(c=>String(c['No.']||c.col_A)===clientCode)||{};
+  const contractRef=o['No.']||o.id;
+  const clientName=o['اسم العميل']||o['ليمعلا مسا']||customer['الاسم الأول']||'';
+  const days=start&&end?Math.ceil((end-start)/86400000):0;
+  const daily=parseAmount(o['سعر السيارة اليومي بالجنيه المصري']||0);
+  const total=parseAmount(o['إجمالي المستحق (Total)']||o['قحتسملا يلامجإ (Total)']||0);
+  const paid=parseAmount(o['المدفوع EGP']||o['عوفدملا EGP']||0);
+  const deposit=parseAmount(o['deposit_held']||0);
+  const plate=car.plate||formatPlate(car)||'';
+  const carLabel=car.car_label||getCarLabel(car,'en')||carCode;
+  const html=generateContractHTML({
+    ref:contractRef,
+    branch:o['فرع الإصدار']||o.branch||'HRG',
+    client:{
+      name:clientName,
+      passport:customer['رقم جواز السفر']||customer['رفسلا زاوج مقر']||'',
+      license:customer['رقم رخصة القيادة']||'',
+      nationality:customer['رمز الدولة']||customer.col_H||'',
+      phone:customer['رقم التليفون']||'',
+      email:customer['البريد الإلكتروني']||'',
+      address:customer['العنوان']||''
+    },
+    car:{label:carLabel,plate,vin:car.chassis||car['رقم الشاسيه']||'',motor:car['رقم الموتور']||'',year:car.year||car['سنة الصنع']||''},
+    period:{start,end,days,pickup_loc:o['مكان الاستلام']||o['مالتسالا ناكم']||'Office',dropoff_loc:o['مكان التسليم']||o['ميلستلا ناكم']||'Office'},
+    finance:{daily,total,paid,pending:Math.max(0,total-paid),deposit},
+    insurance:o['insurance_plan']||'Basic',
+    mode:days>28?'Monthly':'Daily'
+  });
+  const win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(()=>win.print(),800);
+  try{
+    await db.collection('bookings').doc(orderId).update({
+      contract_generated:true,
+      contract_generated_at:new Date().toISOString(),
+      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){}
+}
+
+function generateContractHTML(data){
+  const logo='https://brothersegy.com/wp-content/uploads/2026/02/12345.png';
+  const today=new Date().toLocaleDateString('en-GB');
+  const startStr=data.period.start?data.period.start.toLocaleDateString('en-GB')+' '+data.period.start.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+  const endStr=data.period.end?data.period.end.toLocaleDateString('en-GB')+' '+data.period.end.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+  const branchNames={HRG:'Hurghada',ALX:'Alexandria',CAI:'Cairo',RSH:'Rashid',GEN:'General'};
+  const branchName=branchNames[data.branch]||data.branch;
+  const baseCalc=data.mode==='Monthly'?`${data.finance.daily} x ${Math.ceil(data.period.days/30)} Mo`:`${data.finance.daily} x ${data.period.days} Days`;
+  const userIssuedBy=(typeof G!=='undefined'&&G.user?.username)||'system';
+  return`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;background:white;}
+@page{size:A4;margin:10mm 15mm;}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.no-print{display:none!important;}.page-break{page-break-after:always;}}
+.page{width:210mm;min-height:290mm;padding:8mm 12mm;margin:0 auto 20px;background:white;box-shadow:0 0 10px rgba(0,0,0,0.1);position:relative;display:flex;flex-direction:column;}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #04509D;padding-bottom:8px;margin-bottom:12px;}
+.logo{height:45px;object-fit:contain;}
+.contract-title{font-size:18pt;font-weight:bold;color:#04509D;text-align:right;}
+.contract-ref{font-weight:bold;font-size:11pt;text-align:right;}
+.hq-info{font-size:7.5pt;color:#555;text-align:right;line-height:1.4;}
+.box{border:1px solid #000;padding:6px 8px;margin-bottom:10px;position:relative;}
+.box-title{background:#04509D;color:white;font-weight:bold;font-size:8pt;padding:2px 8px;position:absolute;top:-10px;left:-1px;text-transform:uppercase;}
+.box-title-dark{background:#000;color:white;font-weight:bold;font-size:8pt;padding:2px 8px;position:absolute;top:-10px;left:-1px;text-transform:uppercase;}
+table{width:100%;border-collapse:collapse;font-size:8.5pt;}
+th,td{border:1px solid #000;padding:4px 6px;vertical-align:middle;}
+th{background:#f0f0f0;font-weight:bold;text-align:left;}
+.total-row{font-weight:bold;background:#04509D;color:white;}
+.total-row td{border-color:#04509D;}
+.sig-section{display:flex;justify-content:space-between;margin-top:auto;border-top:1px solid #000;padding-top:8px;}
+.sig-box{text-align:center;width:40%;font-size:9pt;font-weight:bold;}
+.terms-grid{column-count:2;column-gap:20px;font-size:8pt;line-height:1.3;}
+.term-block{margin-bottom:10px;break-inside:avoid;}
+.term-title{font-weight:bold;color:#04509D;border-bottom:1px solid #ccc;margin-bottom:3px;text-transform:uppercase;font-size:8pt;}
+.receipt-half{height:48%;border:2px solid #000;padding:12px;display:flex;flex-direction:column;}
+.rec-header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px;align-items:center;}
+.rec-title{font-size:14pt;font-weight:bold;color:#04509D;text-transform:uppercase;}
+.rec-amount{font-size:20pt;font-weight:bold;}
+.detach{text-align:center;border-top:1px dashed #999;color:#999;padding:8px 0;font-size:8pt;}
+.print-btn{position:fixed;top:10px;right:10px;background:#04509D;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;z-index:999;}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60%;opacity:0.04;pointer-events:none;z-index:0;}
+.content{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;}
+</style></head><body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+<div class="page page-break">
+  <img class="watermark" src="${logo}">
+  <div class="content">
+  <div class="header">
+    <div><img src="${logo}" class="logo"><br>
+      <div style="font-size:8pt;color:#555;margin-top:4px;"><strong>BROTHERS EGY</strong><br>Car Rental Services • www.brothersegy.com<br>${branchName} Branch</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="contract-title">RENTAL AGREEMENT</div>
+      <div class="contract-ref">Contract No: ${data.ref}</div>
+      <div class="hq-info">Date: ${today}<br>Branch: ${branchName}<br>Tax: 589-464-418 | CR: 10770</div>
+    </div>
+  </div>
+  <div class="box" style="margin-top:10px;">
+    <span class="box-title-dark">LESSEE INFORMATION</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:8.5pt;padding-top:4px;">
+      <div><strong>${data.client.name||'—'}</strong><br>
+        Passport/ID: ${data.client.passport||'—'}<br>
+        Nationality: ${data.client.nationality||'—'}<br>
+        Phone: ${data.client.phone||'—'}<br>
+        Email: ${data.client.email||'—'}<br>
+        License: ${data.client.license||'—'}<br>
+        Address: ${data.client.address||'—'}
+      </div>
+      <div><strong>VEHICLE INFORMATION</strong><br>
+        ${data.car.label||'—'}<br>
+        KM at Pickup: —<br>Fuel Level: Full (8/8)<br>
+        Pickup: ${startStr}<br>Dropoff: ${endStr}<br>
+        Duration: <strong>${data.period.days} Days</strong><br>
+        Pickup Location: ${data.period.pickup_loc}<br>
+        Dropoff Location: ${data.period.dropoff_loc}<br>
+        KM Package: Standard 120 KM/Day<br>
+        Insurance: ${data.insurance}
+      </div>
+    </div>
+  </div>
+  <div class="box" style="margin-top:16px;">
+    <span class="box-title-dark">FINANCIAL SUMMARY</span>
+    <table style="margin-top:4px;">
+      <thead><tr><th>Description</th><th>Calculation</th><th style="text-align:right;">Amount (EGP)</th></tr></thead>
+      <tbody><tr><td>Base Rent</td><td>${baseCalc}</td><td style="text-align:right;">${data.finance.total.toLocaleString()}</td></tr></tbody>
+      <tfoot><tr class="total-row"><td colspan="2" style="text-align:right;color:white;">TOTAL CONTRACT VALUE</td><td style="text-align:right;color:white;font-size:12pt;">£${data.finance.total.toLocaleString()}.00</td></tr></tfoot>
+    </table>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      <div style="background:#e8f5e9;border:1px solid #27ae60;padding:8px;border-radius:4px;">
+        <div style="font-weight:bold;color:#27ae60;font-size:9pt;">PAYMENT RECEIVED</div>
+        <div>Cash EGP: £${data.finance.paid.toLocaleString()}.00</div>
+        <div style="font-weight:bold;color:#27ae60;">Total Paid: £${data.finance.paid.toLocaleString()}.00</div>
+        <div style="color:${data.finance.pending>0?'#c0392b':'#27ae60'};font-weight:bold;">Remaining: £${data.finance.pending.toLocaleString()}.00</div>
+      </div>
+      <div style="background:#fff8e1;border:1px solid #f59e0b;padding:8px;border-radius:4px;">
+        <div style="font-weight:bold;color:#f59e0b;font-size:9pt;">DEPOSIT HELD</div>
+        <div>Total Held: £${data.finance.deposit.toLocaleString()}.00</div>
+        <div>Required: £${data.finance.deposit.toLocaleString()}.00</div>
+      </div>
+    </div>
+  </div>
+  <div class="box" style="margin-top:16px;">
+    <span class="box-title">TERMS & CONDITIONS SUMMARY</span>
+    <div style="font-size:7.5pt;margin-top:4px;line-height:1.3;">
+      <strong>1. ELIGIBILITY:</strong> Min age 21. Valid license and passport mandatory. Authorized drivers only.<br>
+      <strong>2. RENTAL CYCLE:</strong> 24-hr units. Exceeding by 5+ hours = full extra day.<br>
+      <strong>3. MILEAGE:</strong> 120 KM/day included. Excess charged at return rate.<br>
+      <strong>4. FUEL:</strong> Same-to-Same policy.<br>
+      <strong>5. INSURANCE:</strong> Void if no Police Report filed immediately.<br>
+      <strong>6. DEPOSIT:</strong> Refunded upon safe return.<br>
+      <strong>7. LIABILITY:</strong> Lessee bears full legal liability during rental period.
+    </div>
+  </div>
+  <div class="sig-section">
+    <div class="sig-box">Lessee Signature<br><br>____________________<br><div style="font-size:8pt;margin-top:4px;">${data.client.name||''}</div></div>
+    <div class="sig-box">Lessor Signature<br><br>____________________<br><div style="font-size:8pt;margin-top:4px;">Brothers EGY – ${branchName}</div></div>
+  </div>
+  <div style="margin-top:10px;background:#f8f9fa;border:1px solid #ddd;padding:10px;border-radius:4px;display:flex;align-items:center;gap:12px;">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data=REF-${encodeURIComponent(data.ref)}&size=70x70" style="width:60px;height:60px;">
+    <div>
+      <div style="font-weight:bold;font-size:9pt;color:#04509D;">BROTHERS EGY – RENTAL AGREEMENT</div>
+      <div style="font-size:7.5pt;">Ref: ${data.ref}</div>
+      <div style="font-size:7.5pt;">Issued by: ${userIssuedBy} | ${today}</div>
+    </div>
+  </div>
+  </div>
+</div>
+<div class="page page-break">
+<div class="content">
+  <div style="font-weight:bold;font-size:12pt;border-bottom:2px solid #04509D;padding-bottom:6px;margin-bottom:12px;">TERMS & CONDITIONS</div>
+  <div class="terms-grid">
+    <div class="term-block"><div class="term-title">1. DRIVER REQUIREMENTS & ELIGIBILITY</div>* Minimum Age: 21 years or older.<br>* Valid driving license for at least 1 year.<br>* Valid ID or Passport mandatory.<br>* Only named drivers may operate the vehicle.</div>
+    <div class="term-block"><div class="term-title">2. RENTAL PERIOD & EXTENSIONS</div>* 24-hour cycle charges.<br>* Grace period: max 1 hour. After = full day charged.<br>* Extensions must be pre-approved.<br>* Early return: no refund issued.</div>
+    <div class="term-block"><div class="term-title">3. CANCELLATION & NO-SHOW</div>* Free cancellation: 48+ hours before pickup.<br>* Late cancellation (&lt;48h): 30% retained.<br>* No-show: 100% forfeiture.</div>
+    <div class="term-block"><div class="term-title">4. DELIVERY & MILEAGE</div>* Standard: 120 KM/day.<br>* Extra KM charged at return.<br>* Delivery to hotels/airports only.</div>
+    <div class="term-block" style="border:2px solid #e67e22;padding:6px;background:#fff8e1;">
+      <div class="term-title" style="color:#e67e22;border-color:#e67e22;">5. YOUR INSURANCE: ${data.insurance.toUpperCase()}</div>
+      ${data.insurance==='Full Protection'?'Zero Deductible Waiver. Reduces liability to ZERO for covered items.':data.insurance==='Intermediate'?'Reduced Liability (70/30). Client pays 70% of costs.':'High Deductible. Client pays 100% for Glass, Tires, Undercarriage.'}
+    </div>
+    <div class="term-block"><div class="term-title">6. THEFT & LOSS WAIVER</div>* Theft NOT covered by insurance.<br>* Vehicle must be parked securely.</div>
+    <div class="term-block"><div class="term-title">7. VOIDING OF INSURANCE</div>Insurance NULL AND VOID if:<br>1. No Police Report filed immediately.<br>2. Driving under influence.<br>3. Off-road driving.<br>4. Unauthorized driver.<br>5. Gross negligence.</div>
+    <div class="term-block"><div class="term-title">8. PENALTIES SCHEDULE</div>* Key Loss: $400 USD<br>* License Loss: $250 USD<br>* Spare Tire/Tools: $300 USD<br>* Fire Extinguisher: $200 USD<br>* Tire Damage: $200 USD/tire<br>* Interior Damage: $100-$1,000 USD<br>* Dirty Return: min $10 USD</div>
+    <div class="term-block"><div class="term-title">9. SECURITY DEPOSIT & REFUNDS</div>* 100% refundable on safe return.<br>* Same currency mix refunded.<br>* Released only after inspection signed.</div>
+    <div class="term-block"><div class="term-title">10. DISPUTE RESOLUTION</div>Independent evaluation by authorized center. Legal disputes referred to Competent Court under Egyptian Law.</div>
+    <div class="term-block"><div class="term-title">11. TRAFFIC FINES</div>Lessee fully responsible for all traffic violations.</div>
+    <div class="term-block"><div class="term-title">12. MECHANICAL DIFFICULTIES</div>Call Company immediately. No unauthorized repairs.</div>
+    <div class="term-block"><div class="term-title">13. INSURANCE & LIABILITY NOTICES</div>* Insurance does NOT cover interior negligence.<br>* Police Report MANDATORY if lessee refuses settlement.</div>
+  </div>
+  <div style="margin-top:auto;border-top:1px solid #000;padding-top:8px;text-align:center;font-weight:bold;">
+    I have read and accepted all terms & conditions.<br>
+    <div style="display:flex;justify-content:center;gap:60px;margin-top:8px;font-size:9pt;">
+      <div>Signature: ____________________</div><div>Date: ........................</div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="page">
+<div class="content">
+  <div class="receipt-half">
+    <div class="rec-header">
+      <img src="${logo}" style="height:40px;">
+      <div style="text-align:center;flex:1;"><div class="rec-title">OFFICIAL RECEIPT</div><div style="font-size:9pt;">CLIENT COPY</div></div>
+      <div style="text-align:right;"><img src="https://api.qrserver.com/v1/create-qr-code/?data=REF-${encodeURIComponent(data.ref)}&size=60x60" style="height:50px;"><div style="font-size:7pt;font-weight:bold;">DATE: ${today}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:8.5pt;border-bottom:1px dashed #ccc;padding-bottom:8px;margin-bottom:8px;">
+      <div><div><strong>RECEIVED FROM</strong> ${data.client.name||'—'}</div><div><strong>PASSPORT/ID</strong> ${data.client.passport||'—'}</div><div><strong>PHONE</strong> ${data.client.phone||'—'}</div></div>
+      <div><div><strong>CONTRACT NO</strong> ${data.ref}</div><div><strong>VEHICLE</strong> ${(data.car.label||'—').slice(0,40)}</div><div><strong>PERIOD</strong> ${startStr} → ${endStr}</div></div>
+    </div>
+    <div style="border:1px solid #ccc;background:#fbfbfb;padding:10px;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong style="font-size:10pt;">AMOUNT RECEIVED</strong>
+        <span class="rec-amount">£${data.finance.paid.toLocaleString()}.00</span>
+      </div>
+    </div>
+    ${data.finance.pending>0?`<div style="font-size:8pt;color:#c0392b;font-weight:bold;">⚠ OUTSTANDING BALANCE: £${data.finance.pending.toLocaleString()}.00</div>`:''}
+    <div style="margin-top:auto;display:flex;justify-content:flex-end;"><div style="text-align:center;border-top:1px solid #000;width:200px;padding-top:5px;font-size:9pt;font-weight:bold;">AUTHORIZED SIGNATURE<br><div style="font-size:8pt;margin-top:2px;">Date: ........................</div></div></div>
+  </div>
+  <div class="detach">- - - - - DETACH HERE - - - - -</div>
+  <div class="receipt-half">
+    <div class="rec-header">
+      <img src="${logo}" style="height:40px;">
+      <div style="text-align:center;flex:1;"><div class="rec-title">OFFICIAL RECEIPT</div><div style="font-size:9pt;">COMPANY COPY</div></div>
+      <div style="text-align:right;"><div style="font-size:7pt;font-weight:bold;">DATE: ${today}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:8.5pt;border-bottom:1px dashed #ccc;padding-bottom:8px;margin-bottom:8px;">
+      <div><div><strong>RECEIVED FROM</strong> ${data.client.name||'—'}</div><div><strong>CONTRACT NO</strong> ${data.ref}</div></div>
+      <div><div><strong>VEHICLE</strong> ${(data.car.label||'—').slice(0,40)}</div><div><strong>PERIOD</strong> ${startStr} → ${endStr}</div></div>
+    </div>
+    <div style="border:1px solid #ccc;background:#fbfbfb;padding:10px;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong style="font-size:10pt;">AMOUNT RECEIVED</strong>
+        <span class="rec-amount">£${data.finance.paid.toLocaleString()}.00</span>
+      </div>
+    </div>
+    <div style="margin-top:auto;display:flex;justify-content:flex-end;"><div style="text-align:center;border-top:1px solid #000;width:200px;padding-top:5px;font-size:9pt;font-weight:bold;">AUTHORIZED SIGNATURE<br><div style="font-size:8pt;margin-top:2px;">Date: ........................</div></div></div>
+  </div>
+</div>
+</div>
+</body></html>`;
 }
 
 </script>

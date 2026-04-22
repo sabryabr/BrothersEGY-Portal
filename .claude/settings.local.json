@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"تاريخ الانتهاء\\\\|تاريخ التسليم\\\\|end.*date\\\\|End.*Date\\\\|'No\\\\\\\\.'\\\\|'اسم العميل'\" index.html)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('project_id:', d.get\\('project_id','?'\\)\\); print\\('client_email:', d.get\\('client_email','?'\\)[:40]+'...'\\)\")",
+      "Bash(node:*)",
+      "Bash(ls *.json*)",
+      "Bash(npm install:*)",
+      "Bash(claude install:*)",
+      "Bash(grep -v \"//\")",
+      "Bash(git rm:*)"
+    ]
+  }
+}
