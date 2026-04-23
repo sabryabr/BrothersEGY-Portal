@@ -316,51 +316,79 @@ async function init(){
   const P=new URLSearchParams(window.location.search);
   currentOrderId=P.get('orderId')||P.get('order_id')||null;
 
-  const prefill=(id,key,keys)=>{
-    const el=document.getElementById(id);if(!el)return;
-    const val=[key,...(keys||[])].map(k=>P.get(k)).find(v=>v);
-    if(val)el.value=val;
-  };
+  const setVal=(id,val)=>{if(!val&&val!==0)return;const el=document.getElementById(id);if(el)el.value=val;};
+  const get=(...keys)=>keys.map(k=>P.get(k)).find(v=>v!=null&&v!=='');
 
-  const hasPrefill=P.has('fname')||P.has('first_name')||P.has('carId');
+  // Contract number pre-set from ERP (use once instead of generating new)
+  const contractNo=get('contractNo');
+  if(contractNo)window._contractNo=contractNo;
+
+  const hasPrefill=[...P.keys()].some(k=>!['orderId','order_id'].includes(k));
   if(hasPrefill){
     document.getElementById('prefill-notice').style.display='block';
-    prefill('en-fname','fname','first_name');
-    prefill('en-lname','lname','last_name');
-    prefill('en-passport','passport');
-    prefill('en-phone','phone');
-    prefill('en-nationality','nationality');
-    prefill('en-email','email');
-    prefill('en-license','license');
-    prefill('en-address','address');
-    prefill('en-pickup','pickup');
-    prefill('en-dropoff','dropoff');
-    prefill('en-daily','daily_rate');
-    prefill('en-ins-fee','ins_fee');
-    prefill('en-req-dep','deposit');
-    prefill('en-paid-egp','paid_egp');
-    prefill('en-paid-usd','paid_usd');
-    prefill('en-paid-eur','paid_eur');
-    prefill('en-dep-egp','dep_egp');
 
-    if(P.get('branch')){
+    // Client details
+    setVal('en-fname',get('cl_fname','fname','first_name'));
+    setVal('en-lname',get('cl_sname','cl_lname','lname','last_name'));
+    setVal('en-passport',get('cl_pass','passport'));
+    setVal('en-nationality',get('cl_nation','nationality'));
+    setVal('en-phone',get('cl_phone','phone'));
+    setVal('en-email',get('cl_email','email'));
+    setVal('en-license',get('cl_lic','license'));
+    setVal('en-address',get('cl_addr','address'));
+    setVal('en-add-dr-name',get('cl_add_driver'));
+    setVal('en-add-dr-lic',get('cl_add_lic'));
+
+    // Vehicle
+    const carCode=get('carCode','carId');
+    if(carCode){const sel=document.getElementById('en-car');if(sel){sel.value=carCode;selectCar();}}
+    setVal('en-km-out',get('kmOut'));
+
+    // Dates & locations
+    setVal('en-pickup',get('pickup'));
+    setVal('en-dropoff',get('dropoff'));
+    const plocType=get('p_loc_type','ploc_type');
+    if(plocType){const sel=document.getElementById('en-ploc-type');if(sel)[...sel.options].forEach(o=>{if(o.value===plocType||o.textContent===plocType)o.selected=true;});}
+    setVal('en-ploc-addr',get('p_loc_detail','ploc_addr','ploc'));
+    const dlocType=get('d_loc_type','dloc_type');
+    if(dlocType){const sel=document.getElementById('en-dloc-type');if(sel)[...sel.options].forEach(o=>{if(o.value===dlocType||o.textContent===dlocType)o.selected=true;});}
+    setVal('en-dloc-addr',get('d_loc_detail','dloc_addr','dloc'));
+
+    // Financial
+    setVal('en-daily',get('rateRent','daily_rate'));
+    setVal('en-ins-fee',get('rateIns','ins_fee'));
+    setVal('en-del-fee',get('fee_del','del_fee'));
+    setVal('en-pick-fee',get('fee_col','pick_fee'));
+    setVal('en-paid-egp',get('pay_rent_egp','paid_egp'));
+    setVal('en-paid-usd',get('pay_rent_usd','paid_usd'));
+    setVal('en-paid-eur',get('pay_rent_eur','paid_eur'));
+    setVal('en-dep-egp',get('pay_dep_egp','dep_egp'));
+    setVal('en-dep-usd',get('pay_dep_usd','dep_usd'));
+    setVal('en-dep-eur',get('pay_dep_eur','dep_eur'));
+    setVal('en-req-dep',get('req_deposit','deposit'));
+    setVal('en-km-cost',get('kmCost','km_cost'));
+
+    // Packages & mode
+    const kmPkg=get('kmPkg','km_pkg');
+    if(kmPkg){const sel=document.getElementById('en-km-pkg');if(sel)sel.value=kmPkg;}
+    const insPlan=get('insPlan','ins_plan');
+    if(insPlan){const sel=document.getElementById('en-ins-pkg');if(sel)sel.value=insPlan;}
+    const rentalMode=get('rentalMode','rental_mode');
+    if(rentalMode){const sel=document.getElementById('en-mode');if(sel)sel.value=rentalMode;}
+
+    // Branch
+    const branch=get('branch');
+    if(branch){
       const sel=document.getElementById('en-branch');
-      if(sel){const code=P.get('branch').toUpperCase().slice(0,3);
-        [...sel.options].forEach(o=>{if(o.value===code)o.selected=true;});
-      }
+      if(sel){const code=branch.toUpperCase().slice(0,3);[...sel.options].forEach(o=>{if(o.value===code)o.selected=true;});}
     }
-    if(P.get('carId')){
-      const sel=document.getElementById('en-car');
-      if(sel){sel.value=P.get('carId');selectCar();}
-    }
-    if(P.get('ploc'))document.getElementById('en-ploc-addr').value=P.get('ploc');
-    if(P.get('dloc'))document.getElementById('en-dloc-addr').value=P.get('dloc');
+
     calc();
+    if(currentOrderId){
+      setTimeout(generateContract,800);
+    }
   }else{
-    // Default today's date
-    const now=new Date();
-    const isoNow=now.toISOString().slice(0,16);
-    document.getElementById('en-pickup').value=isoNow;
+    document.getElementById('en-pickup').value=new Date().toISOString().slice(0,16);
   }
 }
 
@@ -441,7 +469,8 @@ async function generateContract(){
   if(daily<=0){alert('Daily rent must be greater than 0.');return;}
 
   const branchCode=document.getElementById('en-branch')?.value||'HRG';
-  const ref=await generateDocRef('CN',branchCode);
+  const ref=window._contractNo||(await generateDocRef('CN',branchCode));
+  window._contractNo=null;
   currentRef=ref;
   document.getElementById('ref-preview').textContent=ref;
 

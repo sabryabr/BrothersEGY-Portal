@@ -3490,6 +3490,7 @@ async function loadFleetRadar(){
       </div>
     </div>
     <div id="fleet-filter-bar-gantt"></div>
+    <div id="fleet-location-filter-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px 4px;border-bottom:1px solid var(--border);margin-bottom:4px;"></div>
     <!-- Legend -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 13px;
                 background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);">
@@ -3524,6 +3525,7 @@ async function loadFleetRadar(){
          padding:13px;box-shadow:0 12px 40px rgba(0,0,0,0.7);pointer-events:none;"></div>`;
 
   buildFleetFilterBar('fleet-filter-bar-gantt','renderGantt');
+  buildLocationFilterBar();
   await triggerGlobalRender();
   initGanttDrag();
 }
@@ -3586,6 +3588,22 @@ function ganttScrollToToday(){
   const CAR_COL=240;
   const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2)+100;
   wrap.scrollTo({left:Math.max(0,todayPx),behavior:'smooth'});
+}
+
+function buildLocationFilterBar(){
+  const bar=document.getElementById('fleet-location-filter-bar');if(!bar)return;
+  const locs=[{v:'all',l:'All'},{v:'HRG',l:'HRG'},{v:'ALX',l:'ALX'},{v:'CAI',l:'CAI'},{v:'Workshop',l:'🔧 Workshop'},{v:'With Client',l:'🚗 With Client'}];
+  const cur=window.GANTT_LOCATION_FILTER||'all';
+  bar.innerHTML=`<span style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;">LOCATION</span>`
+    +locs.map(loc=>`<button class="filter-btn-loc${cur===loc.v?' active':''}" data-loc="${loc.v}" onclick="setLocationFilter('${loc.v}')"
+      style="padding:2px 9px;border-radius:99px;border:1px solid ${cur===loc.v?'var(--accent)':'var(--border)'};
+             background:${cur===loc.v?'var(--accent)':'var(--glass)'};color:${cur===loc.v?'#fff':'var(--text2)'};
+             font-size:10px;font-weight:700;cursor:pointer;transition:all 0.15s;">${loc.l}</button>`).join('');
+}
+function setLocationFilter(loc){
+  window.GANTT_LOCATION_FILTER=loc;
+  buildLocationFilterBar();
+  renderGantt();
 }
 
 async function renderGantt(){
@@ -3662,6 +3680,9 @@ async function renderGantt(){
       }
       return true;
     });
+    // Location filter
+    const locFilter=window.GANTT_LOCATION_FILTER||'all';
+    const activeCars=locFilter==='all'?cars:cars.filter(c=>(c.current_location||'').toLowerCase().includes(locFilter.toLowerCase()));
 
     // Build date header
     let headerMonthHTML='',headerDayHTML='';
@@ -3700,7 +3721,7 @@ async function renderGantt(){
       accident:'#ef4444',maintenance:'#f59e0b',archived:'#64748b'
     };
 
-    cars.forEach((car,ci)=>{
+    (typeof activeCars!=='undefined'?activeCars:cars).forEach((car,ci)=>{
     // All possible ID values for this car
     const possibleIds=new Set([
       String(car.ID||'').trim(),
@@ -3779,6 +3800,7 @@ async function renderGantt(){
               <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
                 <span class="pill pill-${statusKey}" style="font-size:8px;padding:1px 5px;">${statusLabel}</span>
                 <span style="font-size:9px;color:var(--text3);">${orderCount} orders</span>
+                ${car.current_location?`<span style="font-size:8px;color:var(--text3);">📍${car.current_location.replace(/-?Office/,'').replace(/-?Airport/,'✈️')}</span>`:''}
               </div>
             </div>
           </div>
@@ -4232,6 +4254,26 @@ async function openCarDetailModal(carId){
         </div>
       </div>
     </div>
+    <!-- Location -->
+    <div style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;">
+      <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:8px;">📍 Current Location</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <select id="car-location-select-${car.id}" class="form-input" style="flex:1;min-width:160px;">
+          <option value="">-- Select Location --</option>
+          <option value="HRG-Office">Hurghada Office</option>
+          <option value="HRG-Airport">Hurghada Airport</option>
+          <option value="ALX-Office">Alexandria Office</option>
+          <option value="CAI-Office">Cairo Office</option>
+          <option value="RSH-Office">Rashid Office</option>
+          <option value="With Client">With Client</option>
+          <option value="Workshop">Workshop / Service</option>
+          <option value="Other">Other</option>
+        </select>
+        <input type="text" id="car-location-detail-${car.id}" class="form-input" style="flex:1;min-width:140px;" placeholder="Detail / notes..." value="${car.current_location_detail||''}">
+        <button class="btn btn-primary btn-sm" onclick="saveCarLocation('${car.id}')">💾 Save</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:5px;">Current: <strong>${car.current_location||'Not set'}</strong>${car.current_location_updated?' (updated: '+car.current_location_updated+')':''}</div>
+    </div>
     <!-- Action Buttons -->
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <button class="btn btn-primary" onclick="closeModal();showPage('vehicle-360');setTimeout(()=>{const s=document.getElementById('v360-car-select');if(s){s.value='${car.ID||car.id}';loadVehicle360Details();}},300)">
@@ -4245,7 +4287,26 @@ async function openCarDetailModal(carId){
     </div>`;
 
   openModal(`🚗 ${getCarLabel(car,'en')}`,html,true);
+  setTimeout(()=>{const sel=document.getElementById('car-location-select-'+car.id);if(sel&&car.current_location)sel.value=car.current_location;},100);
   await logAction('VIEW','Fleet Radar',`Viewed car details: ${getCarLabel(car,'en')}`);
+}
+
+async function saveCarLocation(carId){
+  const sel=document.getElementById('car-location-select-'+carId);
+  const det=document.getElementById('car-location-detail-'+carId);
+  const location=sel?.value||'';
+  const detail=det?.value||'';
+  try{
+    await db.collection('fleet').doc(carId).update({
+      current_location:location,
+      current_location_detail:detail,
+      current_location_updated:new Date().toISOString().slice(0,10),
+      current_location_updated_by:G.user?.username||''
+    },{merge:true});
+    const idx=G.fleet.findIndex(c=>c.id===carId);
+    if(idx>=0){G.fleet[idx].current_location=location;G.fleet[idx].current_location_detail=detail;G.fleet[idx].current_location_updated=new Date().toISOString().slice(0,10);}
+    toast('✅ Location updated: '+location,'success');
+  }catch(e){toast('Error: '+e.message,'error');}
 }
 
 /* ---- Car Edit Modal ---- */
@@ -15012,6 +15073,7 @@ async function _renderVehicle360Full(){
           <span style="font-size:9px;color:var(--text3);">${cat}</span>
         </div>
         <div style="font-size:10px;color:var(--text3);margin-top:4px;">🔢 ${c.plate||'No plate'}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px;">📍 ${c.current_location||'Location unknown'}</div>
         ${fee?`<div style="font-size:10px;color:var(--success);margin-top:2px;">💰 ${fee}/mo</div>`:''}
       </div>`;
     };
@@ -15517,37 +15579,127 @@ function updatePropLocation(type){
 }
 
 /* ============================================================
-   FIX 7 - Add deposit payment
+   FIX 7 - Deposit payment modal (multi-currency)
    ============================================================ */
-async function addDepositPayment(orderId,type){
-  const amount=prompt(`Enter deposit ${type==='collect'?'collected':'returned'} amount (EGP):`);
-  if(!amount||isNaN(amount))return;
-  const currency=prompt('Currency? (EGP/USD/EUR)','EGP');
+function addDepositPayment(orderId,type){
+  const label=type==='collect'?'Collect Deposit':'Return Deposit';
+  const color=type==='collect'?'#22c55e':'#f59e0b';
+  const html=`
+    <div style="font-size:11px;color:var(--text3);margin-bottom:14px;">
+      ${type==='collect'?'Record deposit collected from customer.':'Record deposit returned to customer.'}
+      Exchange rates: USD ${G.ratesUSD?.toFixed(2)||'55'} | EUR ${G.ratesEUR?.toFixed(2)||'60'}
+    </div>
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="field"><label>EGP (Cash)</label><input type="number" id="dep-egp" value="0" min="0" oninput="calcDepTotal()"/></div>
+      <div class="field"><label>USD (Cash)</label><input type="number" id="dep-usd" value="0" min="0" oninput="calcDepTotal()"/></div>
+      <div class="field"><label>EUR (Cash)</label><input type="number" id="dep-eur" value="0" min="0" oninput="calcDepTotal()"/></div>
+      <div class="field"><label>Card (EGP)</label><input type="number" id="dep-card" value="0" min="0" oninput="calcDepTotal()"/></div>
+      <div class="field"><label>Online (EGP)</label><input type="number" id="dep-online" value="0" min="0" oninput="calcDepTotal()"/></div>
+    </div>
+    <div style="background:var(--surface3);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:10px;color:var(--text2);">Total (approx EGP):</span>
+      <span id="dep-total-display" style="font-size:16px;font-weight:800;color:${color};">£0.00</span>
+    </div>
+    <div class="field" style="margin-bottom:12px;"><label>Notes (optional)</label><input type="text" id="dep-notes" placeholder="e.g. Cheque #1234 / damaged deposit"/></div>
+    <button onclick="saveDepositPayment('${orderId}','${type}')" style="width:100%;padding:11px;background:${color};color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;">${label}</button>
+  `;
+  openModal(label,html,false);
+}
+
+function calcDepTotal(){
+  const egp=parseFloat(document.getElementById('dep-egp')?.value)||0;
+  const usd=parseFloat(document.getElementById('dep-usd')?.value)||0;
+  const eur=parseFloat(document.getElementById('dep-eur')?.value)||0;
+  const card=parseFloat(document.getElementById('dep-card')?.value)||0;
+  const online=parseFloat(document.getElementById('dep-online')?.value)||0;
+  const total=egp+(usd*(G.ratesUSD||55))+(eur*(G.ratesEUR||60))+card+online;
+  const el=document.getElementById('dep-total-display');
+  if(el)el.textContent=fmtMoney(total);
+}
+
+async function saveDepositPayment(orderId,type){
+  const egp=parseFloat(document.getElementById('dep-egp')?.value)||0;
+  const usd=parseFloat(document.getElementById('dep-usd')?.value)||0;
+  const eur=parseFloat(document.getElementById('dep-eur')?.value)||0;
+  const card=parseFloat(document.getElementById('dep-card')?.value)||0;
+  const online=parseFloat(document.getElementById('dep-online')?.value)||0;
+  const notes=document.getElementById('dep-notes')?.value||'';
+  const totalEGP=egp+(usd*(G.ratesUSD||55))+(eur*(G.ratesEUR||60))+card+online;
+  if(totalEGP<=0){toast('Enter at least one amount','warning');return;}
+
   const field=type==='collect'?'deposit_held':'deposit_returned';
+  const dateStr=new Date().toISOString().slice(0,10);
+  const receiptPayload={orderId,type,egp,usd,eur,card,online,totalEGP,notes,date:dateStr,collected_by:G.user?.username||'',timestamp:Date.now()};
   try{
     const snap=await db.collection('bookings').doc(orderId).get();
-    const current=parseFloat(snap.data()[field]||0);
+    const cur=snap.data()||{};
     await db.collection('bookings').doc(orderId).update({
-      [field]:current+parseFloat(amount),
-      [`${field}_currency`]:currency||'EGP',
+      [field]:(parseFloat(cur[field]||0))+totalEGP,
+      [`${field}_egp`]:(parseFloat(cur[`${field}_egp`]||0))+egp,
+      [`${field}_usd`]:(parseFloat(cur[`${field}_usd`]||0))+usd,
+      [`${field}_eur`]:(parseFloat(cur[`${field}_eur`]||0))+eur,
       _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
     });
-    await db.collection('payment_log').add({
-      order_id:orderId,
-      type:'deposit_'+type,
-      amount:parseFloat(amount),
-      currency:currency||'EGP',
-      date:new Date().toISOString().slice(0,10),
-      collected_by:G.user?.username||'',
-      timestamp:Date.now()
-    });
-    toast(`✅ Deposit ${type==='collect'?'collected':'returned'}: ${fmtMoney(parseFloat(amount))}`,'success');
+    const logRef=await db.collection('payment_log').add({order_id:orderId,type:'deposit_'+type,...receiptPayload});
+    await db.collection('receipts').add({...receiptPayload,receipt_type:'deposit_'+type,receipt_id:logRef.id});
+    closeModal();
+    toast(`✅ Deposit ${type==='collect'?'collected':'returned'}: ${fmtMoney(totalEGP)}`,'success');
+    printDepositReceipt({...receiptPayload,orderRef:orderId,receiptId:logRef.id});
     openOrderDetail(orderId);
   }catch(e){toast('Failed: '+e.message,'error');}
 }
 
+function printDepositReceipt(d){
+  const logo='https://brothersegy.com/wp-content/uploads/2026/02/12345.png';
+  const title=d.type==='collect'?'DEPOSIT RECEIPT':'DEPOSIT RETURN RECEIPT';
+  const today=new Date().toLocaleString('en-GB');
+  const fmtM=n=>'£'+parseFloat(n||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const copyHtml=copyLabel=>`
+    <div style="border:2px solid #1e40af;border-radius:8px;padding:14px;font-family:Arial,sans-serif;font-size:9pt;color:#000;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e40af;padding-bottom:8px;margin-bottom:10px;">
+        <div><img src="${logo}" style="height:34px;"/><div style="font-size:13pt;font-weight:900;color:#1e40af;">BROTHERS EGY</div><div style="font-size:7pt;color:#64748b;">Car Rental Services</div></div>
+        <div style="text-align:right;"><div style="font-size:12pt;font-weight:800;color:#1e40af;">${title}</div><div style="font-size:8pt;margin-top:3px;">${copyLabel}</div><div style="font-size:8pt;color:#64748b;">Date: ${today}</div><div style="font-size:8pt;color:#64748b;">Order: ${d.orderRef||'—'}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:8pt;margin-bottom:10px;">
+        <div><strong>Agent:</strong> ${d.collected_by||'—'}</div>
+        <div><strong>Notes:</strong> ${d.notes||'—'}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:10px;">
+        <thead><tr style="background:#1e40af;color:#fff;"><th style="padding:5px 8px;text-align:left;">Method</th><th style="padding:5px 8px;text-align:right;">Amount</th></tr></thead>
+        <tbody>
+          ${d.egp>0?`<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">Cash EGP</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtM(d.egp)}</td></tr>`:''}
+          ${d.usd>0?`<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">Cash USD</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">$${d.usd}</td></tr>`:''}
+          ${d.eur>0?`<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">Cash EUR</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">€${d.eur}</td></tr>`:''}
+          ${d.card>0?`<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">Card</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtM(d.card)}</td></tr>`:''}
+          ${d.online>0?`<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">Online</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">${fmtM(d.online)}</td></tr>`:''}
+        </tbody>
+        <tfoot><tr style="background:#f0fdf4;font-weight:800;"><td style="padding:6px 8px;color:#166534;">TOTAL (EGP)</td><td style="padding:6px 8px;text-align:right;font-size:11pt;color:#166534;">${fmtM(d.totalEGP)}</td></tr></tfoot>
+      </table>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;">
+        <div style="text-align:center;"><div style="width:130px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:7.5pt;color:#64748b;">Customer Signature</div></div>
+        <div style="text-align:center;"><div style="width:130px;border-top:1px solid #334155;margin-bottom:3px;"></div><div style="font-size:7.5pt;color:#64748b;">Agent – ${d.collected_by||'Brothers EGY'}</div></div>
+      </div>
+    </div>`;
+  const win=window.open('','_blank','width=580,height=700');
+  if(!win)return;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;background:#f1f5f9;padding:20px;}
+  .sheet{max-width:520px;margin:0 auto;background:#fff;padding:20px;box-shadow:0 4px 16px rgba(0,0,0,.1);}
+  .cut{text-align:center;border-top:1px dashed #94a3b8;border-bottom:1px dashed #94a3b8;padding:4px 0;color:#94a3b8;font-size:8pt;margin:12px 0;}
+  .no-print{text-align:center;margin-bottom:14px;}
+  @media print{body{background:#fff;padding:0;}.no-print{display:none!important;}.sheet{box-shadow:none;padding:10px;}}
+  </style></head><body>
+  <div class="no-print"><button onclick="window.print()" style="padding:8px 18px;background:#1e40af;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">🖨️ Print</button></div>
+  <div class="sheet">
+    ${copyHtml('CLIENT COPY')}
+    <div class="cut">✂ — — — — — — CUT HERE — — — — — — ✂</div>
+    ${copyHtml('COMPANY COPY')}
+  </div></body></html>`);
+  win.document.close();
+}
+
 /* ============================================================
-   FIX 8 - Internal contract generation
+   FIX 8 - Open contract-en.html with URL params pre-filled
    ============================================================ */
 async function printOrderContract(orderId){
   let o=allOrders.find(x=>x.id===orderId);
@@ -15555,42 +15707,70 @@ async function printOrderContract(orderId){
     try{const snap=await db.collection('bookings').doc(orderId).get();if(!snap.exists){toast('Order not found','error');return;}o={id:snap.id,...snap.data()};}
     catch(e){toast('Could not load order','error');return;}
   }
-  const{start,end}=getOrderDates(o);
   const carCode=String(o['كود السيارة']||o.col_D||'');
   const car=G.fleet.find(c=>String(c.ID||c.id)===carCode)||{};
   const clientCode=String(o['كود العميل']||o.col_B||'');
-  const customer=G.customers.find(c=>String(c['No.']||c.col_A)===clientCode)||{};
-  const contractRef=o['No.']||o.id;
-  const clientName=o['اسم العميل']||o['ليمعلا مسا']||customer['الاسم الأول']||'';
-  const days=start&&end?Math.ceil((end-start)/86400000):0;
-  const daily=parseAmount(o['سعر السيارة اليومي بالجنيه المصري']||0);
-  const total=parseAmount(o['إجمالي المستحق (Total)']||o['قحتسملا يلامجإ (Total)']||0);
-  const paid=parseAmount(o['المدفوع EGP']||o['عوفدملا EGP']||0);
-  const deposit=parseAmount(o['deposit_held']||0);
-  const plate=car.plate||formatPlate(car)||'';
-  const carLabel=car.car_label||getCarLabel(car,'en')||carCode;
-  const html=generateContractHTML({
-    ref:contractRef,
-    branch:o['فرع الإصدار']||o.branch||'HRG',
-    client:{
-      name:clientName,
-      passport:customer['رقم جواز السفر']||customer['رفسلا زاوج مقر']||'',
-      license:customer['رقم رخصة القيادة']||'',
-      nationality:customer['رمز الدولة']||customer.col_H||'',
-      phone:customer['رقم التليفون']||'',
-      email:customer['البريد الإلكتروني']||'',
-      address:customer['العنوان']||''
-    },
-    car:{label:carLabel,plate,vin:car.chassis||car['رقم الشاسيه']||'',motor:car['رقم الموتور']||'',year:car.year||car['سنة الصنع']||''},
-    period:{start,end,days,pickup_loc:o['مكان الاستلام']||o['مالتسالا ناكم']||'Office',dropoff_loc:o['مكان التسليم']||o['ميلستلا ناكم']||'Office'},
-    finance:{daily,total,paid,pending:Math.max(0,total-paid),deposit},
-    insurance:o['insurance_plan']||'Basic',
-    mode:days>28?'Monthly':'Daily'
-  });
-  const win=window.open('','_blank');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(()=>win.print(),800);
+  const customer=(G.customers||[]).find(c=>String(c['No.']||c.col_A)===String(clientCode))||{};
+
+  const nameParts=(o['اسم العميل']||o['ليمعلا مسا']||'').split(' ');
+  const fname=nameParts[0]||'';
+  const sname=nameParts.slice(1).join(' ')||'';
+
+  const p=new URLSearchParams();
+  p.set('orderId',orderId);
+  if(fname)p.set('cl_fname',fname);
+  if(sname)p.set('cl_sname',sname);
+  const pass=customer['رقم جواز السفر']||customer['رفسلا زاوج مقر']||customer['passport']||'';
+  if(pass)p.set('cl_pass',pass);
+  const nation=customer['رمز الدولة']||customer.col_H||'';
+  if(nation)p.set('cl_nation',nation);
+  const phone=customer['رقم التليفون']||o['phone']||'';
+  if(phone)p.set('cl_phone',phone);
+  const email=customer['البريد الإلكتروني']||customer['عنوان البريد الإلكتروني']||'';
+  if(email)p.set('cl_email',email);
+  const lic=customer['رقم رخصة القيادة']||'';
+  if(lic)p.set('cl_lic',lic);
+  const addr=customer['العنوان']||'';
+  if(addr)p.set('cl_addr',addr);
+  if(carCode)p.set('carCode',carCode);
+  const carModel=car.car_label||car.model||getCarLabel(car,'en')||'';
+  if(carModel)p.set('carModel',carModel);
+  const plate=car.plate||car.Plate||formatPlate(car)||'';
+  if(plate)p.set('carPlate',plate);
+  const vin=car.chassis||car['رقم الشاسيه']||'';
+  if(vin)p.set('carVin',vin);
+  const motor=car['رقم الموتور']||'';
+  if(motor)p.set('carMotor',motor);
+  if(o['بداية التعاقد'])p.set('pickup',o['بداية التعاقد']);
+  if(o['نهاية التعاقد'])p.set('dropoff',o['نهاية التعاقد']);
+  const pLoc=o['مكان الاستلام']||o['مالتسالا ناكم']||'';
+  if(pLoc){const pts=pLoc.split(' - ');p.set('p_loc_type',pts[0]||'Office');if(pts[1])p.set('p_loc_detail',pts.slice(1).join(' - '));}
+  const dLoc=o['مكان التسليم']||o['ميلستلا ناكم']||'';
+  if(dLoc){const pts=dLoc.split(' - ');p.set('d_loc_type',pts[0]||'Office');if(pts[1])p.set('d_loc_detail',pts.slice(1).join(' - '));}
+  const daily=String(o['سعر السيارة اليومي بالجنيه المصري']||o.daily_rate||'').replace(/[£,]/g,'');
+  if(daily)p.set('rateRent',daily);
+  if(o.insurance_rate)p.set('rateIns',String(o.insurance_rate).replace(/[£,]/g,''));
+  if(o.insurance_plan)p.set('insPlan',o.insurance_plan);
+  if(o.delivery_fee)p.set('fee_del',String(o.delivery_fee).replace(/[£,]/g,''));
+  if(o.pickup_fee)p.set('fee_col',String(o.pickup_fee).replace(/[£,]/g,''));
+  const pEGP=String(o['المدفوع EGP']||o['عوفدملا EGP']||'').replace(/[£,]/g,'');
+  if(pEGP)p.set('pay_rent_egp',pEGP);
+  const pUSD=String(o['المدفوع USD']||'').replace(/[£,]/g,'');
+  if(pUSD)p.set('pay_rent_usd',pUSD);
+  const pEUR=String(o['المدفوع EUR']||'').replace(/[£,]/g,'');
+  if(pEUR)p.set('pay_rent_eur',pEUR);
+  const depEGP=String(o['الوديعة المعلقة لدينا']||o.deposit_held||'').replace(/[£,]/g,'');
+  if(depEGP)p.set('pay_dep_egp',depEGP);
+  if(o.deposit_usd)p.set('pay_dep_usd',String(o.deposit_usd).replace(/[£,]/g,''));
+  if(o.deposit_eur)p.set('pay_dep_eur',String(o.deposit_eur).replace(/[£,]/g,''));
+  if(o.required_deposit)p.set('req_deposit',String(o.required_deposit).replace(/[£,]/g,''));
+  if(o.km_package)p.set('kmPkg',o.km_package);
+  if(o.km_cost)p.set('kmCost',String(o.km_cost).replace(/[£,]/g,''));
+  if(o['No.'])p.set('contractNo',String(o['No.']));
+  p.set('branch',o['فرع الإصدار']||o.branch||'HRG');
+  if(o.rental_mode)p.set('rentalMode',o.rental_mode);
+
+  window.open('contract-en.html?'+p.toString(),'_blank');
   try{
     await db.collection('bookings').doc(orderId).update({
       contract_generated:true,
