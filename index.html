@@ -1559,6 +1559,7 @@ function applyPermissions(){
 async function loadSharedData(){
   await Promise.all([loadFleet(),loadCustomers(),loadProposalsList(),loadBookingsCache()]);
   updateSidebarBadges();
+  try{initRealtimeListeners();}catch(e){console.warn('Realtime listeners failed:',e.message);}
 }
 async function loadFleet(){
   try{
@@ -1618,6 +1619,61 @@ async function loadProposalsList(){
     if(draftCount>0){badge.textContent=draftCount;badge.classList.remove('hidden');}
   }catch(e){console.warn('Proposals load failed:',e.message);}
 }
+
+function initRealtimeListeners(){
+  // Bookings live listener
+  db.collection('bookings').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      const doc={id:change.doc.id,...change.doc.data()};
+      if(change.type==='added'||change.type==='modified'){
+        const idx=G.bookings.findIndex(b=>b.id===doc.id);
+        if(idx>=0)G.bookings[idx]=doc;else G.bookings.push(doc);
+        if(Array.isArray(allOrders)){
+          const idx2=allOrders.findIndex(b=>b.id===doc.id);
+          if(idx2>=0)allOrders[idx2]=doc;
+        }
+      }
+      if(change.type==='removed'){
+        G.bookings=G.bookings.filter(b=>b.id!==doc.id);
+      }
+    });
+    const activeSection=document.querySelector('.page-section.active');
+    if(activeSection?.id==='page-order-book')filterOrders();
+    refreshDashboardKPIs();
+  });
+
+  // Fleet live listener
+  db.collection('fleet').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      const doc={id:change.doc.id,...change.doc.data()};
+      if(change.type==='added'||change.type==='modified'){
+        const idx=G.fleet.findIndex(c=>c.id===doc.id);
+        if(idx>=0)G.fleet[idx]=doc;else G.fleet.push(doc);
+      }
+      if(change.type==='removed'){
+        G.fleet=G.fleet.filter(c=>c.id!==doc.id);
+      }
+    });
+  });
+
+  // Proposals live listener
+  db.collection('proposals').onSnapshot(snap=>{
+    if(!G.proposals)G.proposals=[];
+    snap.docChanges().forEach(change=>{
+      const doc={id:change.doc.id,...change.doc.data()};
+      if(change.type==='added'||change.type==='modified'){
+        const idx=G.proposals.findIndex(p=>p.id===doc.id);
+        if(idx>=0)G.proposals[idx]=doc;else G.proposals.push(doc);
+      }
+      if(change.type==='removed'){
+        G.proposals=G.proposals.filter(p=>p.id!==doc.id);
+      }
+    });
+    const activeSection=document.querySelector('.page-section.active');
+    if(activeSection?.id==='page-proposals'&&typeof renderProposalsList==='function')renderProposalsList();
+  });
+}
+
 async function loadSettings(){
   try{const snap=await db.collection('settings').doc('main').get();if(snap.exists)G.settings={...G.settings,...snap.data()};}
   catch(e){console.warn('Settings load failed:',e.message);}
@@ -1654,11 +1710,32 @@ async function updateSidebarBadges(){
    ============================================================ */
 let NAV_HISTORY=[];
 
+function pushNav(description,restoreFn){
+  NAV_HISTORY.push({description,restoreFn,ts:Date.now()});
+  if(NAV_HISTORY.length>30)NAV_HISTORY.shift();
+  updateBackBtn();
+}
+
+function updateBackBtn(){
+  const btn=document.getElementById('back-btn');
+  if(!btn)return;
+  const total=NAV_HISTORY.length+MODAL_HISTORY.length;
+  if(total>0){
+    btn.style.display='flex';
+    const last=NAV_HISTORY.length>0?NAV_HISTORY[NAV_HISTORY.length-1]:null;
+    btn.title=last?'Back to: '+last.description:'Back';
+  }else{
+    btn.style.display='none';
+  }
+}
+
 function showPage(pageId,params={}){
   // Push previous page to history (skip if same page or going back)
   if(G.currentPage&&G.currentPage!==pageId&&!G._navGoingBack){
-    NAV_HISTORY.push({page:G.currentPage,params:G.currentParams||{}});
-    if(NAV_HISTORY.length>20)NAV_HISTORY.shift(); // cap history
+    const prevPage=G.currentPage;
+    const prevParams=G.currentParams||{};
+    NAV_HISTORY.push({description:'Page: '+prevPage,restoreFn:()=>showPage(prevPage,prevParams),ts:Date.now()});
+    if(NAV_HISTORY.length>30)NAV_HISTORY.shift();
   }
   G._navGoingBack=false;
   G.currentParams=params;
@@ -1672,9 +1749,7 @@ function showPage(pageId,params={}){
   if(G.pendingReturn?.destination===pageId)showReturnBanner();else hideReturnBanner();
   document.getElementById('sidebar').classList.remove('mobile-open');
 
-  // Show/hide back button
-  const backBtn=document.getElementById('back-btn');
-  if(backBtn)backBtn.style.display=NAV_HISTORY.length>0?'block':'none';
+  updateBackBtn();
 }
 
 function goBack(){
@@ -1689,10 +1764,10 @@ function goBack(){
   }else if(NAV_HISTORY.length>0){
     const prev=NAV_HISTORY.pop();
     G._navGoingBack=true;
-    showPage(prev.page,prev.params);
+    if(typeof prev.restoreFn==='function')prev.restoreFn();
+    else if(prev.page)showPage(prev.page,prev.params||{});
   }
-  const backBtn=document.getElementById('back-btn');
-  if(backBtn)backBtn.style.display=(MODAL_HISTORY.length+NAV_HISTORY.length)>0?'block':'none';
+  updateBackBtn();
 }
 function renderPage(pageId){
   const renders={
@@ -1720,8 +1795,7 @@ let MODAL_HISTORY=[];
 function openModal(title,html,wide=false){
   MODAL_HISTORY.push({title,content:html,wide});
   _openModalDirect(title,html,wide);
-  const backBtn=document.getElementById('back-btn');
-  if(backBtn)backBtn.style.display='block';
+  updateBackBtn();
 }
 
 function _openModalDirect(title,html,wide=false){
@@ -1738,9 +1812,8 @@ function closeModal(){
     _openModalDirect(prev.title,prev.content,prev.wide);
   }else{
     document.getElementById('global-modal').classList.remove('open');
-    const backBtn=document.getElementById('back-btn');
-    if(backBtn)backBtn.style.display=NAV_HISTORY.length>0?'block':'none';
   }
+  updateBackBtn();
 }
 
 /* ============================================================
@@ -1907,10 +1980,10 @@ async function loadDashboard(){
         <div class="kpi-sub">Currently running</div>
         <div class="kpi-icon">📋</div>
       </div>
-      <div class="kpi-card" onclick="showPage('order-book')" style="cursor:pointer;">
+      <div class="kpi-card" onclick="showPage('order-book');setTimeout(()=>setOrderFilter('overdue'),300)" style="cursor:pointer;">
         <div class="kpi-label">Overdue Orders</div>
         <div class="kpi-value text-danger" id="kpi-overdue">--</div>
-        <div class="kpi-sub">Past end date</div>
+        <div class="kpi-sub">Past end date — click to view</div>
         <div class="kpi-icon">⚠️</div>
       </div>
       <div class="kpi-card" onclick="showPage('fleet-radar')" style="cursor:pointer;">
@@ -3023,6 +3096,7 @@ function refreshOrderBook(){
 
 /* ---- Order Detail Modal ---- */
 async function openOrderDetail(orderId){
+  pushNav('Order #'+orderId,()=>openOrderDetail(orderId));
   let o=allOrders.find(x=>x.id===orderId);
   if(!o){
     try{const snap=await db.collection('bookings').doc(orderId).get();if(!snap.exists){toast('Order not found','error');return;}o={id:snap.id,...snap.data()};}
@@ -3147,12 +3221,72 @@ async function openOrderDetail(orderId){
       <button class="btn btn-ghost" onclick="viewOrderPayments('` + o.id + `','` + (o['No.']||o.id) + `')">💳 Payments</button>
       <button class="btn btn-ghost" onclick="viewOrderDocuments('` + o.id + `','` + (o['No.']||o.id) + `')">📁 Docs</button>
       <button class="btn btn-ghost" onclick="openReminderForm('` + o.id + `')">🔔 Set Reminder</button>
+      <button class="btn btn-ghost" onclick="extendOrder('` + o.id + `')">📅 Extend Order</button>
+      <button class="btn btn-ghost" onclick="switchOrderCar('` + o.id + `')">🔄 Switch Car</button>
       ${G.user?.role==='Admin'?`<button class="btn btn-sm" style="background:var(--danger);color:#fff;" onclick="if(confirm('DELETE order #${o['No.']} permanently? This cannot be undone.')) adminDeleteOrder('${o.id}')">🗑️ Delete</button>`:''}
     </div>`;
 
     openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`, html, true);
     logAction('VIEW','Order Book', `Viewed order #${o['No.']||o.id}`);
 
+}
+
+/* ---- Extend Order ---- */
+async function extendOrder(orderId){
+  const o=allOrders.find(b=>b.id===orderId)||G.bookings.find(b=>b.id===orderId);
+  const currentEnd=o?.col_T||o?.['تاريخ الانتهاء']||'';
+  const newEnd=prompt('New end date/time (YYYY-MM-DDTHH:MM or YYYY-MM-DD HH:MM):\nCurrent: '+currentEnd,currentEnd);
+  if(!newEnd||newEnd===currentEnd)return;
+  try{
+    await db.collection('bookings').doc(orderId).update({col_T:newEnd,_sys_updated:firebase.firestore.FieldValue.serverTimestamp()});
+    const idx=allOrders.findIndex(b=>b.id===orderId);if(idx>=0)allOrders[idx].col_T=newEnd;
+    const idx2=G.bookings.findIndex(b=>b.id===orderId);if(idx2>=0)G.bookings[idx2].col_T=newEnd;
+    toast('✅ Order extended to: '+newEnd,'success');
+    closeModal();setTimeout(()=>openOrderDetail(orderId),200);
+  }catch(e){toast('Extend failed: '+e.message,'error');}
+}
+
+/* ---- Switch Car ---- */
+async function switchOrderCar(orderId){
+  const o=allOrders.find(b=>b.id===orderId)||G.bookings.find(b=>b.id===orderId);
+  if(!o)return;
+  const cars=G.fleet.filter(c=>c.is_active!==false&&!c.archived);
+  const html=`<div>
+    <select id="car-switch-sel" style="width:100%;margin-bottom:12px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <option value="">-- Select replacement car --</option>
+      ${cars.map(c=>`<option value="${c.id}">${getCarLabel(c,'en')} | ${c.plate||''}</option>`).join('')}
+    </select>
+    <button class="btn btn-primary btn-full" onclick="
+      const sel=document.getElementById('car-switch-sel');
+      const car=G.fleet.find(c=>c.id===sel.value);
+      if(!car){toast('Select a car','error');return;}
+      closeModal();
+      setTimeout(()=>doSwitchOrderCar('${orderId}',car.id,getCarLabel(car,'en')),100);
+    ">🔄 Confirm Switch</button>
+  </div>`;
+  openModal('🔄 Select Replacement Car',html);
+}
+
+async function doSwitchOrderCar(orderId,newCarId,newCarLabel){
+  const o=allOrders.find(b=>b.id===orderId)||G.bookings.find(b=>b.id===orderId);
+  if(!o)return;
+  const oldCarId=o['كود السيارة']||'';
+  const depositHeld=parseAmount(o.deposit_held||o['الوديعة المحتجزة']||0);
+  const updates={
+    'كود السيارة':newCarId,
+    car_label:newCarLabel,
+    car_switched_from:oldCarId,
+    car_switched_at:new Date().toISOString(),
+    deposit_transfer_note:`Deposit transferred from car ${oldCarId} to car ${newCarId}. Amount: ${fmtMoney(depositHeld)}`,
+    _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    await db.collection('bookings').doc(orderId).update(updates);
+    const idx=allOrders.findIndex(b=>b.id===orderId);if(idx>=0)Object.assign(allOrders[idx],updates);
+    const idx2=G.bookings.findIndex(b=>b.id===orderId);if(idx2>=0)Object.assign(G.bookings[idx2],updates);
+    toast('✅ Car switched to: '+newCarLabel+'. Deposit transferred.','success');
+    openOrderDetail(orderId);
+  }catch(e){toast('Car switch failed: '+e.message,'error');}
 }
 
 /* ---- Order Edit ---- */
@@ -3237,10 +3371,20 @@ function quickAddPayment(orderId){
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:3px;"><span style="color:var(--text3);">Outstanding:</span><strong style="color:var(--danger);">${fmtMoney(debt)}</strong></div>
     </div>
     <div class="form-grid">
-      <div class="field"><label>Amount EGP</label><input type="number" id="qp-egp" value="0" oninput="updateQPTotal()"/></div>
-      <div class="field"><label>Amount USD</label><input type="number" id="qp-usd" value="0" oninput="updateQPTotal()"/></div>
-      <div class="field"><label>Amount EUR</label><input type="number" id="qp-eur" value="0" oninput="updateQPTotal()"/></div>
-      <div class="field"><label>Card (EGP)</label><input type="number" id="qp-card" value="0" oninput="updateQPTotal()"/></div>
+      <div class="field"><label>Amount EGP (Cash)</label><input type="number" id="qp-egp" value="0" oninput="updateQPTotal()"/></div>
+      <div class="field"><label>Amount USD (Cash)</label><input type="number" id="qp-usd" value="0" oninput="updateQPTotal()"/></div>
+      <div class="field"><label>Amount EUR (Cash)</label><input type="number" id="qp-eur" value="0" oninput="updateQPTotal()"/></div>
+      <div class="field"><label>Card / POS (EGP)</label><input type="number" id="qp-card" value="0" oninput="updateQPTotal()"/></div>
+      <div class="field"><label>Online Transfer (EGP)</label><input type="number" id="qp-online" value="0" oninput="updateQPTotal()"/></div>
+      <div class="field"><label>Collected By</label>
+        <select id="qp-collected-by">
+          <option value="${G.user?.username||'me'}">Me (${G.user?.username||''})</option>
+          <option value="sabry">Sabry</option>
+          <option value="eslam">Eslam</option>
+          <option value="shams">Shams</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
     </div>
     <div style="margin-top:9px;padding:9px 13px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:700;">Total This Payment</span>
@@ -3261,6 +3405,7 @@ function quickAddPayment(orderId){
           <option value="Fuel Shortfall">Fuel Shortfall</option>
           <option value="Damage Charge">Damage Charge</option>
           <option value="Security Deposit">Security Deposit</option>
+          <option value="website_deposit">🌐 Website Booking Deposit</option>
           <option value="Other">Other</option>
         </select></div>
     </div>
@@ -3276,15 +3421,18 @@ function updateQPTotal(){
   const usd=parseFloat(document.getElementById('qp-usd')?.value)||0;
   const eur=parseFloat(document.getElementById('qp-eur')?.value)||0;
   const card=parseFloat(document.getElementById('qp-card')?.value)||0;
+  const online=parseFloat(document.getElementById('qp-online')?.value)||0;
   const el=document.getElementById('qp-total');
-  if(el)el.textContent=fmtMoney(egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card);
+  if(el)el.textContent=fmtMoney(egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card+online);
 }
 async function saveQuickPayment(orderId,totalDue,prevPaid){
   const egp=parseFloat(document.getElementById('qp-egp')?.value)||0;
   const usd=parseFloat(document.getElementById('qp-usd')?.value)||0;
   const eur=parseFloat(document.getElementById('qp-eur')?.value)||0;
   const card=parseFloat(document.getElementById('qp-card')?.value)||0;
-  const thisPayment=egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card;
+  const online=parseFloat(document.getElementById('qp-online')?.value)||0;
+  const collectedBy=document.getElementById('qp-collected-by')?.value||G.user?.username||'';
+  const thisPayment=egp+(usd*G.ratesUSD)+(eur*G.ratesEUR)+card+online;
   if(thisPayment<=0){toast('Payment must be greater than 0','error');return;}
   const payDate=document.getElementById('qp-date')?.value;
   const payCategory=document.getElementById('qp-category')?.value;
@@ -3311,8 +3459,9 @@ async function saveQuickPayment(orderId,totalDue,prevPaid){
       payment_date:payDate,
       category:payCategory,
       notes:payNotes,
-      egp,usd,eur,card,
+      egp,usd,eur,card,online,
       total_egp:thisPayment,
+      collected_by:collectedBy,
       recorded_by:G.user?.username||'',
       branch:G.user?.branch||'',
       created_at:Date.now()
@@ -4169,6 +4318,7 @@ function closeGanttTip(){hideGanttTip();}
 
 /* ---- Car Detail Modal ---- */
 async function openCarDetailModal(carId){
+  pushNav('Car '+carId,()=>openCarDetailModal(carId));
   const car=G.fleet.find(c=>String(c.ID||c.id)===String(carId));
   if(!car){toast('Car not found','error');return;}
   const isPriv=['Admin','Executive'].includes(G.user?.role);
@@ -5072,18 +5222,44 @@ function filterCRM(){
 
 function openAddCustomerModal(){
   const html=`
-    <p style="font-size:11px;color:var(--text3);margin-bottom:13px;">Required: Full name + Phone + (National ID or Passport)</p>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:13px;">Required: Full name + Phone</p>
     <div class="form-grid">
       <div class="field"><label>First Name *</label><input type="text" id="nc-fname" placeholder="First Name"/></div>
       <div class="field"><label>Last Name *</label><input type="text" id="nc-lname" placeholder="Last Name"/></div>
       <div class="field"><label>Phone *</label><input type="text" id="nc-phone" placeholder="+20..."/></div>
-      <div class="field"><label>Nationality / Country Code</label><input type="text" id="nc-nat" placeholder="EG / UK etc."/></div>
-      <div class="field"><label>National ID</label><input type="text" id="nc-natid" placeholder="National ID"/></div>
-      <div class="field"><label>Passport No.</label><input type="text" id="nc-passport" placeholder="Passport Number"/></div>
-      <div class="field"><label>Driver License</label><input type="text" id="nc-license" placeholder="License Number"/></div>
-      <div class="field"><label>Email</label><input type="text" id="nc-email" placeholder="Email"/></div>
-      <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="nc-address" placeholder="Full Address"/></div>
+      <div class="field">
+        <label>Client Source</label>
+        <select id="nc-source">
+          <option value="">-- How did they find us? --</option>
+          <option value="Website">🌐 Website</option>
+          <option value="WhatsApp">💬 WhatsApp</option>
+          <option value="Messenger">📱 Messenger</option>
+          <option value="Instagram">📸 Instagram</option>
+          <option value="Phone Call">📞 Phone Call</option>
+          <option value="Office Visit">🏢 Office Visit</option>
+          <option value="Referral">🤝 Referral</option>
+          <option value="Booking.com">🏨 Booking.com</option>
+          <option value="Airbnb">🏠 Airbnb</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
     </div>
+    <details style="margin-top:10px;">
+      <summary style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px;">▸ More Details (optional)</summary>
+      <div class="form-grid" style="margin-top:8px;">
+        <div class="field"><label>Nationality / Country Code</label><input type="text" id="nc-nat" placeholder="EG / UK etc."/></div>
+        <div class="field"><label>Email</label><input type="text" id="nc-email" placeholder="Email"/></div>
+        <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="nc-address" placeholder="Full Address"/></div>
+      </div>
+    </details>
+    <details style="margin-top:8px;">
+      <summary style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px;">▸ Contract Fields (required for contract generation)</summary>
+      <div class="form-grid" style="margin-top:8px;">
+        <div class="field"><label>National ID</label><input type="text" id="nc-natid" placeholder="National ID"/></div>
+        <div class="field"><label>Passport No.</label><input type="text" id="nc-passport" placeholder="Passport Number"/></div>
+        <div class="field"><label>Driver License</label><input type="text" id="nc-license" placeholder="License Number"/></div>
+      </div>
+    </details>
     <div style="display:flex;gap:7px;margin-top:13px;">
       <button class="btn btn-success" onclick="saveNewCustomer()">💾 Save Customer</button>
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -5095,16 +5271,16 @@ async function saveNewCustomer(){
   const fname=document.getElementById('nc-fname')?.value.trim();
   const lname=document.getElementById('nc-lname')?.value.trim();
   const phone=document.getElementById('nc-phone')?.value.trim();
-  const natid=document.getElementById('nc-natid')?.value.trim();
-  const passport=document.getElementById('nc-passport')?.value.trim();
+  const natid=document.getElementById('nc-natid')?.value.trim()||'';
+  const passport=document.getElementById('nc-passport')?.value.trim()||'';
+  const source=document.getElementById('nc-source')?.value||'';
   if(!fname||!lname||!phone){toast('First name, last name, and phone are required','error');return;}
-  if(!natid&&!passport){toast('At least one ID (National ID or Passport) is required','error');return;}
   try{
     const snap=await db.collection('customers').limit(1).get();
     const lastNo=snap.empty?0:parseInt(snap.docs[0].data()['No.']||0);
     const nextNo=lastNo+1;
     const now=Date.now();
-    const newCust={'No.':String(nextNo),'الاسم الأول':fname,'الاسم الأخير':lname,'رقم التليفون':phone,'رمز الدولة':document.getElementById('nc-nat')?.value.trim()||'','الرقم القومي':natid,'رقم جواز السفر':passport,'رقم رخصة القيادة':document.getElementById('nc-license')?.value.trim()||'','عنوان البريد الإلكتروني':document.getElementById('nc-email')?.value.trim()||'','العنوان':document.getElementById('nc-address')?.value.trim()||'','تاريخ التسجيل':new Date().toLocaleDateString('en-GB',{month:'2-digit',year:'numeric'}),'_sys_updated':now};
+    const newCust={'No.':String(nextNo),'الاسم الأول':fname,'الاسم الأخير':lname,'رقم التليفون':phone,'رمز الدولة':document.getElementById('nc-nat')?.value.trim()||'','الرقم القومي':natid,'رقم جواز السفر':passport,'رقم رخصة القيادة':document.getElementById('nc-license')?.value.trim()||'','عنوان البريد الإلكتروني':document.getElementById('nc-email')?.value.trim()||'','العنوان':document.getElementById('nc-address')?.value.trim()||'','client_source':source,'تاريخ التسجيل':new Date().toLocaleDateString('en-GB',{month:'2-digit',year:'numeric'}),'_sys_updated':now};
     const ref=await db.collection('customers').add(newCust);
     newCust.id=ref.id;G.customers.unshift(newCust);
     await logAction('ADD','CRM Hub',`New customer: ${fname} ${lname} | ID: ${passport||natid}`);
@@ -5127,17 +5303,24 @@ async function saveNewCustomer(){
 
 function openEditCustomerModal(customerId){
   const c=G.customers.find(x=>x.id===customerId);if(!c)return;
+  const srcOpts=['','Website','WhatsApp','Messenger','Instagram','Phone Call','Office Visit','Referral','Booking.com','Airbnb','Other'];
   const html=`
     <div style="font-size:10px;color:var(--success);margin-bottom:11px;font-weight:700;">CRM ID: #${c['No.']||c.col_A||c.id}</div>
     <div class="form-grid">
       <div class="field"><label>First Name</label><input type="text" id="ec-fname" value="${c['الاسم الأول']||c.col_C||''}"/></div>
       <div class="field"><label>Last Name</label><input type="text" id="ec-lname" value="${c['الاسم الأخير']||c.col_D||''}"/></div>
       <div class="field"><label>Phone</label><input type="text" id="ec-phone" value="${c['رقم التليفون']||''}"/></div>
+      <div class="field">
+        <label>Client Source</label>
+        <select id="ec-source">
+          ${srcOpts.map(s=>`<option value="${s}" ${(c.client_source||'')==s?'selected':''}>${s||'-- How did they find us? --'}</option>`).join('')}
+        </select>
+      </div>
       <div class="field"><label>Nationality</label><input type="text" id="ec-nat" value="${c['رمز الدولة']||c.col_H||''}"/></div>
+      <div class="field"><label>Email</label><input type="text" id="ec-email" value="${c['عنوان البريد الإلكتروني']||''}"/></div>
       <div class="field"><label>National ID</label><input type="text" id="ec-natid" value="${c['الرقم القومي']||''}"/></div>
       <div class="field"><label>Passport No.</label><input type="text" id="ec-passport" value="${c['رقم جواز السفر']||''}"/></div>
       <div class="field"><label>Driver License</label><input type="text" id="ec-license" value="${c['رقم رخصة القيادة']||''}"/></div>
-      <div class="field"><label>Email</label><input type="text" id="ec-email" value="${c['عنوان البريد الإلكتروني']||''}"/></div>
       <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="ec-address" value="${c['العنوان']||''}"/></div>
     </div>
     <div style="display:flex;gap:7px;margin-top:13px;flex-wrap:wrap;">
@@ -5150,7 +5333,7 @@ function openEditCustomerModal(customerId){
 
 async function updateCustomer(customerId){
   try{
-    const upd={'الاسم الأول':document.getElementById('ec-fname')?.value.trim(),'الاسم الأخير':document.getElementById('ec-lname')?.value.trim(),'رقم التليفون':document.getElementById('ec-phone')?.value.trim(),'رمز الدولة':document.getElementById('ec-nat')?.value.trim(),'الرقم القومي':document.getElementById('ec-natid')?.value.trim(),'رقم جواز السفر':document.getElementById('ec-passport')?.value.trim(),'رقم رخصة القيادة':document.getElementById('ec-license')?.value.trim(),'عنوان البريد الإلكتروني':document.getElementById('ec-email')?.value.trim(),'العنوان':document.getElementById('ec-address')?.value.trim(),'_sys_updated':Date.now()};
+    const upd={'الاسم الأول':document.getElementById('ec-fname')?.value.trim(),'الاسم الأخير':document.getElementById('ec-lname')?.value.trim(),'رقم التليفون':document.getElementById('ec-phone')?.value.trim(),'رمز الدولة':document.getElementById('ec-nat')?.value.trim(),'الرقم القومي':document.getElementById('ec-natid')?.value.trim(),'رقم جواز السفر':document.getElementById('ec-passport')?.value.trim(),'رقم رخصة القيادة':document.getElementById('ec-license')?.value.trim(),'عنوان البريد الإلكتروني':document.getElementById('ec-email')?.value.trim(),'العنوان':document.getElementById('ec-address')?.value.trim(),'client_source':document.getElementById('ec-source')?.value||'','_sys_updated':Date.now()};
     await db.collection('customers').doc(customerId).update(upd);
     const idx=G.customers.findIndex(c=>c.id===customerId);
     if(idx>-1)G.customers[idx]={...G.customers[idx],...upd};
@@ -7818,8 +8001,8 @@ async function loadVehicle360Details(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px;">
 
       <!-- Vehicle Info -->
-      <div class="panel">
-        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:11px;">🚗 Vehicle Info</div>
+      <div class="panel" id="v360-section-vehicle">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:11px;">🚗 Vehicle Info <button class="btn btn-ghost btn-xs" onclick="makeV360SectionEditable('${car.id}','vehicle')" style="float:right;">✏️ Edit</button></div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px;">
           <span style="color:var(--text3);">Model:</span><span style="font-weight:700;">${car.model||car.Type||'—'}</span>
           <span style="color:var(--text3);">Year:</span><span>${car.year||car['سنة الصنع']||'—'}</span>
@@ -7835,8 +8018,8 @@ async function loadVehicle360Details(){
       </div>
 
       <!-- Contract & Expiries -->
-      <div class="panel">
-        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:11px;">📋 Contract & Expiries</div>
+      <div class="panel" id="v360-section-contract">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:11px;">📋 Contract & Expiries <button class="btn btn-ghost btn-xs" onclick="makeV360SectionEditable('${car.id}','contract')" style="float:right;">✏️ Edit</button></div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px;">
           <span style="color:var(--text3);">Contract:</span><span style="font-weight:700;color:${dotColor};">${car.Contract||car['حاله التعاقد']||'—'}</span>
           <span style="color:var(--text3);">Start:</span><span>${fmtDateShort(parseDBDate(car['بداية التعاقد']||''))||'—'}</span>
@@ -7854,8 +8037,8 @@ async function loadVehicle360Details(){
       </div>
 
       <!-- Owner Info -->
-      <div class="panel">
-        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:11px;">👤 Owner</div>
+      <div class="panel" id="v360-section-owner">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:11px;">👤 Owner <button class="btn btn-ghost btn-xs" onclick="makeV360SectionEditable('${car.id}','owner')" style="float:right;">✏️ Edit</button></div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px;">
           <span style="color:var(--text3);">Name:</span>
           <span style="font-weight:700;">${((car['الاسم الأول']||'')+' '+(car['الاسم الأخير']||'')).trim()||'—'}</span>
@@ -7985,6 +8168,65 @@ async function loadVehicle360Details(){
   }
 }
 
+/* ---- V360 Inline Edit ---- */
+function makeV360SectionEditable(carId,section){
+  const container=document.getElementById('v360-section-'+section);
+  if(!container)return;
+  const car=G.fleet.find(c=>String(c.ID||c.id)===String(carId))||G.fleet.find(c=>c.id===carId);
+  if(!car)return;
+  const fields={
+    'vehicle':[
+      {label:'Type (EN)',key:'car_type_en'},{label:'Model (EN)',key:'car_model_en'},
+      {label:'Year',key:'year'},{label:'Color (EN)',key:'car_color_en'},
+      {label:'VIN/Chassis',key:'chassis'},{label:'Motor No.',key:'motor'},
+      {label:'Plate',key:'plate'},
+    ],
+    'owner':[
+      {label:'Owner First Name',key:'owner_first'},{label:'Owner Last Name',key:'owner_last'},
+      {label:'Monthly Fee',key:'monthly_fee'},{label:'Payment Frequency (days)',key:'payment_frequency'},
+    ],
+    'contract':[
+      {label:'Contract Start',key:'contract_start',type:'date'},{label:'Contract End',key:'contract_end',type:'date'},
+      {label:'Contract Status',key:'is_active'},{label:'License Expiry',key:'license_end',type:'date'},
+      {label:'Insurance Expiry',key:'insurance_end',type:'date'},
+    ]
+  };
+  const sectionFields=fields[section]||[];
+  container.innerHTML=`
+    <div style="display:grid;gap:8px;padding:10px 0;">
+      ${sectionFields.map(f=>`
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;">
+          <label style="font-size:10px;color:var(--text3);">${f.label}</label>
+          <input type="${f.type||'text'}" id="v360-edit-${f.key}" class="form-input" value="${(car[f.key]||'').toString().replace(/"/g,'&quot;')}" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;">
+        </div>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="saveV360Section('${carId}','${section}')">💾 Save Changes</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadVehicle360Details()">✕ Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function saveV360Section(carId,section){
+  const fields={
+    'vehicle':['car_type_en','car_model_en','year','car_color_en','chassis','motor','plate'],
+    'owner':['owner_first','owner_last','monthly_fee','payment_frequency'],
+    'contract':['contract_start','contract_end','is_active','license_end','insurance_end']
+  };
+  const updates={};
+  (fields[section]||[]).forEach(key=>{
+    const el=document.getElementById('v360-edit-'+key);
+    if(el)updates[key]=el.value;
+  });
+  updates._sys_updated=firebase.firestore.FieldValue.serverTimestamp();
+  try{
+    await db.collection('fleet').doc(carId).update(updates);
+    const idx=G.fleet.findIndex(c=>c.id===carId);
+    if(idx>=0)Object.assign(G.fleet[idx],updates);
+    toast('✅ Car details updated','success');
+    loadVehicle360Details();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
 /* ============================================================
    RISK RADAR - ENHANCED WITH ALL 3 EXPIRY TYPES + FILTERS
 ============================================================ */
@@ -8024,6 +8266,8 @@ async function loadRiskRadar(){
       id="risk-type-insurance" onclick="filterRiskTable('Insurance',this)">🛡 Insurance</button>
     <button class="btn btn-ghost btn-sm risk-type-btn"
       id="risk-type-contract" onclick="filterRiskTable('Contract',this)">📄 Contract</button>
+    <button class="btn btn-ghost btn-sm risk-type-btn"
+      id="risk-type-deposit" onclick="filterRiskTable('Deposit Return Due',this)">🔒 Deposits</button>
   </div>
 
   <div class="panel">
@@ -8058,6 +8302,40 @@ async function loadRiskRadar(){
     });
   });
 
+  // Add deposit return risks from bookings
+  G.bookings.forEach(b=>{
+    const held=parseAmount(b.deposit_held||b['الوديعة المحتجزة']||0);
+    const returned=parseAmount(b.deposit_returned||b['الوديعة المردودة']||0);
+    const isClosed=b.closed||b.status==='Closed'||b['حالة الطلب']==='Closed';
+    const{end}=getOrderDates(b);
+    const daysLeft=end?Math.ceil((end-today)/86400000):99;
+    if(held>returned&&held>0){
+      if(isClosed){
+        allRisks.push({
+          car:null,label:'Deposit Return Due',icon:'🔒',
+          daysLeft:-1,risk:'expired',
+          carLabel:b.car_label||b['كود السيارة']||'—',
+          owner:b['اسم العميل']||'—',
+          plate:b['No.']||b.id,
+          date:null,
+          depositNote:`${fmtMoney(held-returned)} not returned to client`,
+          orderId:b.id,orderNo:b['No.']||b.id
+        });
+      }else if(daysLeft>=0&&daysLeft<=3){
+        allRisks.push({
+          car:null,label:'Deposit Due Soon',icon:'⚠️',
+          daysLeft,risk:daysLeft<=0?'expired':'high',
+          carLabel:b.car_label||b['كود السيارة']||'—',
+          owner:b['اسم العميل']||'—',
+          plate:b['No.']||b.id,
+          date:end,
+          depositNote:`${fmtMoney(held-returned)} to return in ${daysLeft}d`,
+          orderId:b.id,orderNo:b['No.']||b.id
+        });
+      }
+    }
+  });
+
   allRisks.sort((a,b)=>a.daysLeft-b.daysLeft);
   window._riskData=allRisks;
 
@@ -8065,6 +8343,7 @@ async function loadRiskRadar(){
   const expired=allRisks.filter(r=>r.risk==='expired').length;
   const high=allRisks.filter(r=>r.risk==='high').length;
   const medium=allRisks.filter(r=>r.risk==='medium').length;
+  const depositRiskCount=allRisks.filter(r=>r.label==='Deposit Return Due'||r.label==='Deposit Due Soon').length;
   const low=allRisks.filter(r=>r.risk==='low').length;
 
   const kpiEl=document.getElementById('risk-kpis');
@@ -8094,6 +8373,11 @@ async function loadRiskRadar(){
       <div class="kpi-label">Low Risk</div>
       <div class="kpi-value text-success">${low}</div>
       <div class="kpi-sub">Expiring soon</div>
+    </div>
+    <div class="kpi-card" style="cursor:pointer;" onclick="filterRiskTable('Deposit Return Due',null)">
+      <div class="kpi-label">Deposit Returns Due</div>
+      <div class="kpi-value" style="color:#f59e0b;">${depositRiskCount}</div>
+      <div class="kpi-sub">Unreturned deposits</div>
     </div>`;
   }
 
@@ -8141,17 +8425,18 @@ function renderRiskTable(risks){
     <tbody>
       ${risks.map(r=>{
         const riskColor=r.risk==='expired'||r.risk==='high'?'var(--danger)':r.risk==='medium'?'var(--warning)':'var(--success)';
-        const carId=r.car.ID||r.car.id;
+        const isDepositRisk=r.label==='Deposit Return Due'||r.label==='Deposit Due Soon';
+        const carId=isDepositRisk?null:(r.car?.ID||r.car?.id);
         return`<tr>
           <td style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${r.carLabel}
           </td>
-          <td style="font-size:11px;">${r.plate}</td>
+          <td style="font-size:11px;">${isDepositRisk?(r.orderNo||r.plate):r.plate}</td>
           <td>${r.icon} ${r.label}</td>
-          <td style="white-space:nowrap;">${fmtDateShort(r.date)}</td>
+          <td style="white-space:nowrap;">${r.depositNote||fmtDateShort(r.date)}</td>
           <td>
             <strong style="color:${riskColor};">
-              ${r.daysLeft<=0?`EXPIRED ${Math.abs(r.daysLeft)}d ago`:r.daysLeft+' days'}
+              ${isDepositRisk?(r.daysLeft<0?'Overdue':r.daysLeft+' days'):r.daysLeft<=0?`EXPIRED ${Math.abs(r.daysLeft)}d ago`:r.daysLeft+' days'}
             </strong>
           </td>
           <td>
@@ -8162,6 +8447,7 @@ function renderRiskTable(risks){
           <td style="font-size:11px;">${r.owner}</td>
           <td>
             <div style="display:flex;gap:3px;">
+              ${isDepositRisk?`<button class="btn btn-ghost btn-xs" onclick="openOrderDetail('${r.orderId}')" title="Open Order">📋</button>`:`
               <button class="btn btn-ghost btn-xs"
                 onclick="showPage('vehicle-360');setTimeout(()=>{const s=document.getElementById('v360-car-select');if(s){s.value='${carId}';loadVehicle360Details();}},300)">
                 🔭
@@ -8169,7 +8455,7 @@ function renderRiskTable(risks){
               <button class="btn btn-ghost btn-xs"
                 onclick="openCarDetailModal('${carId}')">
                 👁
-              </button>
+              </button>`}
             </div>
           </td>
         </tr>`;
@@ -10440,13 +10726,18 @@ async function computeIEKPIs(){
     const margin=income>0?Math.round((net/income)*100):0;
     const periodLabel=period.month?` · ${period.label}`:' · All time';
 
+    // Deposit calculations from bookings
+    const depositHeld=G.bookings.reduce((s,b)=>s+parseAmount(b.deposit_held||b['الوديعة المحتجزة']||0),0);
+    const depositReturned=G.bookings.reduce((s,b)=>s+parseAmount(b.deposit_returned||b['الوديعة المردودة']||0),0);
+    const depositLiability=depositHeld-depositReturned;
+
     const kpiRow=document.getElementById('ie-kpi-row');
     if(kpiRow){
       kpiRow.innerHTML=`
       <div class="kpi-card" style="cursor:pointer;" onclick="showIETab('income',document.getElementById('ie-tab-income'))">
-        <div class="kpi-label">Total Income</div>
+        <div class="kpi-label">Net Income</div>
         <div class="kpi-value text-success">${fmtMoney(income)}</div>
-        <div class="kpi-sub">${incomeCount} records${periodLabel}</div>
+        <div class="kpi-sub">${incomeCount} records${periodLabel} · excl. deposits</div>
         <div class="kpi-icon">📥</div>
       </div>
       <div class="kpi-card" style="cursor:pointer;" onclick="showIETab('car',document.getElementById('ie-tab-car'))">
@@ -10478,6 +10769,18 @@ async function computeIEKPIs(){
         <div class="kpi-value" style="color:${margin>=30?'var(--success)':margin>=10?'var(--warning)':'var(--danger)'};">${margin}%</div>
         <div class="kpi-sub">Net / Income</div>
         <div class="kpi-icon">📊</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Deposit Liability</div>
+        <div class="kpi-value" style="color:var(--warning);">${fmtMoney(depositLiability)}</div>
+        <div class="kpi-sub">Held but not returned</div>
+        <div class="kpi-icon">🔒</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Deposits Returned</div>
+        <div class="kpi-value" style="color:var(--success);">${fmtMoney(depositReturned)}</div>
+        <div class="kpi-sub">Of ${fmtMoney(depositHeld)} held</div>
+        <div class="kpi-icon">↩️</div>
       </div>`;
     }
 
@@ -12698,10 +13001,9 @@ async function loadProposalsPage(){
           style="font-size:10px;color:var(--accent);font-weight:700;"></span>
       </div>
 
-      <!-- Mode Toggle -->
+      <!-- Mode Toggle (Reservation only) -->
       <div style="display:flex;gap:6px;margin-bottom:13px;background:var(--surface2);border-radius:9px;padding:6px;">
-        <button class="btn btn-primary btn-sm" id="pr-btn-quick" onclick="prSetMode('quick')" style="flex:1;font-size:11px;">⚡ Quick Quote</button>
-        <button class="btn btn-ghost btn-sm" id="pr-btn-reservation" onclick="prSetMode('reservation')" style="flex:1;font-size:11px;">📋 Reservation</button>
+        <button class="btn btn-primary btn-sm" id="pr-btn-reservation" onclick="prSetMode('reservation')" style="flex:1;font-size:11px;">📋 New Proposal / Reservation</button>
       </div>
 
       <!-- Client Search (CRM) -->
@@ -12796,12 +13098,31 @@ async function loadProposalsPage(){
           margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border);">
           ② Vehicle Selection
         </div>
-        <div class="field" style="margin-bottom:7px;">
-          <label>Select from Fleet</label>
-          <select id="pr-car" onchange="prSelectCar()">
-            <option value="">-- Select Car --</option>
-          </select>
+        <!-- Car Selection Mode -->
+        <div style="margin-bottom:10px;">
+          <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:6px;">VEHICLE SELECTION</label>
+          <div style="display:flex;gap:10px;margin-bottom:8px;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;">
+              <input type="radio" name="prop-car-mode" value="fleet" checked onchange="togglePropCarMode('fleet')"> From Fleet
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;">
+              <input type="radio" name="prop-car-mode" value="manual" onchange="togglePropCarMode('manual')"> Manual (any car)
+            </label>
+          </div>
+          <div id="prop-car-fleet">
+            <select id="pr-car" onchange="prSelectCar()">
+              <option value="">-- Select from fleet --</option>
+            </select>
+          </div>
+          <div id="prop-car-manual" style="display:none;margin-top:6px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:6px;">
+              <input id="prop-manual-brand" class="form-input" placeholder="Brand (e.g. MG, Renault)" style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              <input id="prop-manual-model" class="form-input" placeholder="Model (e.g. ZS, Duster)" style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              <input id="prop-manual-year" class="form-input" placeholder="Year" style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+            </div>
+          </div>
         </div>
+
         <div id="pr-car-badge" class="car-info-badge"></div>
 
         <!-- Overlap Warning -->
@@ -12839,16 +13160,19 @@ async function loadProposalsPage(){
           ③ Mileage & Insurance
         </div>
         <div class="form-grid">
-          <div class="field">
+          <div class="field" style="grid-column:span 2;">
             <label>KM Package</label>
-            <select id="pr-km" onchange="prCalc()">
-              <option value="standard">Standard (120 KM/Day)</option>
-              <option value="500">500 KM Package</option>
-              <option value="750">750 KM Package</option>
-              <option value="1000">1000 KM Package</option>
-              <option value="unlimited">Unlimited KM</option>
-              <option value="unlimited_surcharge">Unlimited KM Daily Surcharge</option>
+            <select id="pr-km" onchange="onKmPkgChange(this);prCalc()">
+              <option value="Standard (120 KM/Day)">Standard — 120 KM/Day (included)</option>
+              <option value="200 KM/Day">200 KM/Day package</option>
+              <option value="300 KM/Day">300 KM/Day package</option>
+              <option value="Unlimited">Unlimited KM</option>
+              <option value="Manual">Manual / Custom</option>
             </select>
+            <div id="km-pkg-manual-wrap" style="display:none;margin-top:6px;display:none;grid-template-columns:1fr 1fr;gap:6px;">
+              <input id="km-pkg-manual-desc" class="form-input" placeholder="Description (e.g. 500 KM/Day)" style="padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <input id="km-pkg-manual-cost" class="form-input" type="number" placeholder="Extra cost (EGP)" style="padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);" oninput="prCalc()">
+            </div>
           </div>
           <div class="field">
             <label>KM Package Cost (EGP)</label>
@@ -13056,26 +13380,96 @@ function prCalc(){
 }
 
 function prSetMode(mode){
-  window._prMode=mode;
-  const quickBtn=document.getElementById('pr-btn-quick');
+  window._prMode=mode||'reservation';
   const resBtn=document.getElementById('pr-btn-reservation');
   const passWrap=document.getElementById('pr-passport-wrap');
   const licWrap=document.getElementById('pr-license-wrap');
-  if(mode==='reservation'){
-    if(quickBtn){quickBtn.classList.remove('btn-primary');quickBtn.classList.add('btn-ghost');}
-    if(resBtn){resBtn.classList.remove('btn-ghost');resBtn.classList.add('btn-primary');}
-    if(passWrap)passWrap.style.display='';
-    if(licWrap)licWrap.style.display='';
+  if(resBtn){resBtn.classList.remove('btn-ghost');resBtn.classList.add('btn-primary');}
+  if(passWrap)passWrap.style.display='';
+  if(licWrap)licWrap.style.display='';
+}
+
+function togglePropCarMode(mode){
+  const fleetDiv=document.getElementById('prop-car-fleet');
+  const manualDiv=document.getElementById('prop-car-manual');
+  if(fleetDiv)fleetDiv.style.display=mode==='fleet'?'':'none';
+  if(manualDiv)manualDiv.style.display=mode==='manual'?'':'none';
+}
+
+function onKmPkgChange(sel){
+  const wrap=document.getElementById('km-pkg-manual-wrap');
+  if(!sel)sel=document.getElementById('pr-km');
+  if(wrap)wrap.style.display=(sel&&sel.value==='Manual')?'grid':'none';
+}
+
+function convertProposalToOrder(proposalId){
+  const p=G.proposals.find(x=>x.id===proposalId);
+  if(!p){toast('Proposal not found','error');return;}
+  const doConvert=async(carId,carLabel)=>{
+    try{
+      const branchCode=p.branch||G.user?.branch||'GEN';
+      const orderRef=await generateDocRef('ORD',branchCode);
+      await db.collection('bookings').add({
+        'No.':orderRef,
+        'اسم العميل':p.client_name,
+        'كود العميل':p.client_crm_id||'',
+        'كود السيارة':carId||'',
+        'car_label':carLabel||'',
+        'col_L':p.pickup_date,
+        'col_T':p.dropoff_date,
+        'مكان الاستلام':p.pickup_location||'Office',
+        'مكان التسليم':p.dropoff_location||'Office',
+        'سعر السيارة اليومي بالجنيه المصري':p.daily_rate||0,
+        'إجمالي المستحق (Total)':p.total_estimate||0,
+        'branch':branchCode,
+        'حالة الطلب':'Active',
+        'from_proposal':proposalId,
+        'insurance_plan':p.insurance_plan||'basic',
+        'km_package':p.km_package||'standard',
+        '_sys_created':firebase.firestore.FieldValue.serverTimestamp()
+      });
+      await db.collection('proposals').doc(proposalId).update({
+        status:'Converted',
+        converted_at:new Date().toISOString()
+      });
+      if(G.proposals){const idx=G.proposals.findIndex(x=>x.id===proposalId);if(idx>=0)G.proposals[idx].status='Converted';}
+      toast('✅ Proposal converted to Order: '+orderRef,'success');
+      closeModal();
+    }catch(e){toast('Conversion failed: '+e.message,'error');}
+  };
+  const carId=p.car_id||'';
+  const carLabel=p.car_label||'';
+  if(carId){
+    if(confirm('Convert this proposal to an order?\nCar: '+carLabel))doConvert(carId,carLabel);
   }else{
-    if(quickBtn){quickBtn.classList.remove('btn-ghost');quickBtn.classList.add('btn-primary');}
-    if(resBtn){resBtn.classList.remove('btn-primary');resBtn.classList.add('btn-ghost');}
-    if(passWrap)passWrap.style.display='none';
-    if(licWrap)licWrap.style.display='none';
-    const passEl=document.getElementById('pr-passport');
-    const licEl=document.getElementById('pr-license');
-    if(passEl)passEl.value='';
-    if(licEl)licEl.value='';
+    const cars=G.fleet.filter(c=>c.is_active!==false);
+    const html=`<div><select id="conv-car-sel" class="form-input" style="width:100%;margin-bottom:12px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <option value="">-- Select actual car --</option>
+      ${cars.map(c=>`<option value="${c.id}">${getCarLabel(c,'en')} | ${c.plate||''}</option>`).join('')}
+    </select><button class="btn btn-primary btn-full" onclick="const sel=document.getElementById('conv-car-sel');const car=G.fleet.find(c=>c.id===sel.value);if(!car){toast('Select a car','error');return;}closeModal();setTimeout(()=>convertProposalToOrderWithCar('${proposalId}',car.id,getCarLabel(car,'en')),100);">✅ Confirm & Convert</button></div>`;
+    openModal('Select Car for Order',html);
   }
+}
+
+async function convertProposalToOrderWithCar(proposalId,carId,carLabel){
+  const p=G.proposals.find(x=>x.id===proposalId);
+  if(!p)return;
+  try{
+    const branchCode=p.branch||G.user?.branch||'GEN';
+    const orderRef=await generateDocRef('ORD',branchCode);
+    await db.collection('bookings').add({
+      'No.':orderRef,'اسم العميل':p.client_name,'كود العميل':p.client_crm_id||'',
+      'كود السيارة':carId||'','car_label':carLabel||'','col_L':p.pickup_date,'col_T':p.dropoff_date,
+      'مكان الاستلام':p.pickup_location||'Office','مكان التسليم':p.dropoff_location||'Office',
+      'سعر السيارة اليومي بالجنيه المصري':p.daily_rate||0,'إجمالي المستحق (Total)':p.total_estimate||0,
+      'branch':branchCode,'حالة الطلب':'Active','from_proposal':proposalId,
+      'insurance_plan':p.insurance_plan||'basic','km_package':p.km_package||'standard',
+      '_sys_created':firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('proposals').doc(proposalId).update({status:'Converted',converted_at:new Date().toISOString()});
+    if(G.proposals){const idx=G.proposals.findIndex(x=>x.id===proposalId);if(idx>=0)G.proposals[idx].status='Converted';}
+    toast('✅ Proposal converted to Order: '+orderRef,'success');
+  }catch(e){toast('Conversion failed: '+e.message,'error');}
 }
 
 /* ---- Overlap Detection ---- */
@@ -13197,7 +13591,8 @@ async function generateProposal(){
   const fname=(document.getElementById('pr-fname')?.value||'').trim();
   const lname=(document.getElementById('pr-lname')?.value||'').trim();
   const clientName=(fname+' '+lname).trim();
-  const carId=document.getElementById('pr-car')?.value;
+  const carMode=document.querySelector('input[name="prop-car-mode"]:checked')?.value||'fleet';
+  const carId=carMode==='fleet'?document.getElementById('pr-car')?.value:null;
   const pickup=document.getElementById('pr-pickup')?.value;
   const dropoff=document.getElementById('pr-dropoff')?.value;
   const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
@@ -13208,32 +13603,47 @@ async function generateProposal(){
     document.getElementById('pr-client-search')?.focus();
     return;
   }
-  const prMode=window._prMode||'quick';
+  const prMode=window._prMode||'reservation';
   if(prMode==='reservation'){
     const passport=(document.getElementById('pr-passport')?.value||'').trim();
     const license=(document.getElementById('pr-license')?.value||'').trim();
     if(!passport){toast('Passport / National ID is required in Reservation mode','error');return;}
     if(!license){toast('Driver License is required in Reservation mode','error');return;}
   }
-  if(!carId){toast('Please select a car from the fleet.','error');return;}
+  if(carMode==='fleet'&&!carId){toast('Please select a car from the fleet, or switch to Manual mode.','error');return;}
+  if(carMode==='manual'){
+    const brand=document.getElementById('prop-manual-brand')?.value.trim();
+    const model=document.getElementById('prop-manual-model')?.value.trim();
+    if(!brand||!model){toast('Brand and Model are required in Manual mode','error');return;}
+  }
   if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
 
   const pickupD=new Date(pickup),dropoffD=new Date(dropoff);
   if(dropoffD<=pickupD){toast('Dropoff must be after pickup.','error');return;}
   if(daily<=0){toast('Daily rent must be greater than 0.','error');return;}
 
-  // Check for conflict warning visible
-  const warnEl=document.getElementById('pr-overlap-warn');
-  if(warnEl&&warnEl.style.display!=='none'){
-    const proceed=confirm(
-      'There is a potential conflict with this car and dates.\n\n'+
-      'Are you sure you want to generate this proposal anyway?'
-    );
-    if(!proceed)return;
+  // Check for conflict warning visible (fleet mode only)
+  if(carMode==='fleet'){
+    const warnEl=document.getElementById('pr-overlap-warn');
+    if(warnEl&&warnEl.style.display!=='none'){
+      const proceed=confirm(
+        'There is a potential conflict with this car and dates.\n\n'+
+        'Are you sure you want to generate this proposal anyway?'
+      );
+      if(!proceed)return;
+    }
   }
 
-  const car=getCarById(carId);
-  const carLabel=car?getCarLabel(car,'en'):String(carId);
+  let car=carId?getCarById(carId):null;
+  let carLabel;
+  if(carMode==='manual'){
+    const brand=document.getElementById('prop-manual-brand')?.value.trim()||'';
+    const model=document.getElementById('prop-manual-model')?.value.trim()||'';
+    const year=document.getElementById('prop-manual-year')?.value.trim()||'';
+    carLabel=[brand,model,year].filter(Boolean).join(' ');
+  }else{
+    carLabel=car?getCarLabel(car,'en'):String(carId||'');
+  }
   const branchCode=G.user?.branch||'GEN';
   const ref=await generateDocRef('PR',branchCode);
 
@@ -13261,8 +13671,9 @@ async function generateProposal(){
     client_email:document.getElementById('pr-email')?.value.trim()||'',
     client_passport:document.getElementById('pr-passport')?.value.trim()||'',
     client_license:document.getElementById('pr-license')?.value.trim()||'',
-    proposal_mode:window._prMode||'quick',
-    car_id:String(carId),
+    proposal_mode:window._prMode||'reservation',
+    car_mode:carMode,
+    car_id:carId?String(carId):'',
     car_label:carLabel,
     pickup_date:pickup,
     dropoff_date:dropoff,
@@ -13284,7 +13695,7 @@ async function generateProposal(){
     child_seat_days:seatD,
     extra_driver_days:drvD,
     total_estimate:total,
-    status:window._prMode==='reservation'?'Pending':'Draft',
+    status:'Draft',
     converted_to:'',
     issued_by:G.user?.username||'',
     branch:branchCode,
@@ -13618,17 +14029,17 @@ function renderProposalsList(){
           <button class="btn btn-ghost btn-xs"
             onclick="regenerateProposalDoc('${p.id}')"
             title="Print">🖨️</button>
-          ${p.status==='Draft'||p.status==='Accepted'?`
+          ${p.status==='Draft'||p.status==='Accepted'||p.status==='Pending'?`
           <button class="btn btn-success btn-xs"
-            onclick="convertProposalToContract('${p.id}')"
-            title="Convert to contract">📄</button>
+            onclick="convertProposalToOrder('${p.id}')"
+            title="Accept & Convert to Order">✅ Order</button>
           `:''}
-          ${p.status==='Draft'&&isPriv?`
+          ${p.status==='Draft'||p.status==='Pending'?`
           <button class="btn btn-warning btn-xs"
             onclick="updateProposalStatus('${p.id}','Accepted')"
-            title="Mark Accepted">✓</button>
+            title="Mark Accepted">✓ Accept</button>
           `:''}
-          ${p.status==='Draft'?`
+          ${p.status==='Draft'||p.status==='Pending'?`
           <button class="btn btn-danger btn-xs"
             onclick="updateProposalStatus('${p.id}','Cancelled')"
             title="Cancel">✕</button>
@@ -14899,6 +15310,7 @@ function setOrderFilter(status){
 
 // FIX 3 + FIX 6: openClientProfile = alias for openCRMProfile
 function openClientProfile(customerId){
+  pushNav('Client '+customerId,()=>openClientProfile(customerId));
   if(typeof openCRMProfile==='function') openCRMProfile(customerId);
 }
 
@@ -15899,7 +16311,7 @@ th{background:#f0f0f0;font-weight:bold;text-align:left;}
     <div class="sig-box">Lessor Signature<br><br>____________________<br><div style="font-size:8pt;margin-top:4px;">Brothers EGY – ${branchName}</div></div>
   </div>
   <div style="margin-top:10px;background:#f8f9fa;border:1px solid #ddd;padding:10px;border-radius:4px;display:flex;align-items:center;gap:12px;">
-    <img src="https://api.qrserver.com/v1/create-qr-code/?data=REF-${encodeURIComponent(data.ref)}&size=70x70" style="width:60px;height:60px;">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent('https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref='+data.ref)}&size=70x70" style="width:60px;height:60px;">
     <div>
       <div style="font-weight:bold;font-size:9pt;color:#04509D;">BROTHERS EGY – RENTAL AGREEMENT</div>
       <div style="font-size:7.5pt;">Ref: ${data.ref}</div>
@@ -15943,7 +16355,7 @@ th{background:#f0f0f0;font-weight:bold;text-align:left;}
     <div class="rec-header">
       <img src="${logo}" style="height:40px;">
       <div style="text-align:center;flex:1;"><div class="rec-title">OFFICIAL RECEIPT</div><div style="font-size:9pt;">CLIENT COPY</div></div>
-      <div style="text-align:right;"><img src="https://api.qrserver.com/v1/create-qr-code/?data=REF-${encodeURIComponent(data.ref)}&size=60x60" style="height:50px;"><div style="font-size:7pt;font-weight:bold;">DATE: ${today}</div></div>
+      <div style="text-align:right;"><img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent('https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref='+data.ref)}&size=60x60" style="height:50px;"><div style="font-size:7pt;font-weight:bold;">DATE: ${today}</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:8.5pt;border-bottom:1px dashed #ccc;padding-bottom:8px;margin-bottom:8px;">
       <div><div><strong>RECEIVED FROM</strong> ${data.client.name||'—'}</div><div><strong>PASSPORT/ID</strong> ${data.client.passport||'—'}</div><div><strong>PHONE</strong> ${data.client.phone||'—'}</div></div>
