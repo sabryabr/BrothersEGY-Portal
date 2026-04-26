@@ -3355,7 +3355,7 @@ async function saveOrderEdit(orderId){
     await db.collection('bookings').doc(orderId).update(upd);
     await logAction('EDIT','Order Book',`Updated Order #${order?.['No.']||orderId} → ${newStatus}`);
     toast('Order updated!','success');closeModal();
-  }catch(e){toast('Update failed: '+e.message,'error');}
+  }catch(e){console.error('OrderEdit error:',e);toast('Update failed: '+e.message,'error');}
 }
 
 /* ---- Quick Payment ---- */
@@ -6236,6 +6236,7 @@ async function generateProposal(){
 }
 
 function buildProposalA4(ref,d){
+  const a4El=document.getElementById('pr-a4');if(!a4El)return;
   const kmMap={standard:'Standard (120 KM/Day)',500:'500 KM Package',1000:'1000 KM Package',unlimited:'Unlimited KM'};
   const insMap={basic:'Basic (100% Client Liability)',intermediate:'Intermediate (70/30)',full:'Full Protection (Zero Liability)'};
   const rows=[
@@ -6317,7 +6318,7 @@ function buildProposalA4(ref,d){
     </div>
     ${a4FooterHTML(ref,'PRICE PROPOSAL',false)}`;
   const a4=document.getElementById('pr-a4');if(a4)a4.innerHTML=html;
-  document.getElementById('pr-output').style.display='block';
+  const prOutputEl=document.getElementById('pr-output');if(prOutputEl)prOutputEl.style.display='block';
   attachQRAndBarcode(ref);
 }
 
@@ -8169,17 +8170,28 @@ async function loadVehicle360Details(){
 }
 
 /* ---- V360 Inline Edit ---- */
+function getCarFieldValue(car,key,altKeys=[]){
+  if(car[key]!==undefined&&car[key]!==null&&car[key]!=='')return car[key];
+  for(const ak of altKeys){if(car[ak]!==undefined&&car[ak]!==null&&car[ak]!=='')return car[ak];}
+  return '';
+}
+
 function makeV360SectionEditable(carId,section){
   const container=document.getElementById('v360-section-'+section);
   if(!container)return;
-  const car=G.fleet.find(c=>String(c.ID||c.id)===String(carId))||G.fleet.find(c=>c.id===carId);
+  const car=G.fleet.find(c=>String(c.ID||c.id)===String(carId))
+         ||G.fleet.find(c=>c.id===carId)
+         ||G.fleet.find(c=>String(c.ID)===String(carId));
   if(!car)return;
   const fields={
     'vehicle':[
-      {label:'Type (EN)',key:'car_type_en'},{label:'Model (EN)',key:'car_model_en'},
-      {label:'Year',key:'year'},{label:'Color (EN)',key:'car_color_en'},
-      {label:'VIN/Chassis',key:'chassis'},{label:'Motor No.',key:'motor'},
-      {label:'Plate',key:'plate'},
+      {label:'Type (EN)',key:'car_type_en',altKeys:['typeEN','Type','car_type']},
+      {label:'Model (EN)',key:'car_model_en',altKeys:['modelEN','Model','car_model']},
+      {label:'Year',key:'year',altKeys:['Year','سنة الصنع']},
+      {label:'Color (EN)',key:'car_color_en',altKeys:['colorEN','Color','car_color']},
+      {label:'VIN/Chassis',key:'chassis',altKeys:['رقم الشاسيه','VIN']},
+      {label:'Motor No.',key:'motor',altKeys:['رقم الموتور']},
+      {label:'Plate',key:'plate',altKeys:['Plate','لوحة']},
     ],
     'owner':[
       {label:'Owner First Name',key:'owner_first'},{label:'Owner Last Name',key:'owner_last'},
@@ -8197,7 +8209,7 @@ function makeV360SectionEditable(carId,section){
       ${sectionFields.map(f=>`
         <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;">
           <label style="font-size:10px;color:var(--text3);">${f.label}</label>
-          <input type="${f.type||'text'}" id="v360-edit-${f.key}" class="form-input" value="${(car[f.key]||'').toString().replace(/"/g,'&quot;')}" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;">
+          <input type="${f.type||'text'}" id="v360-edit-${f.key}" class="form-input" value="${getCarFieldValue(car,f.key,f.altKeys||[]).toString().replace(/"/g,'&quot;')}" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;">
         </div>`).join('')}
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn btn-primary btn-sm" onclick="saveV360Section('${carId}','${section}')">💾 Save Changes</button>
@@ -12989,10 +13001,10 @@ async function loadProposalsPage(){
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:400px 1fr;gap:14px;align-items:start;">
+  <div style="display:grid;grid-template-columns:480px 1fr;gap:16px;align-items:start;">
 
     <!-- ===== LEFT CONTROL PANEL ===== -->
-    <div class="panel sticky-panel">
+    <div class="panel sticky-panel" style="overflow-x:hidden;max-height:calc(100vh - 120px);overflow-y:auto;">
 
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
@@ -13327,6 +13339,23 @@ async function loadProposalsPage(){
 
   // Populate dropdowns and render list
   populateFleetDropdowns();
+  // Repopulate pr-car with brand+model only (no plate details) for proposals
+  const prCarSel=document.getElementById('pr-car');
+  if(prCarSel){
+    prCarSel.innerHTML='<option value="">-- Select vehicle type --</option>';
+    const seen=new Set();
+    G.fleet.filter(c=>c.is_active!==false).forEach(c=>{
+      const label=getCarLabel(c,'en');
+      if(!seen.has(label)){
+        seen.add(label);
+        const opt=document.createElement('option');
+        opt.value=c.id;
+        opt.textContent=label+(c.year?' ('+c.year+')':'');
+        prCarSel.appendChild(opt);
+      }
+    });
+  }
+  prSetMode('reservation');
   renderProposalsList();
 }
 
@@ -13730,6 +13759,7 @@ async function generateProposal(){
 /* ---- Build A4 Proposal ---- */
 
 function buildProposalA4(ref,d){
+  const a4El=document.getElementById('pr-a4');if(!a4El)return;
   const kmMap={
     standard:'Standard (120 KM/Day)',
     500:'500 KM Package',
@@ -13926,7 +13956,7 @@ function buildProposalA4(ref,d){
   ${a4FooterHTML(ref,'PRICE PROPOSAL',false)}`;
 
   const a4=document.getElementById('pr-a4');if(a4)a4.innerHTML=html;
-  document.getElementById('pr-output').style.display='block';
+  const prOutputEl=document.getElementById('pr-output');if(prOutputEl)prOutputEl.style.display='block';
   attachQRAndBarcode(ref);
 }
 
@@ -14044,6 +14074,11 @@ function renderProposalsList(){
             onclick="updateProposalStatus('${p.id}','Cancelled')"
             title="Cancel">✕</button>
           `:''}
+          ${['Draft','Pending','Cancelled'].includes(p.status)?`
+          <button class="btn btn-danger btn-xs"
+            onclick="if(confirm('Delete proposal ${p.proposal_ref||p.id}? This cannot be undone.')) deleteProposal('${p.id}')"
+            title="Delete proposal">🗑️</button>
+          `:''}
         </div>
       </td>
     </tr>`;
@@ -14078,6 +14113,18 @@ async function updateProposalStatus(id,status){
     toast(`Proposal marked as ${status}`,
       status==='Cancelled'?'warning':'success');
   }catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+async function deleteProposal(proposalId){
+  try{
+    await db.collection('proposals').doc(proposalId).delete();
+    if(G.proposals)G.proposals=G.proposals.filter(p=>p.id!==proposalId);
+    toast('Proposal deleted','success');
+    if(typeof renderProposalsList==='function')renderProposalsList();
+    else if(typeof loadProposalsPage==='function')loadProposalsPage();
+  }catch(e){
+    toast('Delete failed: '+e.message,'error');
+  }
 }
 
 function convertProposalToContract(proposalId){
