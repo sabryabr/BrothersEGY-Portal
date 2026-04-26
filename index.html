@@ -8475,7 +8475,7 @@ function filterRiskBranch(branch,btn){
   if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
   // Re-apply current type filter with new branch
   const typeActive=document.querySelector('.risk-type-btn[style*="var(--accent)"]');
-  filterRiskTable(typeActive?.id?.replace('risk-type-',')||'all',typeActive);
+  filterRiskTable((typeActive?.id?.replace('risk-type-','')||'all'),typeActive);
 }
 
 function filterRiskTable(type,btn){
