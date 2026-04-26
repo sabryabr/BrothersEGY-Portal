@@ -3099,7 +3099,7 @@ async function openOrderDetail(orderId){
   pushNav('Order #'+orderId,()=>openOrderDetail(orderId));
   let o=allOrders.find(x=>x.id===orderId);
   if(!o){
-    try{const snap=await db.collection('bookings').doc(orderId).get();if(!snap.exists){toast('Order not found','error');return;}o={id:snap.id,...snap.data()};}
+    try{const snap=await db.collection('bookings').doc(orderId).get();if(!snap.exists){toast('Order not found','error');return;}o={id:snap.id,...snap.data()};if(!allOrders.find(x=>x.id===o.id))allOrders.push(o);}
     catch(e){toast('Failed to load order','error');return;}
   }
   const today=new Date();
@@ -3351,7 +3351,13 @@ async function saveOrderEdit(orderId){
     const upd={'حالة الطلب':newStatus,'سعر السيارة اليومي بالجنيه المصري':fmtMoney(newDaily),'إجمالي المستحق (Total)':fmtMoney(newTotal),'المدفوع EGP':String(newPaid),'closed':newClosed,'ملاحظات':newNotes,'_sys_updated':Date.now()};
     if(kmStart)upd['كيلومتر بداية']=kmStart;if(kmEnd)upd['كيلومتر نهاية']=kmEnd;
     if(newStatus==='Accident'&&order?.['كود السيارة'])await db.collection('fleet').doc(String(order['كود السيارة'])).update({status:'accident',Contract:'Accident',_sys_updated:Date.now()}).catch(()=>{});
-    if(newClosed&&order?.['كود السيارة'])await db.collection('fleet').doc(String(order['كود السيارة'])).update({status:'available',_sys_updated:Date.now()}).catch(()=>{});
+    if(newClosed&&order?.['كود السيارة']){
+      const dropoffLoc=order['مكان التسليم']||'';
+      const carLocUpd={status:'available',_sys_updated:Date.now()};
+      if(dropoffLoc)Object.assign(carLocUpd,{current_location:dropoffLoc,current_location_updated:new Date().toISOString().slice(0,10),current_location_updated_by:G.user?.username||'system'});
+      await db.collection('fleet').doc(String(order['كود السيارة'])).update(carLocUpd).catch(()=>{});
+      const ci=G.fleet.findIndex(c=>c.id===String(order['كود السيارة']));if(ci>=0)Object.assign(G.fleet[ci],carLocUpd);
+    }
     await db.collection('bookings').doc(orderId).update(upd);
     await logAction('EDIT','Order Book',`Updated Order #${order?.['No.']||orderId} → ${newStatus}`);
     toast('Order updated!','success');closeModal();
@@ -5929,20 +5935,28 @@ async function loadProposalsPage(){
           <div class="form-grid">
             <div class="field"><label>Pickup Date/Time</label><input type="datetime-local" id="pr-pickup" onchange="prCalc()"/></div>
             <div class="field"><label>Dropoff Date/Time</label><input type="datetime-local" id="pr-dropoff" onchange="prCalc()"/></div>
-            <div class="field"><label>Pickup Location</label>
+            <div class="field" style="grid-column:span 2;"><label>Pickup Location *</label>
               <div style="display:flex;gap:6px;">
-                <select id="prop-pickup-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('pickup')">
-                  <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+                <select id="prop-pickup-type" class="form-input" style="width:175px;flex-shrink:0;">
+                  <option value="">-- Branch/Location --</option>
+                  <option value="HRG-Office">🌊 Hurghada – Office</option><option value="HRG-Airport">🌊 Hurghada – Airport</option>
+                  <option value="ALX-Office">🏙 Alexandria – Office</option><option value="ALX-Airport">🏙 Alexandria – Airport</option>
+                  <option value="CAI-Office">🏛 Cairo – Office</option><option value="CAI-Airport">🏛 Cairo – Airport</option>
+                  <option value="RSH-Office">⚓ Rashid – Office</option><option value="Other">Other</option>
                 </select>
-                <input type="text" id="prop-pickup-detail" placeholder="Specific address / terminal..." style="flex:1;">
+                <input type="text" id="prop-pickup-detail" class="form-input" style="flex:1;" placeholder="Hotel / terminal / address...">
               </div>
             </div>
-            <div class="field"><label>Dropoff Location</label>
+            <div class="field" style="grid-column:span 2;"><label>Dropoff Location *</label>
               <div style="display:flex;gap:6px;">
-                <select id="prop-dropoff-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('dropoff')">
-                  <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+                <select id="prop-dropoff-type" class="form-input" style="width:175px;flex-shrink:0;">
+                  <option value="">-- Branch/Location --</option>
+                  <option value="HRG-Office">🌊 Hurghada – Office</option><option value="HRG-Airport">🌊 Hurghada – Airport</option>
+                  <option value="ALX-Office">🏙 Alexandria – Office</option><option value="ALX-Airport">🏙 Alexandria – Airport</option>
+                  <option value="CAI-Office">🏛 Cairo – Office</option><option value="CAI-Airport">🏛 Cairo – Airport</option>
+                  <option value="RSH-Office">⚓ Rashid – Office</option><option value="Other">Other</option>
                 </select>
-                <input type="text" id="prop-dropoff-detail" placeholder="Specific address / terminal..." style="flex:1;">
+                <input type="text" id="prop-dropoff-detail" class="form-input" style="flex:1;" placeholder="Hotel / terminal / address...">
               </div>
             </div>
           </div>
@@ -8185,13 +8199,13 @@ function makeV360SectionEditable(carId,section){
   if(!car)return;
   const fields={
     'vehicle':[
-      {label:'Type (EN)',key:'car_type_en',altKeys:['typeEN','Type','car_type']},
-      {label:'Model (EN)',key:'car_model_en',altKeys:['modelEN','Model','car_model']},
+      {label:'Type (EN)',key:'car_type_en',altKeys:['Type','typeEN','car_type','النوع']},
+      {label:'Model (EN)',key:'car_model_en',altKeys:['Model','model','modelEN','car_model','الطراز','model_name']},
       {label:'Year',key:'year',altKeys:['Year','سنة الصنع']},
-      {label:'Color (EN)',key:'car_color_en',altKeys:['colorEN','Color','car_color']},
-      {label:'VIN/Chassis',key:'chassis',altKeys:['رقم الشاسيه','VIN']},
+      {label:'Color (EN)',key:'car_color_en',altKeys:['Color','colorEN','car_color','اللون']},
+      {label:'VIN/Chassis',key:'chassis',altKeys:['رقم الشاسيه','رقم الشاسية','VIN']},
       {label:'Motor No.',key:'motor',altKeys:['رقم الموتور']},
-      {label:'Plate',key:'plate',altKeys:['Plate','لوحة']},
+      {label:'Plate',key:'plate',altKeys:['Plate','لوحة','col_W']},
     ],
     'owner':[
       {label:'Owner First Name',key:'owner_first'},{label:'Owner Last Name',key:'owner_last'},
@@ -8267,7 +8281,19 @@ async function loadRiskRadar(){
   <!-- KPIs -->
   <div id="risk-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
 
-  <!-- Filter tabs -->
+  <!-- Branch availability summary -->
+  <div id="risk-branch-avail" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px;"></div>
+
+  <!-- Branch filter + type filter row -->
+  <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;">
+    <span style="font-size:9px;font-weight:800;color:var(--text3);text-transform:uppercase;">BRANCH:</span>
+    <button class="btn btn-ghost btn-sm risk-branch-btn" id="rb-all" onclick="filterRiskBranch('all',this)"
+      style="border-color:var(--accent);color:var(--accent);">🌐 All</button>
+    <button class="btn btn-ghost btn-sm risk-branch-btn" id="rb-HRG" onclick="filterRiskBranch('HRG',this)">🌊 Hurghada</button>
+    <button class="btn btn-ghost btn-sm risk-branch-btn" id="rb-ALX" onclick="filterRiskBranch('ALX',this)">🏙 Alexandria</button>
+    <button class="btn btn-ghost btn-sm risk-branch-btn" id="rb-CAI" onclick="filterRiskBranch('CAI',this)">🏛 Cairo</button>
+    <button class="btn btn-ghost btn-sm risk-branch-btn" id="rb-RSH" onclick="filterRiskBranch('RSH',this)">⚓ Rashid</button>
+  </div>
   <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
     <button class="btn btn-ghost btn-sm risk-type-btn active-risk-btn"
       id="risk-type-all" onclick="filterRiskTable('all',this)"
@@ -8397,10 +8423,63 @@ async function loadRiskRadar(){
   const rb=document.getElementById('badge-risk');
   if(rb){rb.textContent=expired+high;rb.classList.toggle('hidden',expired+high===0);}
 
+  // Branch availability summary
+  window._riskBranch='all';
+  const branchAvailEl=document.getElementById('risk-branch-avail');
+  if(branchAvailEl){
+    const branchDefs=[
+      {code:'HRG',label:'Hurghada',icon:'🌊',keywords:['hurghada','الغردقة','hrg']},
+      {code:'ALX',label:'Alexandria',icon:'🏙',keywords:['alexandria','اسكندرية','alx']},
+      {code:'CAI',label:'Cairo',icon:'🏛',keywords:['cairo','قاهرة','cai']},
+      {code:'RSH',label:'Rashid',icon:'⚓',keywords:['rashid','رشيد','rsh']},
+    ];
+    const activeCars=G.fleet.filter(c=>getCarStatusCategory(c)!=='archived');
+    branchAvailEl.innerHTML=branchDefs.map(bd=>{
+      const branchCars=activeCars.filter(c=>{
+        const b=(c.Branch||c.City||c['المحافظة']||c.current_location||'').toLowerCase();
+        return bd.keywords.some(k=>b.includes(k));
+      });
+      const avail=branchCars.filter(c=>getCarStatusCategory(c)==='available').length;
+      const rented=branchCars.filter(c=>getCarStatusCategory(c)==='rented').length;
+      const other=branchCars.length-avail-rented;
+      return`<div class="kpi-card" style="cursor:pointer;" onclick="filterRiskBranch('${bd.code}',document.getElementById('rb-${bd.code}'))">
+        <div class="kpi-label">${bd.icon} ${bd.label}</div>
+        <div style="display:flex;gap:7px;align-items:baseline;margin:4px 0;">
+          <span style="font-size:18px;font-weight:900;color:var(--success);">${avail}</span>
+          <span style="font-size:10px;color:var(--text3);">avail</span>
+          <span style="font-size:14px;font-weight:700;color:var(--accent);">${rented}</span>
+          <span style="font-size:10px;color:var(--text3);">rented</span>
+        </div>
+        <div class="kpi-sub">${branchCars.length} total cars</div>
+      </div>`;
+    }).join('');
+  }
+
   renderRiskTable(allRisks);
 }
 
+function getCarBranchCode(car){
+  const b=(car.Branch||car.City||car['المحافظة']||car.current_location||'').toLowerCase();
+  if(b.includes('hurghada')||b.includes('الغردقة')||b.includes('hrg'))return 'HRG';
+  if(b.includes('alexandria')||b.includes('اسكندرية')||b.includes('alx'))return 'ALX';
+  if(b.includes('cairo')||b.includes('قاهرة')||b.includes('cai'))return 'CAI';
+  if(b.includes('rashid')||b.includes('رشيد')||b.includes('rsh'))return 'RSH';
+  return '';
+}
+
+function filterRiskBranch(branch,btn){
+  window._riskBranch=branch;
+  document.querySelectorAll('.risk-branch-btn').forEach(b=>{
+    b.style.borderColor='var(--border)';b.style.color='var(--text2)';
+  });
+  if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
+  // Re-apply current type filter with new branch
+  const typeActive=document.querySelector('.risk-type-btn[style*="var(--accent)"]');
+  filterRiskTable(typeActive?.id?.replace('risk-type-',')||'all',typeActive);
+}
+
 function filterRiskTable(type,btn){
+  window._riskType=type;
   // Update button styles
   document.querySelectorAll('.risk-type-btn').forEach(b=>{
     b.style.borderColor='var(--border)';b.style.color='var(--text2)';
@@ -8408,13 +8487,14 @@ function filterRiskTable(type,btn){
   if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
 
   const risks=window._riskData||[];
-  let filtered=risks;
+  const branch=window._riskBranch||'all';
+  let filtered=branch==='all'?risks:risks.filter(r=>!r.car||getCarBranchCode(r.car)===branch);
 
   if(type==='all'||type==='expired'){
     // Show all or expired subset
-    if(type==='expired')filtered=risks.filter(r=>r.risk==='expired');
+    if(type==='expired')filtered=filtered.filter(r=>r.risk==='expired');
   }else{
-    filtered=risks.filter(r=>r.label===type);
+    filtered=filtered.filter(r=>r.label===type);
   }
 
   renderRiskTable(filtered);
@@ -13083,22 +13163,38 @@ async function loadProposalsPage(){
             <label>Dropoff Date/Time *</label>
             <input type="datetime-local" id="pr-dropoff" onchange="prCalc();prCheckOverlap()"/>
           </div>
-          <div class="field">
-            <label>Pickup Location</label>
+          <div class="field" style="grid-column:span 2;">
+            <label>Pickup Location <span style="color:var(--danger);">*</span></label>
             <div style="display:flex;gap:6px;">
-              <select id="prop-pickup-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('pickup')">
-                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+              <select id="prop-pickup-type" class="form-input" style="width:175px;flex-shrink:0;">
+                <option value="">-- Branch/Location --</option>
+                <option value="HRG-Office">🌊 Hurghada – Office</option>
+                <option value="HRG-Airport">🌊 Hurghada – Airport</option>
+                <option value="ALX-Office">🏙 Alexandria – Office</option>
+                <option value="ALX-Airport">🏙 Alexandria – Airport</option>
+                <option value="CAI-Office">🏛 Cairo – Office</option>
+                <option value="CAI-Airport">🏛 Cairo – Airport</option>
+                <option value="RSH-Office">⚓ Rashid – Office</option>
+                <option value="Other">Other</option>
               </select>
-              <input type="text" id="prop-pickup-detail" placeholder="Specific address / terminal..." style="flex:1;">
+              <input type="text" id="prop-pickup-detail" class="form-input" style="flex:1;" placeholder="Hotel name / terminal / address...">
             </div>
           </div>
-          <div class="field">
-            <label>Dropoff Location</label>
+          <div class="field" style="grid-column:span 2;">
+            <label>Dropoff Location <span style="color:var(--danger);">*</span></label>
             <div style="display:flex;gap:6px;">
-              <select id="prop-dropoff-type" style="width:140px;flex-shrink:0;" onchange="updatePropLocation('dropoff')">
-                <option value="Office">Office</option><option value="Airport">Airport</option><option value="Hotel">Hotel</option><option value="Other">Other</option>
+              <select id="prop-dropoff-type" class="form-input" style="width:175px;flex-shrink:0;">
+                <option value="">-- Branch/Location --</option>
+                <option value="HRG-Office">🌊 Hurghada – Office</option>
+                <option value="HRG-Airport">🌊 Hurghada – Airport</option>
+                <option value="ALX-Office">🏙 Alexandria – Office</option>
+                <option value="ALX-Airport">🏙 Alexandria – Airport</option>
+                <option value="CAI-Office">🏛 Cairo – Office</option>
+                <option value="CAI-Airport">🏛 Cairo – Airport</option>
+                <option value="RSH-Office">⚓ Rashid – Office</option>
+                <option value="Other">Other</option>
               </select>
-              <input type="text" id="prop-dropoff-detail" placeholder="Specific address / terminal..." style="flex:1;">
+              <input type="text" id="prop-dropoff-detail" class="form-input" style="flex:1;" placeholder="Hotel name / terminal / address...">
             </div>
           </div>
         </div>
@@ -13466,18 +13562,31 @@ function convertProposalToOrder(proposalId){
       closeModal();
     }catch(e){toast('Conversion failed: '+e.message,'error');}
   };
-  const carId=p.car_id||'';
-  const carLabel=p.car_label||'';
-  if(carId){
-    if(confirm('Convert this proposal to an order?\nCar: '+carLabel))doConvert(carId,carLabel);
-  }else{
-    const cars=G.fleet.filter(c=>c.is_active!==false);
-    const html=`<div><select id="conv-car-sel" class="form-input" style="width:100%;margin-bottom:12px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-      <option value="">-- Select actual car --</option>
-      ${cars.map(c=>`<option value="${c.id}">${getCarLabel(c,'en')} | ${c.plate||''}</option>`).join('')}
-    </select><button class="btn btn-primary btn-full" onclick="const sel=document.getElementById('conv-car-sel');const car=G.fleet.find(c=>c.id===sel.value);if(!car){toast('Select a car','error');return;}closeModal();setTimeout(()=>convertProposalToOrderWithCar('${proposalId}',car.id,getCarLabel(car,'en')),100);">✅ Confirm & Convert</button></div>`;
-    openModal('Select Car for Order',html);
-  }
+  // Always show full fleet selection — proposals never bind to a specific car
+  const cars=G.fleet.filter(c=>c.is_active!==false);
+  const html=`
+    <div style="margin-bottom:11px;font-size:11px;color:var(--text3);">
+      Proposal <strong style="color:var(--accent);">${p.proposal_ref||proposalId}</strong> —
+      <strong>${p.client_name}</strong><br>
+      Vehicle type requested: <strong style="color:var(--accent);">${p.car_label||'—'}</strong>
+    </div>
+    <select id="conv-car-sel" class="form-input" style="width:100%;margin-bottom:12px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      <option value="">-- Select actual car from fleet --</option>
+      ${cars.map(c=>{
+        const cat=getCarStatusCategory(c);
+        const dot=cat==='available'?'🟢':cat==='rented'?'🔵':cat==='accident'?'🔴':'🟡';
+        return`<option value="${c.id}" ${cat!=='available'?'style="color:var(--text3);"':''}>${dot} ${getCarLabel(c,'en')} | ${c.plate||''}</option>`;
+      }).join('')}
+    </select>
+    <button class="btn btn-primary btn-full" onclick="
+      const sel=document.getElementById('conv-car-sel');
+      const car=G.fleet.find(c=>c.id===sel.value);
+      if(!car){toast('Please select a car','error');return;}
+      closeModal();
+      setTimeout(()=>convertProposalToOrderWithCar('${proposalId}',car.id,getCarLabel(car,'en')),100);">
+      ✅ Confirm & Convert to Order
+    </button>`;
+  openModal('Select Car for Order',html);
 }
 
 async function convertProposalToOrderWithCar(proposalId,carId,carLabel){
@@ -13489,14 +13598,21 @@ async function convertProposalToOrderWithCar(proposalId,carId,carLabel){
     await db.collection('bookings').add({
       'No.':orderRef,'اسم العميل':p.client_name,'كود العميل':p.client_crm_id||'',
       'كود السيارة':carId||'','car_label':carLabel||'','col_L':p.pickup_date,'col_T':p.dropoff_date,
-      'مكان الاستلام':p.pickup_location||'Office','مكان التسليم':p.dropoff_location||'Office',
+      'مكان الاستلام':p.pickup_location||'','مكان التسليم':p.dropoff_location||'',
       'سعر السيارة اليومي بالجنيه المصري':p.daily_rate||0,'إجمالي المستحق (Total)':p.total_estimate||0,
       'branch':branchCode,'حالة الطلب':'Active','from_proposal':proposalId,
       'insurance_plan':p.insurance_plan||'basic','km_package':p.km_package||'standard',
       '_sys_created':firebase.firestore.FieldValue.serverTimestamp()
     });
-    await db.collection('proposals').doc(proposalId).update({status:'Converted',converted_at:new Date().toISOString()});
-    if(G.proposals){const idx=G.proposals.findIndex(x=>x.id===proposalId);if(idx>=0)G.proposals[idx].status='Converted';}
+    // Auto-update car location to pickup branch
+    if(carId&&p.pickup_location_type){
+      const locUpd={current_location:p.pickup_location_type,current_location_updated:new Date().toISOString().slice(0,10),current_location_updated_by:G.user?.username||'system'};
+      await db.collection('fleet').doc(carId).update(locUpd).catch(()=>{});
+      const idx=G.fleet.findIndex(c=>c.id===carId);if(idx>=0)Object.assign(G.fleet[idx],locUpd);
+    }
+    await db.collection('proposals').doc(proposalId).update({status:'Converted',converted_to:orderRef,converted_at:new Date().toISOString()});
+    if(G.proposals){const idx=G.proposals.findIndex(x=>x.id===proposalId);if(idx>=0){G.proposals[idx].status='Converted';G.proposals[idx].converted_to=orderRef;}}
+    renderProposalsList&&renderProposalsList();
     toast('✅ Proposal converted to Order: '+orderRef,'success');
   }catch(e){toast('Conversion failed: '+e.message,'error');}
 }
@@ -13621,10 +13737,12 @@ async function generateProposal(){
   const lname=(document.getElementById('pr-lname')?.value||'').trim();
   const clientName=(fname+' '+lname).trim();
   const carMode=document.querySelector('input[name="prop-car-mode"]:checked')?.value||'fleet';
-  const carId=carMode==='fleet'?document.getElementById('pr-car')?.value:null;
+  const carSel=document.getElementById('pr-car');
   const pickup=document.getElementById('pr-pickup')?.value;
   const dropoff=document.getElementById('pr-dropoff')?.value;
   const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
+  const pickupLocType=document.getElementById('prop-pickup-type')?.value||'';
+  const dropoffLocType=document.getElementById('prop-dropoff-type')?.value||'';
 
   // Validations
   if(!clientName){
@@ -13639,31 +13757,20 @@ async function generateProposal(){
     if(!passport){toast('Passport / National ID is required in Reservation mode','error');return;}
     if(!license){toast('Driver License is required in Reservation mode','error');return;}
   }
-  if(carMode==='fleet'&&!carId){toast('Please select a car from the fleet, or switch to Manual mode.','error');return;}
+  if(carMode==='fleet'&&!carSel?.value){toast('Please select a vehicle type from the list.','error');return;}
   if(carMode==='manual'){
     const brand=document.getElementById('prop-manual-brand')?.value.trim();
     const model=document.getElementById('prop-manual-model')?.value.trim();
     if(!brand||!model){toast('Brand and Model are required in Manual mode','error');return;}
   }
   if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
+  if(!pickupLocType){toast('Pickup location / branch is required.','error');return;}
+  if(!dropoffLocType){toast('Dropoff location / branch is required.','error');return;}
 
   const pickupD=new Date(pickup),dropoffD=new Date(dropoff);
   if(dropoffD<=pickupD){toast('Dropoff must be after pickup.','error');return;}
   if(daily<=0){toast('Daily rent must be greater than 0.','error');return;}
 
-  // Check for conflict warning visible (fleet mode only)
-  if(carMode==='fleet'){
-    const warnEl=document.getElementById('pr-overlap-warn');
-    if(warnEl&&warnEl.style.display!=='none'){
-      const proceed=confirm(
-        'There is a potential conflict with this car and dates.\n\n'+
-        'Are you sure you want to generate this proposal anyway?'
-      );
-      if(!proceed)return;
-    }
-  }
-
-  let car=carId?getCarById(carId):null;
   let carLabel;
   if(carMode==='manual'){
     const brand=document.getElementById('prop-manual-brand')?.value.trim()||'';
@@ -13671,7 +13778,8 @@ async function generateProposal(){
     const year=document.getElementById('prop-manual-year')?.value.trim()||'';
     carLabel=[brand,model,year].filter(Boolean).join(' ');
   }else{
-    carLabel=car?getCarLabel(car,'en'):String(carId||'');
+    // Use selected option text (brand+model+year) — no specific car plate
+    carLabel=carSel?.options[carSel.selectedIndex]?.text||carSel?.value||'';
   }
   const branchCode=G.user?.branch||'GEN';
   const ref=await generateDocRef('PR',branchCode);
@@ -13702,7 +13810,7 @@ async function generateProposal(){
     client_license:document.getElementById('pr-license')?.value.trim()||'',
     proposal_mode:window._prMode||'reservation',
     car_mode:carMode,
-    car_id:carId?String(carId):'',
+    car_id:'',
     car_label:carLabel,
     pickup_date:pickup,
     dropoff_date:dropoff,
