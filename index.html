@@ -1631,14 +1631,24 @@ function initRealtimeListeners(){
         if(Array.isArray(allOrders)){
           const idx2=allOrders.findIndex(b=>b.id===doc.id);
           if(idx2>=0)allOrders[idx2]=doc;
+          else if(idx===-1)allOrders.push(doc);
         }
       }
       if(change.type==='removed'){
         G.bookings=G.bookings.filter(b=>b.id!==doc.id);
+        if(Array.isArray(allOrders))allOrders=allOrders.filter(b=>b.id!==doc.id);
       }
     });
-    const activeSection=document.querySelector('.page-section.active');
-    if(activeSection?.id==='page-order-book')filterOrders();
+    clearTimeout(window._snapshotRefreshTimer);
+    window._snapshotRefreshTimer=setTimeout(()=>{
+      const active=document.querySelector('.page-section.active');
+      if(!active)return;
+      const pid=active.id;
+      if(pid==='page-order-book'&&typeof filterOrders==='function')filterOrders();
+      if(pid==='page-fleet-radar'&&typeof renderGantt==='function')renderGantt();
+      if(pid==='page-dashboard'&&typeof loadDashboard==='function')loadDashboard();
+      if(pid==='page-vehicle-360'&&typeof loadVehicle360Details==='function')loadVehicle360Details();
+    },1500);
     refreshDashboardKPIs();
   });
 
@@ -3142,7 +3152,7 @@ async function openOrderDetail(orderId){
       </div>
       <div class="panel">
         <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">🚗 Vehicle</div>
-        <div style="font-size:12px;font-weight:700;cursor:${carInFleet?'pointer':'default'};color:${carInFleet?'var(--accent)':'var(--text)'};" ${carInFleet?`onclick="closeModal();showPage('vehicle-360');setTimeout(()=>{const s=document.getElementById('v360-car-select');if(s){s.value='${carCode}';loadVehicle360Details();}},300)"`:''} title="${carInFleet?'Open Vehicle 360':'Vehicle not in fleet'}">${carLabel}${carInFleet?' 🔗':''}</div>
+        <div style="font-size:12px;font-weight:700;cursor:${carInFleet?'pointer':'default'};color:${carInFleet?'var(--accent)':'var(--text)'};" ${carInFleet?`onclick="closeModal();setTimeout(()=>openCarDetailModal('${carInFleet.id||carCode}'),200)"`:''} title="${carInFleet?'View car details':'Vehicle not in fleet'}">${carLabel}${carInFleet?' 🔗':''}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:3px;">Code: ${carCode||'-'}</div>
         <div style="font-size:11px;color:var(--text2);">📍 Pickup: ${o['مكان الاستلام']||'-'}</div>
         <div style="font-size:11px;color:var(--text2);">📍 Dropoff: ${o['مكان التسليم']||'-'}</div>
@@ -3822,7 +3832,9 @@ async function renderGantt(){
         if(!on)return false;
         const bn=(BRANCH_MAP[code]||code).toLowerCase();
         const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
-        return b.includes(bn)||(car.Branch||'').toLowerCase().includes(bn)||
+        const carLocation=(car.current_location||'').toUpperCase();
+        const locationMatch=carLocation.startsWith(code+'-')||carLocation===code;
+        return locationMatch||b.includes(bn)||(car.Branch||'').toLowerCase().includes(bn)||
                (car.City||'').toLowerCase().includes(bn);
       });
       if(!branchPass)return false;
@@ -3837,7 +3849,12 @@ async function renderGantt(){
     });
     // Location filter
     const locFilter=window.GANTT_LOCATION_FILTER||'all';
-    const activeCars=locFilter==='all'?cars:cars.filter(c=>(c.current_location||'').toLowerCase().includes(locFilter.toLowerCase()));
+    const activeCars=locFilter==='all'?cars:cars.filter(c=>{
+      const loc=(c.current_location||'').toLowerCase();
+      if(locFilter==='Workshop')return loc.includes('workshop');
+      if(locFilter==='With Client')return loc.includes('with client');
+      return loc.startsWith(locFilter.toLowerCase()+'-')||loc===locFilter.toLowerCase();
+    });
 
     // Build date header
     let headerMonthHTML='',headerDayHTML='';
@@ -3888,6 +3905,7 @@ async function renderGantt(){
     
     const carIdStr=String(car.ID||car.id||'').trim();
     const carLabel=getCarLabel(car,'en');
+    const shortLabel=(car.car_label||carLabel).split('|')[0].trim().slice(0,28);
     const carIdDisplay=car['No.']||car.ID||car.id||'-';
     const plateDisplay=car.plate||formatPlate(car);
 
@@ -3949,13 +3967,12 @@ async function renderGantt(){
             <div style="padding:4px 6px;max-width:${CAR_COL-4}px;overflow:hidden;">
               <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
                 <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
-                <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-26}px;" title="${getCarLabel(car,'en')}">${getCarLabel(car,'en')}</div>
+                <div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-26}px;" title="${carLabel}">${shortLabel}</div>
               </div>
-              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-12}px;direction:rtl;text-align:right;" title="${getCarLabel(car,'ar')}">${getCarLabel(car,'ar')}</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+              <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${CAR_COL-12}px;">${plateDisplay}</div>
+              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;flex-wrap:wrap;">
                 <span class="pill pill-${statusKey}" style="font-size:8px;padding:1px 5px;">${statusLabel}</span>
-                <span style="font-size:9px;color:var(--text3);">${orderCount} orders</span>
-                ${car.current_location?`<span style="font-size:8px;color:var(--text3);">📍${car.current_location.replace(/-?Office/,'').replace(/-?Airport/,'✈️')}</span>`:''}
+                ${car.current_location?`<span style="font-size:8px;color:var(--text3);">📍${car.current_location.replace(/-Office$/,'').replace(/-Airport$/,'✈️')}</span>`:''}
               </div>
             </div>
           </div>
@@ -8197,6 +8214,7 @@ function makeV360SectionEditable(carId,section){
          ||G.fleet.find(c=>c.id===carId)
          ||G.fleet.find(c=>String(c.ID)===String(carId));
   if(!car)return;
+  console.log('[V360Edit] Car fields:',Object.keys(car));
   const fields={
     'vehicle':[
       {label:'Type (EN)',key:'car_type_en',altKeys:['Type','typeEN','car_type','النوع']},
@@ -8208,13 +8226,18 @@ function makeV360SectionEditable(carId,section){
       {label:'Plate',key:'plate',altKeys:['Plate','لوحة','col_W']},
     ],
     'owner':[
-      {label:'Owner First Name',key:'owner_first'},{label:'Owner Last Name',key:'owner_last'},
-      {label:'Monthly Fee',key:'monthly_fee'},{label:'Payment Frequency (days)',key:'payment_frequency'},
+      {label:'Owner First Name',key:'owner_first',altKeys:['الاسم الأول','BP','owner_fname','الاسم الاول']},
+      {label:'Owner Last Name',key:'owner_last',altKeys:['الاسم الأخير','BQ','owner_lname','الاسم الاخير']},
+      {label:'Monthly Fee',key:'monthly_fee',altKeys:['الأجرة الشهرية','CJ','monthly_rent','fee_monthly','الاجرة الشهرية']},
+      {label:'Payment Frequency (days)',key:'payment_frequency',altKeys:['فترة الدفع','CK','pay_freq']},
     ],
     'contract':[
-      {label:'Contract Start',key:'contract_start',type:'date'},{label:'Contract End',key:'contract_end',type:'date'},
-      {label:'Contract Status',key:'is_active'},{label:'License Expiry',key:'license_end',type:'date'},
-      {label:'Insurance Expiry',key:'insurance_end',type:'date'},
+      {label:'Contract Start',key:'contract_start',type:'date',altKeys:['بداية التعاقد','AW','contract_start_date','تاريخ بدء التعاقد']},
+      {label:'Contract End',key:'contract_end',type:'date',altKeys:['انتهاء التعاقد','AX','contract_end_date','تاريخ انتهاء التعاقد','نهاية التعاقد']},
+      {label:'Contract Status',key:'is_active',altKeys:['حالة التعاقد','AZ','BA','contract_status','حاله التعاقد','Contract']},
+      {label:'License Expiry',key:'license_end',type:'date',altKeys:['انتهاء الرخصة','AQ','license_expiry','نهاية الترخيص']},
+      {label:'Insurance Expiry',key:'insurance_end',type:'date',altKeys:['انتهاء الضمان','BJ','insurance_expiry','نهاية التأمين']},
+      {label:'Handover Date',key:'handover_date',type:'date',altKeys:['تاريخ الاستلام','BC','تاريخ التسليم']},
     ]
   };
   const sectionFields=fields[section]||[];
