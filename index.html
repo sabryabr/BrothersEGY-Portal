@@ -1626,9 +1626,13 @@ async function loadProposalsList(){
   }catch(e){console.warn('Proposals load failed:',e.message);}
 }
 
+let _lastBookingsHash='';
 function initRealtimeListeners(){
   // Bookings live listener
   db.collection('bookings').onSnapshot(snap=>{
+    const newHash=snap.docChanges().map(c=>c.doc.id+c.type).join(',');
+    if(newHash&&newHash===_lastBookingsHash)return;
+    _lastBookingsHash=newHash;
     snap.docChanges().forEach(change=>{
       const doc={id:change.doc.id,...change.doc.data()};
       if(change.type==='added'||change.type==='modified'){
@@ -1654,8 +1658,8 @@ function initRealtimeListeners(){
       if(pid==='page-fleet-radar'&&typeof renderGantt==='function')renderGantt();
       if(pid==='page-dashboard'&&typeof loadDashboard==='function')loadDashboard();
       if(pid==='page-vehicle-360'&&typeof loadVehicle360Details==='function')loadVehicle360Details();
-    },1500);
-    refreshDashboardKPIs();
+    },3000);
+    debouncedKPI();
   });
 
   // Fleet live listener
@@ -2129,7 +2133,12 @@ async function loadDashboard(){
   // Chart renders after all others complete
   setTimeout(()=>loadDashFleetChart(),300);
   // Final KPI refresh pass — ensures cards are never stuck at '--'
-  setTimeout(()=>refreshDashboardKPIs(),600);
+  setTimeout(()=>debouncedKPI(),600);
+}
+
+function debouncedKPI(){
+  clearTimeout(window._kpiDebounce);
+  window._kpiDebounce=setTimeout(()=>{window._kpiLoading=false;loadDashKPIs();},800);
 }
 
 /* ---- refreshDashboardKPIs — fallback to ensure cards never stay at '--' ---- */
@@ -2967,8 +2976,13 @@ function subscribeOrders(){
       if(!isPriv)orders=orders.filter(o=>o['فرع الإصدار']===G.user.branch||o.assigned_user===G.user.username||(!o['فرع الإصدار']&&!o.assigned_user));
       console.log('[OrderBook] After branch filter:',orders.length,'orders');
       allOrders=orders;G.bookings=orders;
-      // Sort client-side by _sys_updated desc
-      allOrders.sort((a,b)=>(b._sys_updated||0)-(a._sys_updated||0));
+      // Sort: orders with proper No. first, then by start date descending
+      allOrders.sort((a,b)=>{
+        const aNo=a['No.']||'';const bNo=b['No.']||'';
+        if(!aNo&&bNo)return 1;if(aNo&&!bNo)return -1;
+        const{start:aS}=getOrderDates(a);const{start:bS}=getOrderDates(b);
+        return (bS||0)-(aS||0);
+      });
       filterOrders();updateOrderSummaryBar();
     },e=>{
       console.warn('Orders onSnapshot error:',e.message,e.code);
@@ -3004,10 +3018,11 @@ function filterOrders(){
     if(from||to){const{start}=getOrderDates(o);if(from&&start&&start<new Date(from))return false;if(to&&start&&start>new Date(to))return false;}
     return true;
   });
-  // FIX 7: sort by start date newest first
+  // Sort: orders with proper No. first, then by start date newest first
   filtered.sort((a,b)=>{
-    const{start:sa}=getOrderDates(a);
-    const{start:sb}=getOrderDates(b);
+    const aNo=a['No.']||'';const bNo=b['No.']||'';
+    if(!aNo&&bNo)return 1;if(aNo&&!bNo)return -1;
+    const{start:sa}=getOrderDates(a);const{start:sb}=getOrderDates(b);
     if(!sa&&!sb)return 0;if(!sa)return 1;if(!sb)return -1;
     return sb-sa;
   });
@@ -3174,23 +3189,27 @@ async function bulkUpdateStatus(){
   if(!status){toast('Select a status first','error');return;}
   if(window._bulkSelected.size===0){toast('No orders selected','error');return;}
   if(!confirm(`Update ${window._bulkSelected.size} orders to status: ${status}?`))return;
-  const batch=db.batch();
   const isClosed=status==='Closed';
-  window._bulkSelected.forEach(id=>{
-    const ref=db.collection('bookings').doc(id);
-    batch.update(ref,{
-      'بلطلا ةلاح':status,
-      closed:isClosed,
-      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    const idx=allOrders.findIndex(o=>o.id===id);
-    if(idx>=0){allOrders[idx]['بلطلا ةلاح']=status;allOrders[idx].closed=isClosed;}
-    const idx2=G.bookings.findIndex(o=>o.id===id);
-    if(idx2>=0){G.bookings[idx2]['بلطلا ةلاح']=status;G.bookings[idx2].closed=isClosed;}
-  });
+  const isActive=['Active','Future','Overdue'].includes(status);
   try{
-    await batch.commit();
-    toast(`✅ Updated ${window._bulkSelected.size} orders to ${status}`,'success');
+    const ids=[...window._bulkSelected];
+    const chunks=[];
+    for(let i=0;i<ids.length;i+=400)chunks.push(ids.slice(i,i+400));
+    for(const chunk of chunks){
+      const batch=db.batch();
+      chunk.forEach(id=>{
+        const ref=db.collection('bookings').doc(id);
+        const upd={'بلطلا ةلاح':status,closed:isClosed,_sys_updated:firebase.firestore.FieldValue.serverTimestamp()};
+        if(isActive)upd.closed=false;
+        batch.update(ref,upd);
+        const idx=allOrders.findIndex(o=>o.id===id);
+        if(idx>=0){allOrders[idx]['بلطلا ةلاح']=status;allOrders[idx].closed=isClosed;}
+        const idx2=G.bookings.findIndex(o=>o.id===id);
+        if(idx2>=0){G.bookings[idx2]['بلطلا ةلاح']=status;G.bookings[idx2].closed=isClosed;}
+      });
+      await batch.commit();
+    }
+    toast(`✅ Updated ${ids.length} orders to ${status}`,'success');
     window._bulkSelected.clear();
     filterOrders();
   }catch(e){
@@ -3353,6 +3372,33 @@ async function openOrderDetail(orderId){
 
     openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`, html, true);
     logAction('VIEW','Order Book', `Viewed order #${o['No.']||o.id}`);
+
+    // Show conflict warning if another active order overlaps this car+period
+    const carCodeForCheck=String(o['كود السيارة']||o.col_D||'').trim();
+    const{start:oStart,end:oEnd}=getOrderDates(o);
+    if(carCodeForCheck&&oStart&&oEnd&&!o.closed){
+      const conflictingOrders=(allOrders.length>0?allOrders:G.bookings).filter(x=>{
+        if(x.id===o.id)return false;
+        const xCarCode=String(x['كود السيارة']||x.col_D||'').trim();
+        if(xCarCode!==carCodeForCheck)return false;
+        const xClosed=x.closed||x['بلطلا ةلاح']==='Closed'||x['بلطلا ةلاح']==='Cancelled';
+        if(xClosed)return false;
+        const{start:xS,end:xE}=getOrderDates(x);
+        if(!xS||!xE)return false;
+        return oStart<xE&&oEnd>xS;
+      });
+      if(conflictingOrders.length>0){
+        const cf=conflictingOrders[0];
+        const cfName=cf['اسم العميل']||cf['ليمعلا مسا']||'Unknown';
+        const cfNo=cf['No.']||cf.id;
+        const warningHtml=`<div style="background:#fef2f2;border:2px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#b91c1c;font-weight:700;">
+          ⚠️ BOOKING CONFLICT: This car also has Order #${cfNo} (${cfName}) overlapping this period!
+          <button class="btn btn-ghost btn-xs" onclick="openOrderDetail('${cf.id}')" style="margin-left:8px;color:#ef4444;">View conflict</button>
+        </div>`;
+        const modalBody=document.querySelector('#global-modal .modal-body');
+        if(modalBody)modalBody.insertAdjacentHTML('afterbegin',warningHtml);
+      }
+    }
 
 }
 
@@ -3633,6 +3679,22 @@ async function openOrderEdit(orderId){
   openModal(`Edit Order #${o['No.']||o.id}`,html);
 }
 
+async function checkCarConflict(carCode,startDate,endDate,excludeOrderId=''){
+  if(!carCode||!startDate||!endDate)return null;
+  const start=new Date(startDate);const end=new Date(endDate);
+  const conflicts=(allOrders.length>0?allOrders:G.bookings).filter(o=>{
+    if(o.id===excludeOrderId)return false;
+    const oCarCode=String(o['كود السيارة']||o.col_D||'').trim();
+    if(oCarCode!==String(carCode).trim())return false;
+    const isClosed=o.closed||o['بلطلا ةلاح']==='Closed'||o['بلطلا ةلاح']==='Cancelled';
+    if(isClosed)return false;
+    const{start:oStart,end:oEnd}=getOrderDates(o);
+    if(!oStart||!oEnd)return false;
+    return start<oEnd&&end>oStart;
+  });
+  return conflicts.length>0?conflicts[0]:null;
+}
+
 async function saveOrderEdit(orderId){
   const order=allOrders.find(o=>o.id===orderId);
   const isPriv=['Admin','Executive'].includes(G.user?.role);
@@ -3654,6 +3716,19 @@ async function saveOrderEdit(orderId){
       const adminSnap=await db.collection('users').get();
       adminSnap.docs.forEach(d=>{if(['Admin','Executive'].includes(d.data().role))createNotification(d.id,'approval',`Rate change request from ${G.user.username} for Order #${order['No.']}`,  'approvals',orderId);});
       closeModal();return;
+    }
+  }
+  // Check for car booking conflict before saving
+  if(order&&['Active','Future','Overdue'].includes(newStatus)){
+    const orderCarCode=String(order['كود السيارة']||order.col_D||'').trim();
+    if(orderCarCode){
+      const{start,end}=getOrderDates(order);
+      const conflict=await checkCarConflict(orderCarCode,start,end,orderId);
+      if(conflict){
+        const conflictName=conflict['اسم العميل']||conflict['ليمعلا مسا']||conflict.id;
+        const proceed=confirm(`⚠️ Car conflict detected!\n\nThis car already has an active order for:\n${conflictName}\n\nDo you want to save anyway?`);
+        if(!proceed)return;
+      }
     }
   }
   try{
