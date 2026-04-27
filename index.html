@@ -1105,11 +1105,16 @@ function getCarCounts(){
     else if(cat==='maintenance')counts.maintenance++;
     else if(cat==='rented')counts.rented++;
     else counts.active++;
+    if(cat==='archived')return; // skip archived from branch counts
     const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
-    if(b.includes('hurghada')||b.includes('الغردقة'))bc.HRG++;
-    else if(b.includes('alexandria')||b.includes('اسكندرية'))bc.ALX++;
-    else if(b.includes('cairo')||b.includes('قاهرة'))bc.CAI++;
-    else if(b.includes('rashid')||b.includes('رشيد'))bc.RSH++;
+    const loc=(car.current_location||'').toUpperCase();
+    let assignedBranch='';
+    if(loc.startsWith('HRG')||b.includes('hurghada')||b.includes('hrg')||b.includes('الغردقة'))assignedBranch='HRG';
+    else if(loc.startsWith('ALX')||b.includes('alexandria')||b.includes('alx')||b.includes('اسكندرية'))assignedBranch='ALX';
+    else if(loc.startsWith('CAI')||b.includes('cairo')||b.includes('cai')||b.includes('قاهرة'))assignedBranch='CAI';
+    else if(loc.startsWith('RSH')||b.includes('rashid')||b.includes('rsh')||b.includes('رشيد'))assignedBranch='RSH';
+    if(!assignedBranch)assignedBranch=G.user?.branch||'HRG';
+    if(bc[assignedBranch]!==undefined)bc[assignedBranch]++;
   });
   return{counts,branchCounts:bc};
 }
@@ -1566,6 +1571,7 @@ async function loadFleet(){
     const snap=await db.collection('fleet').get();
     G.fleet=snap.docs.map(d=>({id:d.id,...d.data()}));
     console.log('[Fleet] Loaded',G.fleet.length,'cars. Sample:',G.fleet.slice(0,3).map(c=>({docId:c.id,plate:c.plate,is_active:c.is_active})));
+    console.log('[Fleet] Branch distribution:',G.fleet.reduce((acc,c)=>{const b=c.current_location||c.Branch||c.City||'Unknown';acc[b]=(acc[b]||0)+1;return acc;},{}));
     populateFleetDropdowns();
     updateDashboardKPIs();
   }catch(e){console.warn('Fleet load failed:',e.message);}
@@ -2865,6 +2871,7 @@ async function loadOrderBook(){
       <div style="display:flex;gap:7px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="showPage('en-contract')">➕ New Order</button>
         <button class="btn btn-ghost btn-sm" onclick="refreshOrderBook()">🔄 Refresh</button>
+        <button id="bulk-mode-btn" class="btn btn-ghost btn-sm" onclick="toggleBulkMode()" style="margin-left:6px;">☑️ Select</button>
       </div>
     </div>
     <!-- Filters -->
@@ -2911,6 +2918,24 @@ async function loadOrderBook(){
     </div>
     <!-- Summary -->
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;margin-bottom:14px;" id="ob-summary-bar"></div>
+    <!-- Bulk Toolbar -->
+    <div id="bulk-toolbar" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span id="bulk-count" style="font-size:11px;font-weight:700;color:var(--accent);">0 selected</span>
+      <button class="btn btn-ghost btn-sm" onclick="bulkSelectAll()">Select All</button>
+      <button class="btn btn-ghost btn-sm" onclick="bulkClearAll()">Clear</button>
+      <div style="width:1px;height:20px;background:var(--border);"></div>
+      <select id="bulk-status-sel" class="form-input" style="width:130px;padding:4px 8px;">
+        <option value="">-- Set Status --</option>
+        <option value="Active">Active</option>
+        <option value="Closed">Closed</option>
+        <option value="Overdue">Overdue</option>
+        <option value="Cancelled">Cancelled</option>
+        <option value="Accident">Accident</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="bulkUpdateStatus()">✅ Apply Status</button>
+      <button class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑️ Delete Selected</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleBulkMode()">✕ Cancel</button>
+    </div>
     <!-- Table -->
     <div class="panel">
       <div id="ob-table-wrap" class="table-wrap">
@@ -3045,7 +3070,7 @@ function renderOrdersTable(orders){
   const today=new Date();
   wrap.innerHTML=`
     <table class="data-table">
-      <thead><tr><th>Order #</th><th>Client</th><th>Car</th><th>Start</th><th>End</th><th>Total</th><th>Paid</th><th>Debt</th><th>Status</th><th>Branch</th><th>Actions</th></tr></thead>
+      <thead><tr>${window._bulkMode?'<th style="width:32px;"></th>':''}<th>Order #</th><th>Client</th><th>Car</th><th>Start</th><th>End</th><th>Total</th><th>Paid</th><th>Debt</th><th>Status</th><th>Branch</th><th>Actions</th></tr></thead>
       <tbody>
         ${orders.map(o=>{
           const{start,end}=getOrderDates(o);
@@ -3068,6 +3093,7 @@ function renderOrdersTable(orders){
           const carLabel=carInFleet?getCarLabel(carInFleet,'en'):(o['اسم السيارة']||'-');
           const clientId=o['كود العميل']||'';
           return`<tr style="cursor:pointer;${isClosed?'opacity:0.7;':''}" onclick="openOrderDetail('${o.id}')">
+            ${window._bulkMode?`<td style="width:32px;padding:4px 8px;" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" data-id="${o.id}" ${window._bulkSelected&&window._bulkSelected.has(o.id)?'checked':''} onchange="toggleBulkSelect('${o.id}',this)" onclick="event.stopPropagation()"></td>`:''}
             <td><span style="color:var(--accent);font-weight:700;">#${getOrderNo(o)}</span></td>
             <td><div style="font-weight:600;">${getOrderClientName(o)||'-'}</div>${clientId?`<div style="font-size:10px;color:var(--text3);">ID: ${clientId}</div>`:''}</td>
             <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${carLabel}</td>
@@ -3105,6 +3131,93 @@ function refreshOrderBook(){
   if(wrap)wrap.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
   window._orderSubActive=false;
   subscribeOrders();
+}
+
+window._bulkMode=false;
+window._bulkSelected=new Set();
+
+function toggleBulkMode(){
+  window._bulkMode=!window._bulkMode;
+  window._bulkSelected.clear();
+  const btn=document.getElementById('bulk-mode-btn');
+  const toolbar=document.getElementById('bulk-toolbar');
+  if(btn)btn.style.background=window._bulkMode?'var(--accent)':'';
+  if(toolbar)toolbar.style.display=window._bulkMode?'flex':'none';
+  filterOrders();
+}
+
+function toggleBulkSelect(orderId,cb){
+  if(cb.checked)window._bulkSelected.add(orderId);
+  else window._bulkSelected.delete(orderId);
+  const countEl=document.getElementById('bulk-count');
+  if(countEl)countEl.textContent=window._bulkSelected.size+' selected';
+}
+
+function bulkSelectAll(){
+  document.querySelectorAll('.bulk-cb').forEach(cb=>{
+    cb.checked=true;
+    window._bulkSelected.add(cb.dataset.id);
+  });
+  const countEl=document.getElementById('bulk-count');
+  if(countEl)countEl.textContent=window._bulkSelected.size+' selected';
+}
+
+function bulkClearAll(){
+  document.querySelectorAll('.bulk-cb').forEach(cb=>cb.checked=false);
+  window._bulkSelected.clear();
+  const countEl=document.getElementById('bulk-count');
+  if(countEl)countEl.textContent='0 selected';
+}
+
+async function bulkUpdateStatus(){
+  const status=document.getElementById('bulk-status-sel')?.value;
+  if(!status){toast('Select a status first','error');return;}
+  if(window._bulkSelected.size===0){toast('No orders selected','error');return;}
+  if(!confirm(`Update ${window._bulkSelected.size} orders to status: ${status}?`))return;
+  const batch=db.batch();
+  const isClosed=status==='Closed';
+  window._bulkSelected.forEach(id=>{
+    const ref=db.collection('bookings').doc(id);
+    batch.update(ref,{
+      'بلطلا ةلاح':status,
+      closed:isClosed,
+      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    const idx=allOrders.findIndex(o=>o.id===id);
+    if(idx>=0){allOrders[idx]['بلطلا ةلاح']=status;allOrders[idx].closed=isClosed;}
+    const idx2=G.bookings.findIndex(o=>o.id===id);
+    if(idx2>=0){G.bookings[idx2]['بلطلا ةلاح']=status;G.bookings[idx2].closed=isClosed;}
+  });
+  try{
+    await batch.commit();
+    toast(`✅ Updated ${window._bulkSelected.size} orders to ${status}`,'success');
+    window._bulkSelected.clear();
+    filterOrders();
+  }catch(e){
+    toast('Bulk update failed: '+e.message,'error');
+  }
+}
+
+async function bulkDelete(){
+  if(window._bulkSelected.size===0){toast('No orders selected','error');return;}
+  if(!confirm(`Permanently delete ${window._bulkSelected.size} orders? This cannot be undone.`))return;
+  const ids=[...window._bulkSelected];
+  try{
+    const chunks=[];
+    for(let i=0;i<ids.length;i+=400)chunks.push(ids.slice(i,i+400));
+    for(const chunk of chunks){
+      const batch=db.batch();
+      chunk.forEach(id=>batch.delete(db.collection('bookings').doc(id)));
+      await batch.commit();
+    }
+    allOrders=allOrders.filter(o=>!ids.includes(o.id));
+    G.bookings=G.bookings.filter(o=>!ids.includes(o.id));
+    toast(`✅ Deleted ${ids.length} orders`,'success');
+    window._bulkSelected.clear();
+    filterOrders();
+  }catch(e){
+    toast('Bulk delete failed: '+e.message,'error');
+  }
 }
 
 /* ---- Order Detail Modal ---- */
@@ -4016,12 +4129,14 @@ async function renderGantt(){
       const allOn=Object.values(FLEET_FILTER.branches).every(v=>v);
       const branchPass=allOff||allOn||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
         if(!on)return false;
-        const bn=(BRANCH_MAP[code]||code).toLowerCase();
-        const b=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
-        const carLocation=(car.current_location||'').toUpperCase();
-        const locationMatch=carLocation.startsWith(code+'-')||carLocation===code;
-        return locationMatch||b.includes(bn)||(car.Branch||'').toLowerCase().includes(bn)||
-               (car.City||'').toLowerCase().includes(bn);
+        const carLoc=(car.current_location||'').toUpperCase();
+        const carBranch=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
+        const branchName=(BRANCH_MAP[code]||code).toLowerCase();
+        if(carLoc.startsWith(code+'-')||carLoc===code)return true;
+        if(carBranch.includes(branchName)||carBranch.includes(code.toLowerCase()))return true;
+        const hasAnyLocation=car.current_location||car.Branch||car.City||car['المحافظة'];
+        if(!hasAnyLocation&&code===(G.user?.branch||'HRG'))return true;
+        return false;
       });
       if(!branchPass)return false;
       if(FLEET_FILTER.search){
