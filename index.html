@@ -2512,6 +2512,8 @@ function onDashPeriodChange(){
 
 /* ---- FIXED KPIs with period filter ---- */
 async function loadDashKPIs(){
+  if(window._kpiLoading)return;
+  window._kpiLoading=true;
   try{
     const isPriv=['Admin','Executive'].includes(G.user?.role);
     const period=getPeriodFilter();
@@ -2594,6 +2596,7 @@ async function loadDashKPIs(){
     if(labelEl)labelEl.textContent=periodFinal.label==='All Time'?'Total Revenue':'Income Collected';
 
   }catch(e){console.warn('KPI error:',e.message);}
+  finally{window._kpiLoading=false;}
 }
 
 /* ---- FIXED Finance with period filter ---- */
@@ -3224,10 +3227,9 @@ async function openOrderDetail(orderId){
       <button class="btn btn-warning" onclick="closeModal();openOrderEdit('` + o.id + `')">✏️ Edit Order</button>
       <button class="btn btn-primary" onclick="closeModal();quickAddPayment('` + o.id + `')">💰 Add Payment</button>
       ` + (!isClosed ? `<button class="btn btn-success" onclick="closeModal();requestCloseOrder('` + o.id + `')">✅ Close</button>` : '') + `
-      <button class="btn btn-ghost" onclick="closeModal();reprintContractFromOrder('` + o.id + `')">📄 Contract</button>
-      <button class="btn btn-ghost" onclick="openENContractForm('` + o.id + `')">📋 EN Contract</button>
-      <button class="btn btn-ghost" onclick="openARContractForm('` + o.id + `')">📋 AR Contract</button>
-      <button class="btn btn-ghost" onclick="closeModal();reprintReceiptFromOrder('` + o.id + `')">🧾 Receipt</button>
+      <button class="btn btn-ghost" onclick="generateOrderContractDirect('` + o.id + `','en')">📄 Contract</button>
+      <button class="btn btn-ghost" onclick="generateOrderContractDirect('` + o.id + `','ar')">📋 AR Contract</button>
+      <button class="btn btn-ghost" onclick="generateOrderReceiptDirect('` + o.id + `')">🧾 Receipt</button>
       <button class="btn btn-ghost" onclick="viewOrderPayments('` + o.id + `','` + (o['No.']||o.id) + `')">💳 Payments</button>
       <button class="btn btn-ghost" onclick="viewOrderDocuments('` + o.id + `','` + (o['No.']||o.id) + `')">📁 Docs</button>
       <button class="btn btn-ghost" onclick="openReminderForm('` + o.id + `')">🔔 Set Reminder</button>
@@ -3239,6 +3241,190 @@ async function openOrderDetail(orderId){
     openModal(`Order #${o['No.']||o.id} — ${o['اسم العميل']||''}`, html, true);
     logAction('VIEW','Order Book', `Viewed order #${o['No.']||o.id}`);
 
+}
+
+async function generateOrderContractDirect(orderId, lang) {
+  try {
+    toast('⏳ Generating contract...', 'info');
+    let o = allOrders.find(x=>x.id===orderId);
+    if(!o) {
+      const snap = await db.collection('bookings').doc(orderId).get();
+      if(!snap.exists){toast('Order not found','error');return;}
+      o = {id:snap.id,...snap.data()};
+      if(!allOrders.find(x=>x.id===o.id))allOrders.push(o);
+    }
+    const carCode = String(o['كود السيارة']||o.col_D||'').trim();
+    const car = G.fleet.find(c=>String(c.ID||c.id)===carCode)||{};
+    const clientCode = String(o['كود العميل']||o.col_B||'').trim();
+    const customer = G.customers.find(c=>String(c['No.']||c.col_A||c.id)===clientCode)||{};
+    const firstName = customer['الاسم الأول']||customer.col_C||'';
+    const lastName = customer['الاسم الأخير']||customer.col_D||'';
+    const clientName = o['اسم العميل']||o['ليمعلا مسا']||(firstName+' '+lastName).trim()||'';
+    const {start,end} = getOrderDates(o);
+    const days = start&&end?Math.max(1,Math.ceil((end-start)/86400000)):1;
+    const daily = parseAmount(o['سعر السيارة اليومي بالجنيه المصري']||0);
+    const total = parseAmount(o['إجمالي المستحق (Total)']||o['قحتسملا يلامجإ (Total)']||daily*days||0);
+    const depHeld = parseAmount(o.deposit_held||0);
+    const depEGP = parseAmount(o.deposit_held_egp||depHeld||0);
+    const depUSD = parseAmount(o.deposit_held_usd||0);
+    const plate = car.plate||formatPlate(car)||'';
+    const carLabel = car.car_label||getCarLabel(car,'en')||carCode;
+    const insFee = parseAmount(o.insurance_fee||o.rateIns||0);
+    const contractNo = o['No.']||o.id;
+    const branch = o['فرع الإصدار']||o.branch||'HRG';
+    const paidEGP = parseAmount(o['المدفوع EGP']||o['عوفدملا EGP']||0);
+    const paidUSD = parseAmount(o['المدفوع USD']||0);
+    const paidEUR = parseAmount(o['المدفوع EUR']||0);
+    const params = new URLSearchParams({
+      orderId, contractNo, branch,
+      rentalMode: days>28?'Monthly':'Daily',
+      cl_fname: firstName||clientName.split(' ')[0]||'',
+      cl_sname: lastName||clientName.split(' ').slice(1).join(' ')||'',
+      cl_pass: customer['رقم جواز السفر']||customer['رفسلا زاوج مقر']||'',
+      cl_nation: customer['رمز الدولة']||customer.col_H||'',
+      cl_phone: customer['رقم التليفون']||'',
+      cl_email: customer['البريد الإلكتروني']||'',
+      cl_lic: customer['رقم رخصة القيادة']||'',
+      cl_addr: customer['العنوان']||'',
+      carCode, carModel: carLabel, carPlate: plate,
+      carVin: car.chassis||car['رقم الشاسيه']||car.col_U||'',
+      carMotor: car['رقم الموتور']||car.col_T||'',
+      carYear: String(car.year||car['سنة الصنع']||''),
+      kmOut: String(o['كيلومتر الخروج']||o.km_out||''),
+      pickup: start?start.toISOString().slice(0,16):'',
+      dropoff: end?end.toISOString().slice(0,16):'',
+      p_loc_type: o['pickup_location_type']||o['مكان الاستلام']||'Office',
+      p_loc_detail: o['مكان الاستلام']||o['مالتسالا ناكم']||'',
+      d_loc_type: o['dropoff_location_type']||o['مكان التسليم']||'Office',
+      d_loc_detail: o['مكان التسليم']||o['ميلستلا ناكم']||'',
+      rateRent: String(daily), rateIns: String(insFee),
+      insPlan: o['insurance_plan']||'Basic',
+      kmPkg: o['km_package']||'Standard (120 KM/Day)',
+      kmCost:'0', fee_del:'0', fee_col:'0',
+      pay_rent_egp: String(paidEGP), pay_rent_usd: String(paidUSD), pay_rent_eur: String(paidEUR),
+      pay_dep_egp: String(depEGP), pay_dep_usd: String(depUSD), pay_dep_eur:'0',
+      req_deposit: String(depHeld),
+    });
+    const file = lang==='ar'?'contract-ar.html':'contract-en.html';
+    window.open(file+'?'+params.toString(),'_blank');
+    await db.collection('bookings').doc(orderId).update({
+      contract_generated:true,
+      contract_generated_at:new Date().toISOString(),
+      [`contract_ref_${lang}`]:contractNo,
+      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(()=>{});
+  } catch(e) {
+    console.error('Contract generation error:',e);
+    toast('Contract error: '+e.message,'error');
+  }
+}
+
+async function generateOrderReceiptDirect(orderId) {
+  try {
+    let o = allOrders.find(x=>x.id===orderId);
+    if(!o) {
+      const snap = await db.collection('bookings').doc(orderId).get();
+      if(!snap.exists){toast('Order not found','error');return;}
+      o = {id:snap.id,...snap.data()};
+      if(!allOrders.find(x=>x.id===o.id))allOrders.push(o);
+    }
+    const clientCode = String(o['كود العميل']||o.col_B||'').trim();
+    const customer = G.customers.find(c=>String(c['No.']||c.col_A||c.id)===clientCode)||{};
+    const carCode = String(o['كود السيارة']||o.col_D||'').trim();
+    const car = G.fleet.find(c=>String(c.ID||c.id)===carCode)||{};
+    const {start,end} = getOrderDates(o);
+    const clientName = o['اسم العميل']||o['ليمعلا مسا']||'';
+    const passport = customer['رقم جواز السفر']||customer['رفسلا زاوج مقر']||'';
+    const phone = customer['رقم التليفون']||'';
+    const paid = getOrderPaid(o);
+    const total = parseAmount(o['إجمالي المستحق (Total)']||o['قحتسملا يلامجإ (Total)']||0);
+    const contractNo = o['No.']||o.id;
+    const plate = car.plate||formatPlate(car)||'';
+    const carLabel = (car.car_label||getCarLabel(car,'en')||carCode).slice(0,40);
+    const branch = o['فرع الإصدار']||o.branch||'HRG';
+    const dateStr = new Date().toISOString().slice(0,10);
+    const paidEGP = parseAmount(o['المدفوع EGP']||0);
+    const paidUSD = parseAmount(o['المدفوع USD']||0);
+    const paidEUR = parseAmount(o['المدفوع EUR']||0);
+    const parts=[];
+    if(paidEGP>0)parts.push(`${paidEGP.toLocaleString()} Cash (EGP)`);
+    if(paidUSD>0)parts.push(`${paidUSD} USD`);
+    if(paidEUR>0)parts.push(`${paidEUR} EUR`);
+    const paymentStr = parts.join(' + ')||`${paid.toLocaleString()} EGP`;
+    const branchCode = branch.toUpperCase().slice(0,3);
+    const now = new Date();
+    const rcRef = `RC-${branchCode}-${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(Date.now()).slice(-4)}`;
+    const logo = 'https://brothersegy.com/wp-content/uploads/2026/02/12345.png';
+    const verifyUrl = `https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${contractNo}`;
+    const singleRec = (copyType) => `
+      <div style="height:48%;border:2px solid #000;padding:15px;display:flex;flex-direction:column;box-sizing:border-box;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px;">
+          <img src="${logo}" style="height:40px;object-fit:contain;">
+          <div style="text-align:center;flex:1;">
+            <div style="font-size:14pt;font-weight:bold;color:#04509D;text-transform:uppercase;">OFFICIAL RECEIPT</div>
+            <div style="font-size:9pt;">${copyType}</div>
+          </div>
+          <div style="text-align:right;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(verifyUrl)}&size=60x60" style="height:50px;">
+            <div style="font-size:7pt;font-weight:bold;">DATE: ${dateStr}</div>
+            <div style="font-size:8pt;font-weight:bold;">RENTAL PAYMENT</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:8.5pt;border-bottom:1px dashed #ccc;padding-bottom:8px;margin-bottom:8px;">
+          <div>
+            <div><strong>RECEIVED FROM</strong> ${clientName}</div>
+            <div><strong>PASSPORT/ID</strong> ${passport||'—'}</div>
+            <div><strong>PHONE</strong> ${phone||'—'}</div>
+          </div>
+          <div>
+            <div><strong>CONTRACT NO</strong> ${contractNo}</div>
+            <div><strong>VEHICLE</strong> ${carLabel} | ${plate}</div>
+            <div><strong>PERIOD</strong> ${start?start.toLocaleDateString('en-GB'):''} → ${end?end.toLocaleDateString('en-GB'):''}</div>
+          </div>
+        </div>
+        <div style="border:1px solid #ccc;background:#fbfbfb;padding:10px;margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="font-size:10pt;">AMOUNT RECEIVED</strong>
+            <span style="font-size:20pt;font-weight:bold;">£${paid.toLocaleString()}.00</span>
+          </div>
+          <div style="font-size:8pt;margin-top:4px;color:#555;">${paymentStr}</div>
+        </div>
+        ${(total-paid)>0?`<div style="font-size:8pt;color:#c0392b;font-weight:bold;">⚠ OUTSTANDING BALANCE: £${(total-paid).toLocaleString()}.00</div>`:'<div style="font-size:8pt;color:#27ae60;font-weight:bold;">✅ FULLY PAID</div>'}
+        <div style="margin-top:auto;display:flex;justify-content:flex-end;">
+          <div style="text-align:center;border-top:1px solid #000;width:200px;padding-top:5px;font-size:9pt;font-weight:bold;">
+            AUTHORIZED SIGNATURE<br><div style="font-size:8pt;margin-top:2px;">Date: ........................</div>
+          </div>
+        </div>
+      </div>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <style>body{font-family:Arial,sans-serif;margin:0;padding:0;}
+      @page{size:A4;margin:10mm 15mm;}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.no-print{display:none!important;}}
+      .print-btn{position:fixed;top:10px;right:10px;background:#04509D;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold;z-index:999;}
+      </style></head><body>
+      <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+      <div style="width:210mm;min-height:296mm;padding:10mm 15mm;box-sizing:border-box;display:flex;flex-direction:column;">
+        ${singleRec('CLIENT COPY')}
+        <div style="text-align:center;border-top:1px dashed #999;color:#999;padding:8px 0;font-size:8pt;">- - - - - DETACH HERE - - - - -</div>
+        ${singleRec('COMPANY COPY')}
+      </div></body></html>`;
+    const win = window.open('','_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(()=>win.print(),600);
+    await db.collection('receipts').add({
+      receipt_ref:rcRef, contract_no:contractNo, order_id:orderId,
+      client_name:clientName, car_label:carLabel+'| '+plate,
+      branch, branch_code:branchCode, receipt_date:dateStr,
+      type:'Rental Payment', amount_egp:paidEGP, amount_usd:paidUSD,
+      total_egp_equiv:paid, payment_details:paymentStr,
+      collected_by:G.user?.username||'', timestamp:Date.now(),
+      _sys_created:firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(()=>{});
+  } catch(e) {
+    console.error('Receipt error:',e);
+    toast('Receipt error: '+e.message,'error');
+  }
 }
 
 /* ---- Extend Order ---- */
