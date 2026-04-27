@@ -1659,7 +1659,6 @@ function initRealtimeListeners(){
       if(pid==='page-dashboard'&&typeof loadDashboard==='function')loadDashboard();
       if(pid==='page-vehicle-360'&&typeof loadVehicle360Details==='function')loadVehicle360Details();
     },3000);
-    debouncedKPI();
   });
 
   // Fleet live listener
@@ -1993,8 +1992,8 @@ async function loadDashboard(){
     </div>
 
     <!-- KPI ROW -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:11px;margin-bottom:18px;">
-      <div class="kpi-card" onclick="showPage('order-book')" style="cursor:pointer;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:11px;margin-bottom:18px;">
+      <div class="kpi-card" onclick="showPage('order-book');setTimeout(()=>setOrderFilter('Active'),300)" style="cursor:pointer;">
         <div class="kpi-label">Active Orders</div>
         <div class="kpi-value text-accent" id="kpi-active">--</div>
         <div class="kpi-sub">Currently running</div>
@@ -2032,8 +2031,28 @@ async function loadDashboard(){
       </div>
     </div>
 
+    <!-- TODAY QUICK STATS -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:18px;" id="dash-today-stats">
+      <div class="panel" style="padding:10px 14px;">
+        <div style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;margin-bottom:6px;">📤 Today's Pickups</div>
+        <div id="dash-today-pickups" style="font-size:22px;font-weight:700;color:var(--accent);">--</div>
+      </div>
+      <div class="panel" style="padding:10px 14px;">
+        <div style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;margin-bottom:6px;">📥 Today's Dropoffs</div>
+        <div id="dash-today-dropoffs" style="font-size:22px;font-weight:700;color:var(--success);">--</div>
+      </div>
+      <div class="panel" style="padding:10px 14px;">
+        <div style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;margin-bottom:6px;">💰 Collected Today</div>
+        <div id="dash-today-collected" style="font-size:22px;font-weight:700;color:var(--warning);">--</div>
+      </div>
+      <div class="panel" style="padding:10px 14px;">
+        <div style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;margin-bottom:6px;">🔒 Deposit Liability</div>
+        <div id="dash-deposit-liability" style="font-size:22px;font-weight:700;color:var(--danger);">--</div>
+      </div>
+    </div>
+
     <!-- ROW 2: Activity Feed + Fleet Chart -->
-    <div style="display:grid;grid-template-columns:1fr 360px;gap:14px;margin-bottom:18px;">
+    <div style="display:grid;grid-template-columns:1fr 400px;gap:14px;margin-bottom:18px;">
       <div class="panel">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
           <h3 style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
@@ -2123,6 +2142,7 @@ async function loadDashboard(){
   // Use allSettled so one failure never blocks others
   await Promise.allSettled([
     loadDashKPIs(),
+    loadDashTodayStats(),
     loadActivityFeed(),
     loadDashFinance(),
     loadDashTasks(),
@@ -2130,10 +2150,7 @@ async function loadDashboard(){
     loadDashRecentOrders(),
     loadDashExpiries()
   ]);
-  // Chart renders after all others complete
   setTimeout(()=>loadDashFleetChart(),300);
-  // Final KPI refresh pass — ensures cards are never stuck at '--'
-  setTimeout(()=>debouncedKPI(),600);
 }
 
 function debouncedKPI(){
@@ -2144,7 +2161,6 @@ function debouncedKPI(){
 /* ---- refreshDashboardKPIs — fallback to ensure cards never stay at '--' ---- */
 async function refreshDashboardKPIs(){
   try{
-    console.log('[KPI] Elements found:',['kpi-active','kpi-overdue','kpi-avail','kpi-revenue'].map(id=>document.getElementById(id)?.id||'MISSING'));
     const orders=G.bookings||[];
     const today=new Date();
     const todayStart=new Date();todayStart.setHours(0,0,0,0);
@@ -2563,20 +2579,29 @@ async function loadDashKPIs(){
     // (is_active===false → returns 'archived', so those are excluded automatically)
     const availableCars = G.fleet.filter(c => {
       const cat = getCarStatusCategory(c);
-      return cat === 'available' || cat === 'future';
+      return cat === 'available';
     }).length;
     document.getElementById('kpi-avail').textContent = availableCars;
 
     try{
-      const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
-      document.getElementById('kpi-tasks').textContent=taskSnap.size;
-    }catch(e){document.getElementById('kpi-tasks').textContent='0';}
+      if(window._cachedTaskCount===undefined||Date.now()-window._taskCacheTime>60000){
+        const taskSnap=await db.collection('tasks').where('assigned_to','==',G.user.username).where('status','in',['pending','inprogress']).get();
+        window._cachedTaskCount=taskSnap.size;
+        window._taskCacheTime=Date.now();
+      }
+      const taskEl=document.getElementById('kpi-tasks');
+      if(taskEl)taskEl.textContent=window._cachedTaskCount;
+    }catch(e){const taskEl=document.getElementById('kpi-tasks');if(taskEl)taskEl.textContent='0';}
 
     document.getElementById('kpi-proposals').textContent=G.proposals.filter(p=>p.status==='Draft').length;
 
     // Revenue with period filter — multi-strategy date parsing
     try{
-      const colSnap=await db.collection('collections').get();
+      if(!window._colCache||Date.now()-window._colCacheTime>120000){
+        window._colCache=await db.collection('collections').get();
+        window._colCacheTime=Date.now();
+      }
+      const colSnap=window._colCache;
       let revenue=0;
       colSnap.docs.forEach(d=>{
         const data=d.data();
@@ -2612,6 +2637,45 @@ async function loadDashKPIs(){
 
   }catch(e){console.warn('KPI error:',e.message);}
   finally{window._kpiLoading=false;}
+}
+
+async function loadDashTodayStats(){
+  try{
+    const today=new Date();
+    const todayStr=today.toISOString().slice(0,10);
+    const todayStart=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    const todayEnd=new Date(todayStart.getTime()+86400000);
+    const orders=G.bookings||[];
+
+    const pickups=orders.filter(o=>{
+      const{start}=getOrderDates(o);
+      return start&&start>=todayStart&&start<todayEnd&&!o.closed;
+    }).length;
+
+    const dropoffs=orders.filter(o=>{
+      const{end}=getOrderDates(o);
+      return end&&end>=todayStart&&end<todayEnd;
+    }).length;
+
+    const depositLiability=orders.reduce((sum,o)=>{
+      const held=parseAmount(o.deposit_held||0);
+      const returned=parseAmount(o.deposit_returned||0);
+      return sum+(held-returned);
+    },0);
+
+    let collected=0;
+    try{
+      const paySnap=await db.collection('payment_log')
+        .where('date','==',todayStr).get();
+      paySnap.forEach(d=>collected+=parseAmount(d.data().total_egp||d.data().egp||0));
+    }catch(e){}
+
+    const setEl=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+    setEl('dash-today-pickups',pickups);
+    setEl('dash-today-dropoffs',dropoffs);
+    setEl('dash-today-collected',fmtMoney(collected));
+    setEl('dash-deposit-liability',fmtMoney(depositLiability));
+  }catch(e){console.warn('Today stats error:',e.message);}
 }
 
 /* ---- FIXED Finance with period filter ---- */
@@ -16126,43 +16190,6 @@ function loadVehicle360ById(carDocId){
 
 // loadVehicle360ById sets a hidden select value so loadVehicle360Details works unchanged
 
-// FIX 10: improve revenue calculation — try multiple date field strategies
-async function _loadDashKPIsRevenue(period,isPriv){
-  try{
-    const colSnap=await db.collection('collections').get();
-    let revenue=0;
-    colSnap.docs.forEach(d=>{
-      const data=d.data();
-      if(!isPriv){
-        const b=data['موقع الفرع']||data.Branch||'';
-        if(!b.toLowerCase().includes((BRANCH_MAP[G.user?.branch]||'').toLowerCase())&&
-           !b.includes((window.BRANCH_AR||{})[G.user?.branch]||''))return;
-      }
-      if(period.month===null){revenue+=parseAmount(data['قيمة التحصيل']);return;}
-
-      // Strategy 1: explicit month/year fields
-      const rawMonth=String(data['شهر']||data.col_G||'').replace(/^0+/,'');
-      const rawYear=String(data['سنة']||data.col_H||'');
-      if(rawMonth&&rawYear&&rawMonth===period.month&&rawYear===period.year){
-        revenue+=parseAmount(data['قيمة التحصيل']);return;
-      }
-
-      // Strategy 2: parse from any date field
-      const dateRaw=data['تاريخ التحصيل']||data['Date']||data.col_A||data.col_B||'';
-      if(dateRaw){
-        const parsed=parseDBDate(dateRaw);
-        if(parsed&&!isNaN(parsed)){
-          const m=String(parsed.getMonth()+1);
-          const y=String(parsed.getFullYear());
-          if(m===period.month&&y===period.year){revenue+=parseAmount(data['قيمة التحصيل']);return;}
-        }
-      }
-    });
-    return revenue;
-  }catch(e){console.warn('Revenue load error:',e.message);return 0;}
-}
-
-// _loadDashKPIsRevenue is now inlined directly into loadDashKPIs above (multi-strategy revenue).
 
 /* ============================================================
    PREFILL PROPOSAL FROM CLIENT PROFILE
