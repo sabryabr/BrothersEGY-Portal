@@ -5104,88 +5104,6 @@ async function saveCarEdit(docId){
 /* ============================================================
    SYSTEM LOGS
    ============================================================ */
-async function loadSystemLogs(){
-  const el=document.getElementById('page-system-logs');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>📜 System Logs</h2><p>Complete audit trail — all user actions</p></div>
-      <button class="btn btn-ghost btn-sm" onclick="loadSystemLogs()">🔄 Refresh</button>
-    </div>
-    <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
-      <div class="kpi-card"><div class="kpi-label">Total Actions</div><div class="kpi-value text-accent" id="log-kpi-total">--</div><div class="kpi-sub">All time</div></div>
-      <div class="kpi-card"><div class="kpi-label">Active Session</div><div class="kpi-value text-success" id="log-kpi-session">0m</div><div class="kpi-sub">Since login</div></div>
-      <div class="kpi-card"><div class="kpi-label">Records Edited</div><div class="kpi-value text-warning" id="log-kpi-edits">--</div><div class="kpi-sub">This session</div></div>
-      <div class="kpi-card"><div class="kpi-label">Current User</div><div class="kpi-value text-success" style="font-size:16px;" id="log-kpi-user">--</div><div class="kpi-sub">Logged in</div></div>
-    </div>
-    <!-- Filters -->
-    <div class="panel" style="margin-bottom:14px;">
-      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;">
-        <div style="flex:1;min-width:160px;">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">🔍 SEARCH</div>
-          <input type="text" id="log-search" placeholder="User, action, details..."
-                 style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
-                 oninput="filterLogs()"/>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">ACTION</div>
-          <select id="log-action-filter" onchange="filterLogs()" style="padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-            <option value="all">All Actions</option>
-            <option value="LOGIN">Login</option>
-            <option value="LOGOUT">Logout</option>
-            <option value="GENERATE">Generate</option>
-            <option value="EDIT">Edit</option>
-            <option value="ADD">Add</option>
-            <option value="PRINT">Print</option>
-            <option value="VIEW">View</option>
-          </select>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">USER</div>
-          <select id="log-user-filter" onchange="filterLogs()" style="padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-            <option value="all">All Users</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <!-- Table -->
-    <div class="panel">
-      <div id="log-table-wrap" class="table-wrap">
-        <div class="empty-state"><div class="spinner lg"></div></div>
-      </div>
-    </div>`;
-
-  // Session timer
-  const loginTime=Date.now();
-  const sessionInterval=setInterval(()=>{
-    const el2=document.getElementById('log-kpi-session');
-    if(!el2){clearInterval(sessionInterval);return;}
-    const mins=Math.floor((Date.now()-loginTime)/60000);
-    el2.textContent=mins<60?`${mins}m`:`${Math.floor(mins/60)}h ${mins%60}m`;
-  },10000);
-
-  // Load logs with realtime
-  const unsub=db.collection('logs').orderBy('timestamp','desc').limit(300)
-    .onSnapshot(snap=>{
-      const logs=snap.docs.map(d=>({id:d.id,...d.data()}));
-      // Update KPIs
-      const kpiTotal=document.getElementById('log-kpi-total');
-      const kpiEdits=document.getElementById('log-kpi-edits');
-      const kpiUser=document.getElementById('log-kpi-user');
-      if(kpiTotal)kpiTotal.textContent=snap.size;
-      if(kpiEdits)kpiEdits.textContent=logs.filter(l=>l.action==='EDIT'||l.action==='ADD').length;
-      if(kpiUser)kpiUser.textContent=G.user?.username||'-';
-      // Populate user filter
-      const userFilter=document.getElementById('log-user-filter');
-      if(userFilter){
-        const users=[...new Set(logs.map(l=>l.user).filter(Boolean))];
-        const current=userFilter.value;
-        userFilter.innerHTML='<option value="all">All Users</option>'+users.map(u=>`<option value="${u}" ${u===current?'selected':''}>${u}</option>`).join('');
-      }
-      window._logsCache=logs;filterLogs();
-    },e=>console.warn('Logs error:',e.message));
-  G.unsubscribers.push(unsub);
-}
 window._logsCache=[];
 function filterLogs(){
   const search=(document.getElementById('log-search')?.value||'').toLowerCase();
@@ -5222,64 +5140,6 @@ function renderLogsTable(logs){
 /* ============================================================
    SETTINGS
    ============================================================ */
-async function loadSettingsPage(){
-  const el=document.getElementById('page-settings');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>⚙️ Settings</h2><p>System configuration — Admin only</p></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <!-- Shift Hours -->
-      <div class="panel">
-        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">🕐 Shift Hours</h3>
-        <div class="form-grid">
-          <div class="field"><label>Shift Start (Hour)</label><input type="number" id="set-shift-start" value="${G.settings.shiftStart||10}" min="0" max="23"/></div>
-          <div class="field"><label>Shift End (Hour)</label><input type="number" id="set-shift-end" value="${G.settings.shiftEnd||18}" min="0" max="23"/></div>
-        </div>
-      </div>
-      <!-- Discount Threshold -->
-      <div class="panel">
-        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">💲 Rate Control</h3>
-        <div class="field">
-          <label>Max Discount % Without Approval</label>
-          <input type="number" id="set-discount" value="${G.settings.discountThreshold||5}" min="0" max="100"/>
-        </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px;">Discounts above this % will require Admin approval</div>
-      </div>
-      <!-- Task Penalties -->
-      <div class="panel">
-        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">⚠️ Task Penalties (EGP)</h3>
-        <div class="form-grid">
-          <div class="field"><label>Low Priority</label><input type="number" id="set-pen-low" value="${G.settings.penaltyLow||50}"/></div>
-          <div class="field"><label>Medium Priority</label><input type="number" id="set-pen-med" value="${G.settings.penaltyMedium||100}"/></div>
-          <div class="field"><label>High Priority</label><input type="number" id="set-pen-high" value="${G.settings.penaltyHigh||200}"/></div>
-          <div class="field"><label>Urgent Priority</label><input type="number" id="set-pen-urg" value="${G.settings.penaltyUrgent||500}"/></div>
-        </div>
-      </div>
-      <!-- WhatsApp -->
-      <div class="panel">
-        <h3 style="font-size:13px;font-weight:800;margin-bottom:13px;">📱 WhatsApp Notifications</h3>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:11px;">
-          Each employee must send <strong style="color:var(--accent);">"I allow callmebot to send me messages"</strong> to <strong>+34 644 60 42 42</strong> on WhatsApp and share their API key below.
-        </div>
-        <div id="whatsapp-keys-list"></div>
-        <button class="btn btn-ghost btn-sm mt-8" onclick="loadWhatsAppKeys()">🔄 Refresh Users</button>
-      </div>
-    </div>
-    <div style="margin-top:14px;">
-      <button class="btn btn-success" onclick="saveSettings()">💾 Save All Settings</button>
-    </div>
-    <!-- Bulk Close Tool -->
-    <div class="panel" style="margin-top:18px;border:1px solid var(--danger);background:rgba(239,68,68,0.04);">
-      <h3 style="font-size:13px;font-weight:800;margin-bottom:8px;color:var(--danger);">🗂️ Bulk Close — Pre-2026 Orders</h3>
-      <p style="font-size:11px;color:var(--text3);margin-bottom:11px;">
-        Marks all open/overdue orders whose contract end date is before <strong>1 Jan 2026</strong> as Closed. Irreversible — confirm before running.
-      </p>
-      <button class="btn btn-sm" style="background:var(--danger);color:#fff;" onclick="confirmBulkCloseOldOrders()">⚡ Run Bulk Close</button>
-      <span id="bulk-close-status" style="font-size:11px;margin-left:10px;color:var(--text3);"></span>
-    </div>`;
-  loadWhatsAppKeys();
-}
 
 async function loadWhatsAppKeys(){
   const list=document.getElementById('whatsapp-keys-list');if(!list)return;
@@ -5372,24 +5232,6 @@ async function bulkCloseOldOrders(){
 /* ============================================================
    TASKS
    ============================================================ */
-async function loadTasks(){
-  const el=document.getElementById('page-tasks');if(!el)return;
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>✅ Task Manager</h2><p>${isPriv?'Assign and monitor all branch tasks':'My assigned tasks'}</p></div>
-      ${isPriv?`<button class="btn btn-primary btn-sm" onclick="openCreateTaskModal()">➕ Create Task</button>`:''}
-    </div>
-    <!-- Filter tabs -->
-    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn btn-ghost btn-sm" id="task-tab-mine" onclick="switchTaskTab('mine',this)" style="border-color:var(--accent);color:var(--accent);">My Tasks</button>
-      ${isPriv?`<button class="btn btn-ghost btn-sm" id="task-tab-all" onclick="switchTaskTab('all',this)">All Tasks</button>`:''}
-      <button class="btn btn-ghost btn-sm" id="task-tab-pending" onclick="switchTaskTab('pending',this)">Pending</button>
-      <button class="btn btn-ghost btn-sm" id="task-tab-done" onclick="switchTaskTab('done',this)">Completed</button>
-    </div>
-    <div id="tasks-list"></div>`;
-  switchTaskTab('mine',document.getElementById('task-tab-mine'));
-}
 
 async function switchTaskTab(tab,btn){
   document.querySelectorAll('[id^="task-tab-"]').forEach(b=>{b.style.borderColor='var(--border)';b.style.color='var(--text2)';});
@@ -5549,70 +5391,7 @@ async function deleteTask(taskId){
 /* ============================================================
    APPROVALS
    ============================================================ */
-async function loadApprovals(){
-  const el=document.getElementById('page-approvals');if(!el)return;
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>🔔 Approvals</h2><p>Pending approval requests from all branches</p></div>
-      <button class="btn btn-ghost btn-sm" onclick="loadApprovals()">🔄 Refresh</button>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn btn-ghost btn-sm" style="border-color:var(--accent);color:var(--accent);" onclick="loadApprovalsList('pending',this)">⏳ Pending</button>
-      <button class="btn btn-ghost btn-sm" onclick="loadApprovalsList('approved',this)">✅ Approved</button>
-      <button class="btn btn-ghost btn-sm" onclick="loadApprovalsList('rejected',this)">❌ Rejected</button>
-      <button class="btn btn-ghost btn-sm" onclick="loadApprovalsList('all',this)">📋 All</button>
-    </div>
-    <div id="approvals-list"></div>`;
-  loadApprovalsList('pending',null);
-}
 
-async function loadApprovalsList(statusFilter,btn){
-  if(btn){document.querySelectorAll('#page-approvals .btn-ghost').forEach(b=>{b.style.borderColor='var(--border)';b.style.color='var(--text2)';});btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';}
-  const list=document.getElementById('approvals-list');if(!list)return;
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  list.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
-  try{
-    let snap;
-    if(statusFilter==='all'){
-      if(isPriv)snap=await db.collection('approvals').orderBy('created_at','desc').limit(100).get();
-      else snap=await db.collection('approvals').where('requested_by','==',G.user.username).orderBy('created_at','desc').limit(50).get();
-    }else{
-      if(isPriv)snap=await db.collection('approvals').where('status','==',statusFilter).orderBy('created_at','desc').limit(100).get();
-      else snap=await db.collection('approvals').where('requested_by','==',G.user.username).where('status','==',statusFilter).orderBy('created_at','desc').limit(50).get();
-    }
-    if(snap.empty){list.innerHTML=`<div class="empty-state"><div class="es-icon">🔔</div><p>No ${statusFilter} approvals</p></div>`;return;}
-    const typeIcons={rate_change:'💲',cancellation:'❌',task_appeal:'📝',expense:'💰',blacklist:'🚫',deposit_waiver:'🔓',general:'🔔'};
-    list.innerHTML=snap.docs.map(d=>{
-      const a={id:d.id,...d.data()};
-      const isPending=a.status==='pending';
-      return`<div style="padding:13px;border-radius:var(--radius);margin-bottom:9px;background:var(--surface2);border:1px solid ${isPending?'rgba(245,158,11,0.3)':'var(--border)'};">
-        <div style="display:flex;align-items:flex-start;gap:10px;">
-          <span style="font-size:22px;">${typeIcons[a.type]||'🔔'}</span>
-          <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:5px;">
-              <span style="font-size:13px;font-weight:700;">${(a.type||'').replace(/_/g,' ').toUpperCase()}</span>
-              <span class="pill pill-${a.status}">${a.status}</span>
-              <span style="font-size:10px;color:var(--text3);">${getTimeAgo(a.created_at)}</span>
-            </div>
-            <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">${a.subject||'-'}</div>
-            <div style="font-size:11px;color:var(--text3);">${a.details||'-'}</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:4px;">
-              Requested by: <strong style="color:var(--accent);">${a.requested_by||'-'}</strong>
-              ${a.branch?' | Branch: '+(BRANCH_MAP[a.branch]||a.branch):''}
-            </div>
-            ${a.admin_note?`<div style="font-size:11px;color:var(--warning);margin-top:5px;padding:5px 9px;background:rgba(245,158,11,0.08);border-radius:6px;">Admin note: ${a.admin_note}</div>`:''}
-          </div>
-          ${isPriv&&isPending?`
-            <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
-              <button class="btn btn-success btn-xs" onclick="decideApproval('${a.id}','approved')">✅ Approve</button>
-              <button class="btn btn-danger btn-xs" onclick="openRejectModal('${a.id}')">❌ Reject</button>
-            </div>`:''} 
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){list.innerHTML=`<div class="empty-state"><p>Could not load: ${e.message}</p></div>`;}
-}
 
 async function decideApproval(approvalId,decision){
   try{
