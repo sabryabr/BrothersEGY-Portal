@@ -1612,8 +1612,6 @@ async function loadCustomers(){
     G.customers=snap.docs.map(d=>({id:d.id,...d.data()}));
     // Sort client-side by _sys_updated or _synced_at if available
     G.customers.sort((a,b)=>(b._sys_updated||b._synced_at||0)-(a._sys_updated||a._synced_at||0));
-    console.log('[CRM] Loaded',G.customers.length,'customers');
-    if(G.customers.length===0)console.warn('[CRM] WARNING: customers collection appears empty in Firestore. Check sync script.');
   }catch(e){console.warn('Customers load failed:',e.message);}
 }
 async function loadProposalsList(){
@@ -5657,126 +5655,6 @@ async function submitRejection(approvalId){
 /* ============================================================
    CRM HUB
    ============================================================ */
-async function loadCRM(){
-  const el=document.getElementById('page-crm');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>👥 CRM Hub</h2><p>Customer database — search, view, add, edit</p></div>
-      <button class="btn btn-primary btn-sm" onclick="openAddCustomerModal()">➕ Add Customer</button>
-    </div>
-    <!-- Search -->
-    <div class="panel" style="margin-bottom:14px;">
-      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;">
-        <div style="flex:1;min-width:200px;">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">🔍 SEARCH CUSTOMERS</div>
-          <input type="text" id="crm-search" placeholder="Name, passport, phone, email, nationality..."
-                 style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
-                 oninput="filterCRM()"/>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="filterCRM()">Search</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('crm-search').value='';filterCRM()">✕ Clear</button>
-      </div>
-    </div>
-    <!-- Table -->
-    <div class="panel">
-      <div id="crm-table-wrap" class="table-wrap">
-        <div class="empty-state"><div class="spinner lg"></div></div>
-      </div>
-    </div>`;
-  filterCRM();
-}
-
-function filterCRM(){
-  const q=(document.getElementById('crm-search')?.value||'').toLowerCase();
-  const wrap=document.getElementById('crm-table-wrap');if(!wrap)return;
-  let customers=G.customers;
-  if(q){customers=customers.filter(c=>[c['الاسم الأول'],c['الاسم الأخير'],c['رقم جواز السفر'],c['الرقم القومي'],c['رقم التليفون'],c['عنوان البريد الإلكتروني'],c['رمز الدولة'],c['No.']].join(' ').toLowerCase().includes(q));}
-  if(!customers.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">👥</div><p>No customers found</p></div>`;return;}
-  wrap.innerHTML=`<table class="data-table">
-    <thead><tr><th>ID</th><th>Name</th><th>Passport / National ID</th><th>Phone</th><th>Email</th><th>Nationality</th><th>Registered</th><th>Actions</th></tr></thead>
-    <tbody>
-      ${customers.slice(0,200).map(c=>{
-        const name=(c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'');
-        return`<tr>
-          <td><span style="color:var(--accent);font-weight:700;">#${c['No.']||c.id}</span></td>
-          <td><div style="font-weight:600;">${name.trim()||'-'}</div></td>
-          <td style="font-size:11px;">${c['رقم جواز السفر']||c['الرقم القومي']||'-'}</td>
-          <td style="font-size:11px;">${c['رقم التليفون']||'-'}</td>
-          <td style="font-size:11px;">${c['عنوان البريد الإلكتروني']||'-'}</td>
-          <td style="font-size:11px;">${c['رمز الدولة']||'-'}</td>
-          <td style="font-size:10px;color:var(--text3);">${c['تاريخ التسجيل']||'-'}</td>
-          <td>
-            <div style="display:flex;gap:3px;">
-              <button class="btn btn-ghost btn-xs" onclick="openEditCustomerModal('${c.id}')">✏️</button>
-              <button class="btn btn-primary btn-xs" onclick="viewCustomerOrders('${c['No.']||c.id}','${name.trim()}')">📋</button>
-            </div>
-          </td>
-        </tr>`;
-      }).join('')}
-    </tbody></table>
-    <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">Showing ${Math.min(200,customers.length)} of ${customers.length} customers</div>`;
-}
-
-function openAddCustomerModal(){
-  const html=`
-    <p style="font-size:11px;color:var(--text3);margin-bottom:13px;">Required: Full name + Phone</p>
-    <div class="form-grid">
-      <div class="field"><label>First Name *</label><input type="text" id="nc-fname" placeholder="First Name"/></div>
-      <div class="field"><label>Last Name *</label><input type="text" id="nc-lname" placeholder="Last Name"/></div>
-      <div class="field"><label>Phone *</label><input type="text" id="nc-phone" placeholder="+20..."/></div>
-      <div class="field">
-        <label>Client Source</label>
-        <select id="nc-source">
-          <option value="">-- How did they find us? --</option>
-          <option value="Website">🌐 Website</option>
-          <option value="WhatsApp">💬 WhatsApp</option>
-          <option value="Messenger">📱 Messenger</option>
-          <option value="Instagram">📸 Instagram</option>
-          <option value="Phone Call">📞 Phone Call</option>
-          <option value="Office Visit">🏢 Office Visit</option>
-          <option value="Referral">🤝 Referral</option>
-          <option value="Booking.com">🏨 Booking.com</option>
-          <option value="Airbnb">🏠 Airbnb</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-    </div>
-    <details style="margin-top:10px;">
-      <summary style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px;">▸ More Details (optional)</summary>
-      <div class="form-grid" style="margin-top:8px;">
-        <div class="field"><label>Nationality / Country Code</label><input type="text" id="nc-nat" placeholder="EG / UK etc."/></div>
-        <div class="field"><label>Email</label><input type="text" id="nc-email" placeholder="Email"/></div>
-        <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="nc-address" placeholder="Full Address"/></div>
-      </div>
-    </details>
-    <details style="margin-top:8px;">
-      <summary style="font-size:11px;color:var(--accent);cursor:pointer;margin-bottom:8px;">▸ Contract Fields (required for contract generation)</summary>
-      <div class="form-grid" style="margin-top:8px;">
-        <div class="field"><label>National ID</label><input type="text" id="nc-natid" placeholder="National ID"/></div>
-        <div class="field"><label>Passport No.</label><input type="text" id="nc-passport" placeholder="Passport Number"/></div>
-        <div class="field"><label>Driver License</label><input type="text" id="nc-license" placeholder="License Number"/></div>
-      </div>
-    </details>
-    <div style="display:flex;gap:7px;margin-top:13px;">
-      <button class="btn btn-success" onclick="saveNewCustomer()">💾 Save Customer</button>
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-    </div>`;
-  openModal('👤 Add New Customer',html);
-}
-
-async function saveNewCustomer(){
-  const fname=document.getElementById('nc-fname')?.value.trim();
-  const lname=document.getElementById('nc-lname')?.value.trim();
-  const phone=document.getElementById('nc-phone')?.value.trim();
-  const natid=document.getElementById('nc-natid')?.value.trim()||'';
-  const passport=document.getElementById('nc-passport')?.value.trim()||'';
-  const source=document.getElementById('nc-source')?.value||'';
-  if(!fname||!lname||!phone){toast('First name, last name, and phone are required','error');return;}
-  try{
-    const snap=await db.collection('customers').limit(1).get();
-    const lastNo=snap.empty?0:parseInt(snap.docs[0].data()['No.']||0);
-    const nextNo=lastNo+1;
-    const now=Date.now();
     const newCust={'No.':String(nextNo),'الاسم الأول':fname,'الاسم الأخير':lname,'رقم التليفون':phone,'رمز الدولة':document.getElementById('nc-nat')?.value.trim()||'','الرقم القومي':natid,'رقم جواز السفر':passport,'رقم رخصة القيادة':document.getElementById('nc-license')?.value.trim()||'','عنوان البريد الإلكتروني':document.getElementById('nc-email')?.value.trim()||'','العنوان':document.getElementById('nc-address')?.value.trim()||'','client_source':source,'تاريخ التسجيل':new Date().toLocaleDateString('en-GB',{month:'2-digit',year:'numeric'}),'_sys_updated':now};
     const ref=await db.collection('customers').add(newCust);
     newCust.id=ref.id;G.customers.unshift(newCust);
@@ -6245,314 +6123,8 @@ async function saveIEGenExp(){
 }
 
 /* ============================================================
-   VEHICLE 360
-   ============================================================ */
-async function renderVehicle360(){
-  const el=document.getElementById('page-vehicle-360');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>🔭 Vehicle 360</h2><p>Complete financial and operational view per vehicle</p></div>
-    </div>
-    <div class="panel" style="margin-bottom:14px;">
-      <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:700;">SELECT VEHICLE</div>
-      <select id="v360-car-select" onchange="loadVehicle360Details()" style="width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);max-width:500px;">
-        <option value="">-- Select a vehicle to view details --</option>
-        ${G.fleet.map(c=>`<option value="${c.ID||c.id}">${getCarLabel(c,'en')}</option>`).join('')}
-      </select>
-    </div>
-    <div id="v360-content">
-      <div class="empty-state"><div class="es-icon">🔭</div><p>Select a vehicle above to view its complete 360° profile</p></div>
-    </div>`;
-}
-
-async function loadVehicle360Details(){
-  const carId=document.getElementById('v360-car-select')?.value;
-  const content=document.getElementById('v360-content');if(!content)return;
-  if(!carId){content.innerHTML='<div class="empty-state"><div class="es-icon">🔭</div><p>Select a vehicle to view details</p></div>';return;}
-  content.innerHTML='<div class="empty-state"><div class="spinner lg"></div></div>';
-  const car=getCarById(carId);if(!car){content.innerHTML='<div class="empty-state"><p>Car not found</p></div>';return;}
-  try{
-    const[ordersSnap,carExpSnap]=await Promise.all([
-      db.collection('bookings').get(),
-      db.collection('car_expenses').get()
-    ]);
-    const orders=ordersSnap.docs.map(d=>({id:d.id,...d.data()})).filter(o=>String(o['كود السيارة'])===String(carId));
-    const carExps=carExpSnap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>String(e['كود السيارة'])===String(carId)||orders.some(o=>String(o['No.'])===String(e['كود الاوردر'])));
-    const totalRevenue=orders.reduce((s,o)=>s+parseAmount(o['إجمالي المستحق (Total)']),0);
-    const totalPaid=orders.reduce((s,o)=>s+parseAmount(o['المدفوع EGP']),0);
-    const totalDeposit=orders.reduce((s,o)=>s+parseAmount(o['الوديعة المعلقة لدينا']),0);
-    const totalExpenses=carExps.reduce((s,e)=>s+parseAmount(e['قيمة المصروف']),0);
-    const netROI=totalPaid-totalExpenses;
-    const today=new Date();
-    const pending=orders.reduce((s,o)=>{
-      const{end}=getOrderDates(o);const st=getOrderStatus(o);if(st==='Closed')return s;
-      const t=parseAmount(o['إجمالي المستحق (Total)']);const p=parseAmount(o['المدفوع EGP']);
-      const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(t/Math.max(1,parseFloat(o.rental_days||1)));
-      let debt=t-p;if(end&&today>end&&!o.closed)debt+=Math.max(0,Math.ceil((today-end)/86400000))*d;
-      return s+Math.max(0,debt);
-    },0);
-    content.innerHTML=`
-      <!-- Car Header -->
-      <div class="panel" style="margin-bottom:14px;">
-        <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-          <div style="flex:1;">
-            <h3 style="font-size:16px;font-weight:800;margin-bottom:6px;">${getCarLabel(car,'en')}</h3>
-            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px;">
-              <span class="pill pill-${getCarStatusCategory(car)}">${getCarStatusCategory(car)}</span>
-              <span class="pill pill-active">Plate: ${car.plate||formatPlate(car)}</span>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px;font-size:11px;">
-              <div><span style="color:var(--text3);">Owner:</span> <strong>${((car['الاسم الأول']||'')+' '+(car['الاسم الأخير']||'')).trim()||'-'}</strong></div>
-              <div><span style="color:var(--text3);">Contract Start:</span> <strong>${fmtDateShort(parseDBDate(car['بداية التعاقد']||''))||'-'}</strong></div>
-              <div><span style="color:var(--text3);">Contract End:</span> <strong>${fmtDateShort(parseDBDate(car['نهاية التعاقد']||''))||'-'}</strong></div>
-              <div><span style="color:var(--text3);">Handover:</span> <strong>${fmtDateShort(parseDBDate(car['تاريخ التسليم']||''))||'-'}</strong></div>
-              <div><span style="color:var(--text3);">License Until:</span> <strong>${fmtDateShort(parseDBDate(car['نهاية الترخيص']||''))||'-'}</strong></div>
-              <div><span style="color:var(--text3);">Insurance Until:</span> <strong>${fmtDateShort(parseDBDate(car['نهاية التأمين']||''))||'-'}</strong></div>
-              <div><span style="color:var(--text3);">KM at Contract:</span> <strong>${car['كيلومتر تعاقد']||'-'}</strong></div>
-              <div><span style="color:var(--text3);">Monthly Fee:</span> <strong>${fmtMoney(parseAmount(car['monthly_fee']||car['القيمة المالية']||0))}</strong></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Financial KPIs -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
-        <div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value text-success">${fmtMoney(totalRevenue)}</div><div class="kpi-sub">${orders.length} orders</div></div>
-        <div class="kpi-card"><div class="kpi-label">Total Collected</div><div class="kpi-value text-success">${fmtMoney(totalPaid)}</div><div class="kpi-sub">Cash received</div></div>
-        <div class="kpi-card"><div class="kpi-label">Pending Debt</div><div class="kpi-value text-danger">${fmtMoney(pending)}</div><div class="kpi-sub">Outstanding</div></div>
-        <div class="kpi-card"><div class="kpi-label">Held Deposits</div><div class="kpi-value text-warning">${fmtMoney(totalDeposit)}</div><div class="kpi-sub">Not refunded</div></div>
-        <div class="kpi-card"><div class="kpi-label">Car Expenses</div><div class="kpi-value text-danger">${fmtMoney(totalExpenses)}</div><div class="kpi-sub">${carExps.length} records</div></div>
-        <div class="kpi-card"><div class="kpi-label">Net ROI</div><div class="kpi-value" style="color:${netROI>=0?'var(--success)':'var(--danger)'};">${fmtMoney(netROI)}</div><div class="kpi-sub">Paid - Expenses</div></div>
-      </div>
-      <!-- Orders History -->
-      <div class="panel" style="margin-bottom:14px;">
-        <h3 style="font-size:13px;font-weight:800;margin-bottom:11px;">📋 Rental History (${orders.length} orders)</h3>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Order #</th><th>Client</th><th>Start</th><th>End</th><th>Total</th><th>Paid</th><th>Debt</th><th>Status</th></tr></thead>
-            <tbody>
-              ${orders.sort((a,b)=>{const{start:as}=getOrderDates(a);const{start:bs}=getOrderDates(b);return(bs||0)-(as||0);}).map(o=>{
-                const{start,end}=getOrderDates(o);
-                const t=parseAmount(o['إجمالي المستحق (Total)']);
-                const p=parseAmount(o['المدفوع EGP']);
-                const d=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(t/Math.max(1,parseFloat(o.rental_days||1)));
-                const st=getOrderStatus(o);const isCl=st==='Closed'||o.closed;
-                const isAc=st==='Accident';const isOD=!isCl&&end&&today>end&&(st==='Active'||st==='Overdue');
-                let ldays=0,lpen=0;if((isOD||isAc)&&end&&!o.closed){ldays=Math.max(0,Math.ceil((today-end)/86400000));lpen=ldays*d;}
-                const debt=isCl?0:Math.max(0,t+lpen-p);
-                const sk=isAc?'accident':isOD?'overdue':isCl?'closed':(st||'active').toLowerCase();
-                return`<tr style="cursor:pointer;" onclick="openOrderDetail('${o.id}')">
-                  <td><span style="color:var(--accent);font-weight:700;">#${o['No.']||o.id}</span></td>
-                  <td>${o['اسم العميل']||'-'}</td>
-                  <td style="font-size:10px;">${start?fmtDate(start):'-'}</td>
-                  <td style="font-size:10px;">${end?fmtDate(end):'-'}</td>
-                  <td>${fmtMoney(t)}</td>
-                  <td>${fmtMoney(p)}</td>
-                  <td style="color:${debt>0?'var(--danger)':'var(--success)'};">${debt>0?fmtMoney(debt):'✅'}</td>
-                  <td><span class="pill pill-${sk}">${isAc?'ACCIDENT':isOD?'OVERDUE':isCl?'Closed':(st||'Active')}</span></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Car Expenses -->
-      <div class="panel">
-        <h3 style="font-size:13px;font-weight:800;margin-bottom:11px;">🔧 Car Expenses (${carExps.length} records)</h3>
-        ${carExps.length===0?'<div class="empty-state" style="padding:20px;"><p>No expenses recorded for this vehicle</p></div>':`
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>No.</th><th>Date</th><th>Type</th><th>Statement</th><th>Paid By</th><th>Due From</th><th>Amount</th></tr></thead>
-            <tbody>
-              ${carExps.map(e=>`<tr>
-                <td>${e['No.']||'-'}</td>
-                <td style="font-size:10px;">${e['يوم']?String(e['يوم']).padStart(2,'0')+'/'+String(e['شهر']).padStart(2,'0')+'/'+e['paid_year']:'-'}</td>
-                <td><span class="pill pill-draft">${e['نوع المصروف']||'-'}</span></td>
-                <td>${e['بيان النثريات']||e['بيان الصيانة']||'-'}</td>
-                <td>${e['تم دفع من طرف']||'-'}</td>
-                <td style="font-size:11px;">${e['مستحق من']||'-'}</td>
-                <td><strong style="color:var(--danger);">${e['قيمة المصروف']||'£0.00'}</strong></td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`}
-      </div>`;
-  }catch(e){content.innerHTML=`<div class="empty-state"><p>Failed to load vehicle data: ${e.message}</p></div>`;}
-}
-
-/* ============================================================
    PART 4: PROPOSALS MODULE
    ============================================================ */
-async function loadProposalsPage(){
-  const el=document.getElementById('page-proposals');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>📋 Proposals</h2><p>Create, manage and convert price proposals</p></div>
-      <button class="btn btn-ghost btn-sm" onclick="loadProposalsList().then(()=>renderProposalsList())">🔄 Refresh</button>
-    </div>
-    <div style="display:grid;grid-template-columns:380px 1fr;gap:14px;align-items:start;">
-      <!-- Control Panel -->
-      <div class="panel sticky-panel">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
-          <h3 style="font-size:13px;font-weight:800;">📋 New Proposal</h3>
-          <span id="pr-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
-        </div>
-        <!-- Client Search -->
-        <div class="crm-search-wrap">
-          <div class="crm-search-header">
-            🔍 SEARCH & AUTO-FILL CLIENT
-            <span id="pr-crm-id" class="crm-id-badge" style="display:none;"></span>
-          </div>
-          <div class="crm-input-row">
-            <input type="text" id="pr-client-search" placeholder="Name, passport, phone..."
-                   oninput="crmSearch('pr')"/>
-          </div>
-          <div class="crm-actions">
-            <button class="crm-action-btn new" onclick="openAddCustomerModal()">+ New</button>
-            <button class="crm-action-btn edit" id="pr-edit-btn" style="display:none;" onclick="crmEditMode('pr')">✏️ Edit</button>
-            <button class="crm-action-btn save" id="pr-save-btn" style="display:none;" onclick="crmSaveEdit('pr')">💾 Save</button>
-            <button class="crm-action-btn cancel" id="pr-cancel-btn" style="display:none;" onclick="crmCancelEdit('pr')">✕ Cancel</button>
-          </div>
-          <div class="crm-suggestions" id="pr-suggestions"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;" id="pr-client-fields">
-            <div class="field"><label>First Name *</label><input type="text" id="pr-fname" placeholder="First Name" readonly/></div>
-            <div class="field"><label>Last Name *</label><input type="text" id="pr-lname" placeholder="Last Name" readonly/></div>
-            <div class="field"><label>Phone</label><input type="text" id="pr-phone" placeholder="Phone" readonly/></div>
-            <div class="field"><label>Email</label><input type="text" id="pr-email" placeholder="Email" readonly/></div>
-          </div>
-        </div>
-        <!-- Dates & Locations -->
-        <div class="form-section" style="margin-bottom:13px;">
-          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">① Dates & Locations</div>
-          <div class="form-grid">
-            <div class="field"><label>Pickup Date/Time</label><input type="datetime-local" id="pr-pickup" onchange="prCalc()"/></div>
-            <div class="field"><label>Dropoff Date/Time</label><input type="datetime-local" id="pr-dropoff" onchange="prCalc()"/></div>
-            <div class="field" style="grid-column:span 2;"><label>Pickup Location *</label>
-              <div style="display:flex;gap:6px;">
-                <select id="prop-pickup-type" class="form-input" style="width:175px;flex-shrink:0;">
-                  <option value="">-- Branch/Location --</option>
-                  <option value="HRG-Office">🌊 Hurghada – Office</option><option value="HRG-Airport">🌊 Hurghada – Airport</option>
-                  <option value="ALX-Office">🏙 Alexandria – Office</option><option value="ALX-Airport">🏙 Alexandria – Airport</option>
-                  <option value="CAI-Office">🏛 Cairo – Office</option><option value="CAI-Airport">🏛 Cairo – Airport</option>
-                  <option value="RSH-Office">⚓ Rashid – Office</option><option value="Other">Other</option>
-                </select>
-                <input type="text" id="prop-pickup-detail" class="form-input" style="flex:1;" placeholder="Hotel / terminal / address...">
-              </div>
-            </div>
-            <div class="field" style="grid-column:span 2;"><label>Dropoff Location *</label>
-              <div style="display:flex;gap:6px;">
-                <select id="prop-dropoff-type" class="form-input" style="width:175px;flex-shrink:0;">
-                  <option value="">-- Branch/Location --</option>
-                  <option value="HRG-Office">🌊 Hurghada – Office</option><option value="HRG-Airport">🌊 Hurghada – Airport</option>
-                  <option value="ALX-Office">🏙 Alexandria – Office</option><option value="ALX-Airport">🏙 Alexandria – Airport</option>
-                  <option value="CAI-Office">🏛 Cairo – Office</option><option value="CAI-Airport">🏛 Cairo – Airport</option>
-                  <option value="RSH-Office">⚓ Rashid – Office</option><option value="Other">Other</option>
-                </select>
-                <input type="text" id="prop-dropoff-detail" class="form-input" style="flex:1;" placeholder="Hotel / terminal / address...">
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- Vehicle -->
-        <div style="margin-bottom:13px;">
-          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">② Vehicle Selection</div>
-          <div class="field" style="margin-bottom:7px;"><label>Select from Fleet</label>
-            <select id="pr-car" onchange="prSelectCar()"><option value="">-- Select Car --</option></select>
-          </div>
-          <div id="pr-car-badge" class="car-info-badge"></div>
-          <div id="pr-overlap-warn" style="display:none;background:rgba(239,68,68,0.1);border:1px solid var(--danger);border-radius:8px;padding:9px;font-size:11px;color:var(--danger);margin-top:7px;"></div>
-          <div class="form-grid" style="margin-top:7px;">
-            <div class="field"><label>Daily Rent (EGP)</label><input type="number" id="pr-daily" placeholder="0" oninput="prCalc()"/></div>
-            <div class="field"><label>Duration</label><input type="text" id="pr-days" readonly/></div>
-          </div>
-        </div>
-        <!-- Mileage & Insurance -->
-        <div style="margin-bottom:13px;">
-          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">③ Mileage & Insurance</div>
-          <div class="form-grid">
-            <div class="field"><label>KM Package</label>
-              <select id="pr-km" onchange="prCalc()">
-                <option value="standard">Standard (120 KM/Day)</option>
-                <option value="500">500 KM Package</option>
-                <option value="1000">1000 KM Package</option>
-                <option value="unlimited">Unlimited KM</option>
-              </select></div>
-            <div class="field"><label>KM Package Cost (EGP)</label><input type="number" id="pr-km-cost" value="0" oninput="prCalc()"/></div>
-            <div class="field"><label>Insurance Plan</label>
-              <select id="pr-ins" onchange="prCalc()">
-                <option value="basic">Basic (100% Liability)</option>
-                <option value="intermediate">Intermediate (70/30)</option>
-                <option value="full">Full Protection (Zero Liability)</option>
-              </select></div>
-            <div class="field"><label>Insurance Fee (Daily EGP)</label><input type="number" id="pr-ins-fee" value="0" oninput="prCalc()"/></div>
-          </div>
-        </div>
-        <!-- Extras -->
-        <div style="margin-bottom:13px;">
-          <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--border);">④ Extras & Delivery</div>
-          <div class="form-grid">
-            <div class="field"><label>Pickup Fee (EGP)</label><input type="number" id="pr-pfee" value="0" oninput="prCalc()"/></div>
-            <div class="field"><label>Dropoff Fee (EGP)</label><input type="number" id="pr-dfee" value="0" oninput="prCalc()"/></div>
-            <div class="field"><label>Security Deposit (EGP)</label><input type="number" id="pr-deposit" value="0" oninput="prCalc()"/></div>
-            <div class="field"><label>Child Seat (days)</label><input type="number" id="pr-seat-days" value="0" min="0" oninput="prCalc()"/></div>
-            <div class="field"><label>Add. Driver (days)</label><input type="number" id="pr-driver-days" value="0" min="0" oninput="prCalc()"/></div>
-          </div>
-        </div>
-        <!-- Live Estimate -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:13px;">
-          <div style="font-size:10px;color:var(--text3);font-weight:700;margin-bottom:8px;text-transform:uppercase;">Live Estimate</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;">
-            <span style="color:var(--text3);">Base Rent:</span><span id="pr-est-base" style="font-weight:700;">£0.00</span>
-            <span style="color:var(--text3);">KM Package:</span><span id="pr-est-km">£0.00</span>
-            <span style="color:var(--text3);">Insurance:</span><span id="pr-est-ins">£0.00</span>
-            <span style="color:var(--text3);">Extras/Fees:</span><span id="pr-est-extras">£0.00</span>
-          </div>
-          <div style="border-top:1px solid var(--border);margin-top:9px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:12px;font-weight:700;">TOTAL ESTIMATE</span>
-            <span id="pr-est-total" style="font-size:17px;font-weight:900;color:var(--accent);">£0.00</span>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="generateProposal()">📋 Generate Proposal</button>
-        <button class="btn btn-ghost btn-full mt-8" onclick="clearProposalForm()">✕ Clear Form</button>
-      </div>
-      <!-- Right Panel: List + Output -->
-      <div>
-        <!-- Proposals List -->
-        <div class="panel" style="margin-bottom:14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px;">
-            <h3 style="font-size:13px;font-weight:800;">📁 Proposals List</h3>
-            <select id="pr-filter" onchange="renderProposalsList()" style="padding:5px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:11px;">
-              <option value="all">All Statuses</option>
-              <option value="Draft">Draft</option>
-              <option value="Accepted">Accepted</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Converted">Converted</option>
-            </select>
-          </div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead><tr><th>Ref</th><th>Client</th><th>Car</th><th>Period</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody id="proposals-tbody">
-                <tr><td colspan="7"><div class="empty-state" style="padding:20px;"><p>No proposals yet</p></div></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <!-- Proposal A4 Output -->
-        <div id="pr-output" style="display:none;">
-          <div style="display:flex;gap:7px;margin-bottom:11px;">
-            <button class="btn btn-primary" onclick="printProposalWindow()">🖨️ Print / Save PDF</button>
-            <button class="btn btn-ghost" onclick="document.getElementById('pr-output').style.display='none'">✕ Close Preview</button>
-          </div>
-          <div class="a4-page" id="pr-a4"></div>
-        </div>
-      </div>
-    </div>`;
-
-  populateFleetDropdowns();
-  renderProposalsList();
-}
-
-/* ---- CRM Search (shared for pr / en / ar) ---- */
 let crmSearchTimeout=null;
 function crmSearch(prefix){
   clearTimeout(crmSearchTimeout);
@@ -6610,342 +6182,9 @@ function crmEditMode(prefix){
   ['fname','lname','phone','email','passport','license','address','nationality'].forEach(f=>{
     const el=document.getElementById(`${prefix}-${f}`);if(el)el.readOnly=false;
   });
-  document.getElementById(`${prefix}-edit-btn`).style.display='none';
-  document.getElementById(`${prefix}-save-btn`).style.display='inline-flex';
-  document.getElementById(`${prefix}-cancel-btn`).style.display='inline-flex';
-}
-async function crmSaveEdit(prefix){
-  const customerId=window[`_crm_${prefix}_id`];if(!customerId){toast('No customer linked','error');return;}
-  try{
-    const upd={'الاسم الأول':document.getElementById(`${prefix}-fname`)?.value.trim(),'الاسم الأخير':document.getElementById(`${prefix}-lname`)?.value.trim(),'رقم التليفون':document.getElementById(`${prefix}-phone`)?.value.trim(),'عنوان البريد الإلكتروني':document.getElementById(`${prefix}-email`)?.value.trim(),'رقم جواز السفر':document.getElementById(`${prefix}-passport`)?.value.trim(),'رقم رخصة القيادة':document.getElementById(`${prefix}-license`)?.value.trim(),'العنوان':document.getElementById(`${prefix}-address`)?.value.trim(),'رمز الدولة':document.getElementById(`${prefix}-nationality`)?.value.trim(),'_sys_updated':Date.now()};
-    await db.collection('customers').doc(customerId).update(upd);
-    const idx=G.customers.findIndex(c=>c.id===customerId);
-    if(idx>-1)G.customers[idx]={...G.customers[idx],...upd};
-    crmCancelEdit(prefix);toast('Customer updated!','success');
-    await logAction('EDIT','CRM','Updated customer from proposal/contract form');
-  }catch(e){toast('Save failed: '+e.message,'error');}
-}
-function crmCancelEdit(prefix){
-  ['fname','lname','phone','email','passport','license','address','nationality'].forEach(f=>{
-    const el=document.getElementById(`${prefix}-${f}`);if(el)el.readOnly=true;
-  });
-  const saveBtn=document.getElementById(`${prefix}-save-btn`);if(saveBtn)saveBtn.style.display='none';
-  const cancelBtn=document.getElementById(`${prefix}-cancel-btn`);if(cancelBtn)cancelBtn.style.display='none';
-  const editBtn=document.getElementById(`${prefix}-edit-btn`);if(editBtn)editBtn.style.display='inline-flex';
-}
-
-/* ---- Proposal Calc ---- */
-function prSelectCar(){
-  const carId=document.getElementById('pr-car')?.value;
-  showCarInfoBadge(carId,'pr-car-badge');
-  if(carId)prCheckOverlap(carId);
-  prCalc();
-}
-async function prCheckOverlap(carId){
-  const pickup=document.getElementById('pr-pickup')?.value;
-  const dropoff=document.getElementById('pr-dropoff')?.value;
-  const warnEl=document.getElementById('pr-overlap-warn');
-  if(!pickup||!dropoff||!carId){if(warnEl)warnEl.style.display='none';return;}
-  const start=new Date(pickup),end=new Date(dropoff);
-  try{
-    const snap=await db.collection('proposals').where('car_id','==',String(carId)).where('status','in',['Draft','Accepted']).get();
-    let conflict=null;
-    snap.docs.forEach(d=>{
-      const pd=d.data();const ps=new Date(pd.pickup_date),pe=new Date(pd.dropoff_date);
-      if(start<pe&&end>ps)conflict=pd;
-    });
-    if(warnEl){
-      if(conflict){warnEl.style.display='block';warnEl.textContent=`⚠️ Conflict: Car already has open proposal (${conflict.proposal_ref}) from ${fmtDateShort(new Date(conflict.pickup_date))} to ${fmtDateShort(new Date(conflict.dropoff_date))}. Cancel it first.`;}
-      else warnEl.style.display='none';
-    }
-  }catch(e){if(warnEl)warnEl.style.display='none';}
-}
-function prCalc(){
-  const pickup=document.getElementById('pr-pickup')?.value;
-  const dropoff=document.getElementById('pr-dropoff')?.value;
-  const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
-  const kmCost=parseFloat(document.getElementById('pr-km-cost')?.value)||0;
-  const insFee=parseFloat(document.getElementById('pr-ins-fee')?.value)||0;
-  const pfee=parseFloat(document.getElementById('pr-pfee')?.value)||0;
-  const dfee=parseFloat(document.getElementById('pr-dfee')?.value)||0;
-  const seatD=parseInt(document.getElementById('pr-seat-days')?.value)||0;
-  const drvD=parseInt(document.getElementById('pr-driver-days')?.value)||0;
-  let days=0;
-  if(pickup&&dropoff){const diff=new Date(dropoff)-new Date(pickup);days=Math.max(0,Math.ceil(diff/86400000));}
-  const daysEl=document.getElementById('pr-days');if(daysEl)daysEl.value=days>0?days+' days':'0';
-  const base=daily*days;const insTotal=insFee*days;
-  const extras=pfee+dfee+(seatD*250)+(drvD*500);
-  const total=base+insTotal+kmCost+extras;
-  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=fmtMoney(v);};
-  s('pr-est-base',base);s('pr-est-km',kmCost);s('pr-est-ins',insTotal);s('pr-est-extras',extras);s('pr-est-total',total);
-}
-
-/* ---- Generate Proposal ---- */
-async function generateProposal(){
-  const clientName=((document.getElementById('pr-fname')?.value||'')+' '+(document.getElementById('pr-lname')?.value||'')).trim();
-  const carId=document.getElementById('pr-car')?.value;
-  const pickup=document.getElementById('pr-pickup')?.value;
-  const dropoff=document.getElementById('pr-dropoff')?.value;
-  const daily=parseFloat(document.getElementById('pr-daily')?.value)||0;
-  if(!clientName){toast('Client name is required. Search and select a client first.','error');return;}
-  if(!carId){toast('Please select a car from the fleet.','error');return;}
-  if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
-  if(daily<=0){toast('Daily rent must be greater than 0.','error');return;}
-  const warnEl=document.getElementById('pr-overlap-warn');
-  if(warnEl&&warnEl.style.display!=='none'){toast('Resolve car conflict before generating proposal.','error');return;}
-  const car=getCarById(carId);
-  const carLabel=car?getCarLabel(car,'en'):carId;
-  const branchCode=G.user?.branch||'GEN';
-  const ref=await generateDocRef('PR',branchCode);
-  const pickupD=new Date(pickup),dropoffD=new Date(dropoff);
-  const days=Math.max(0,Math.ceil((dropoffD-pickupD)/86400000));
-  const kmCost=parseFloat(document.getElementById('pr-km-cost')?.value)||0;
-  const insFee=parseFloat(document.getElementById('pr-ins-fee')?.value)||0;
-  const pfee=parseFloat(document.getElementById('pr-pfee')?.value)||0;
-  const dfee=parseFloat(document.getElementById('pr-dfee')?.value)||0;
-  const deposit=parseFloat(document.getElementById('pr-deposit')?.value)||0;
-  const seatD=parseInt(document.getElementById('pr-seat-days')?.value)||0;
-  const drvD=parseInt(document.getElementById('pr-driver-days')?.value)||0;
-  const base=daily*days;const insTotal=insFee*days;
-  const extras=pfee+dfee+(seatD*250)+(drvD*500);
-  const total=base+insTotal+kmCost+extras;
-  const kmPkg=document.getElementById('pr-km')?.value||'standard';
-  const insPkg=document.getElementById('pr-ins')?.value||'basic';
-  const _puType=document.getElementById('prop-pickup-type')?.value||'Office';
-  const _puDetail=document.getElementById('prop-pickup-detail')?.value.trim()||'';
-  const _doType=document.getElementById('prop-dropoff-type')?.value||'Office';
-  const _doDetail=document.getElementById('prop-dropoff-detail')?.value.trim()||'';
-  const proposalData={proposal_ref:ref,client_name:clientName,client_crm_id:window['_crm_pr_id']||'',client_phone:document.getElementById('pr-phone')?.value.trim()||'',client_email:document.getElementById('pr-email')?.value.trim()||'',car_id:String(carId),car_label:carLabel,pickup_date:pickup,dropoff_date:dropoff,pickup_location_type:_puType,pickup_location_detail:_puDetail,pickup_location:_puType+(_puDetail?' - '+_puDetail:''),dropoff_location_type:_doType,dropoff_location_detail:_doDetail,dropoff_location:_doType+(_doDetail?' - '+_doDetail:''),duration_days:days,daily_rate:daily,km_package:kmPkg,km_cost:kmCost,insurance_plan:insPkg,insurance_fee:insFee,pickup_fee:pfee,delivery_fee:dfee,deposit_amount:deposit,child_seat_days:seatD,extra_driver_days:drvD,total_estimate:total,status:'Draft',converted_to:'',issued_by:G.user?.username||'',branch:branchCode,timestamp:Date.now()};
-  const editingId=document.getElementById('page-proposals')?.dataset?.editingId||'';
-  try{
-    if(editingId){
-      await db.collection('proposals').doc(editingId).update({...proposalData,_sys_updated:firebase.firestore.FieldValue.serverTimestamp(),updated_by:G.user?.username||''});
-      const idx=G.proposals.findIndex(p=>p.id===editingId);
-      if(idx>-1)G.proposals[idx]={...G.proposals[idx],...proposalData};
-      document.getElementById('page-proposals').dataset.editingId='';
-      renderProposalsList();
-      document.getElementById('pr-ref-preview').textContent=proposalData.proposal_ref||editingId;
-      await logAction('EDIT','Proposals',`Proposal ${editingId} updated for ${clientName}`);
-      toast(`Proposal updated!`,'success');
-      buildProposalA4(proposalData.proposal_ref||editingId,proposalData);
-    }else{
-      await db.collection('proposals').doc(ref).set(proposalData);
-      G.proposals.unshift({id:ref,...proposalData});
-      renderProposalsList();
-      document.getElementById('pr-ref-preview').textContent=ref;
-      await logAction('GENERATE','Proposals',`Proposal ${ref} for ${clientName} | ${carLabel} | ${fmtMoney(total)}`);
-      toast(`Proposal ${ref} saved!`,'success');
-      buildProposalA4(ref,proposalData);
-    }
-  }catch(e){toast('Failed to save proposal: '+e.message,'error');}
-}
-
-function buildProposalA4(ref,d){
-  const a4El=document.getElementById('pr-a4');if(!a4El)return;
-  const kmMap={standard:'Standard (120 KM/Day)',500:'500 KM Package',1000:'1000 KM Package',unlimited:'Unlimited KM'};
-  const insMap={basic:'Basic (100% Client Liability)',intermediate:'Intermediate (70/30)',full:'Full Protection (Zero Liability)'};
-  const rows=[
     {desc:'Base Rental',detail:`${d.duration_days} days × ${fmtMoney(d.daily_rate)}/day`,amount:fmtMoney(d.daily_rate*d.duration_days)},
     d.km_cost>0?{desc:'KM Package',detail:kmMap[d.km_package]||d.km_package,amount:fmtMoney(d.km_cost)}:null,
     d.insurance_fee>0?{desc:'Insurance Fee',detail:`${d.duration_days} days × ${fmtMoney(d.insurance_fee)}`,amount:fmtMoney(d.insurance_fee*d.duration_days)}:null,
-    d.pickup_fee>0?{desc:'Pickup Fee',detail:'',amount:fmtMoney(d.pickup_fee)}:null,
-    d.delivery_fee>0?{desc:'Delivery Fee',detail:'',amount:fmtMoney(d.delivery_fee)}:null,
-    d.child_seat_days>0?{desc:'Child Seat',detail:`${d.child_seat_days} days × £250`,amount:fmtMoney(d.child_seat_days*250)}:null,
-    d.extra_driver_days>0?{desc:'Additional Driver',detail:`${d.extra_driver_days} days × £500`,amount:fmtMoney(d.extra_driver_days*500)}:null,
-    d.deposit_amount>0?{desc:'Security Deposit',detail:'Refundable upon safe return',amount:fmtMoney(d.deposit_amount)}:null,
-  ].filter(Boolean);
-  const html=`
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1e40af;padding-bottom:14px;margin-bottom:18px;">
-      <div>
-        <img src="https://brothersegy.com/wp-content/uploads/2026/02/12345.png" style="height:40px;margin-bottom:6px;" alt="Brothers EGY"/>
-        <div style="font-size:18px;font-weight:900;color:#1e40af;">BROTHERS EGY</div>
-        <div style="font-size:10px;color:#64748b;">Car Rental Services • www.brothersegy.com</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:16px;font-weight:800;color:#1e40af;text-transform:uppercase;">Price Proposal</div>
-        <div style="font-size:10px;color:#64748b;margin-top:3px;">Ref: <strong>${ref}</strong></div>
-        <div style="font-size:10px;color:#64748b;">Date: ${new Date().toLocaleDateString('en-GB')}</div>
-        <div style="font-size:10px;color:#64748b;">Branch: ${BRANCH_MAP[d.branch]||d.branch}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-      <div>
-        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Client & Period</div>
-        <div style="font-size:11px;font-weight:700;">${d.client_name}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:3px;">📞 ${d.client_phone||'-'}</div>
-        <div style="font-size:10px;color:#64748b;">✉️ ${d.client_email||'-'}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:5px;">📅 From: ${new Date(d.pickup_date).toLocaleString('en-GB')}</div>
-        <div style="font-size:10px;color:#64748b;">📅 To: ${new Date(d.dropoff_date).toLocaleString('en-GB')}</div>
-        <div style="font-size:10px;color:#64748b;">⏱ Duration: <strong>${d.duration_days} days</strong></div>
-        <div style="font-size:10px;color:#64748b;">📍 Pickup: ${d.pickup_location||'-'}</div>
-        <div style="font-size:10px;color:#64748b;">📍 Dropoff: ${d.dropoff_location||'-'}</div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Vehicle Details</div>
-        <div style="font-size:11px;font-weight:700;">${d.car_label}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:3px;">Daily Rate: <strong>${fmtMoney(d.daily_rate)}</strong></div>
-        <div style="font-size:10px;color:#64748b;">KM Package: ${kmMap[d.km_package]||d.km_package}</div>
-        <div style="font-size:10px;color:#64748b;">Insurance: ${insMap[d.insurance_plan]||d.insurance_plan}</div>
-      </div>
-    </div>
-    <div style="font-size:10px;font-weight:800;color:#1e40af;text-transform:uppercase;margin-bottom:7px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Financial Breakdown</div>
-    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:13px;">
-      <thead><tr style="background:#1e40af;color:#fff;">
-        <th style="padding:7px 10px;text-align:left;">Description</th>
-        <th style="padding:7px 10px;text-align:left;">Details</th>
-        <th style="padding:7px 10px;text-align:right;">Amount (EGP)</th>
-      </tr></thead>
-      <tbody>
-        ${rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#f8fafc'};">
-          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${r.desc}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;">${r.detail}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${r.amount}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-    <div style="background:#1e40af;color:#fff;padding:10px 13px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <span style="font-weight:800;font-size:13px;">TOTAL ESTIMATE</span>
-      <span style="font-size:18px;font-weight:900;">${fmtMoney(d.total_estimate)}</span>
-    </div>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:11px 13px;font-size:9px;color:#475569;line-height:1.6;margin-bottom:13px;">
-      <div style="font-size:10px;font-weight:800;color:#1e40af;margin-bottom:5px;">RENTAL TERMS & CONDITIONS SUMMARY</div>
-      <strong>1. ELIGIBILITY:</strong> Min age 21. Valid License and ID/Passport mandatory.<br>
-      <strong>2. RENTAL CYCLE:</strong> 24-hour units. Exceeding by 5+ hours = full extra day charged.<br>
-      <strong>3. MILEAGE:</strong> 120 KM/day included in standard package. Excess charged at return.<br>
-      <strong>4. FUEL:</strong> Same-to-Same policy. Return at same level as pickup or charges apply.<br>
-      <strong>5. INSURANCE:</strong> Void if no Police Report filed immediately after accident.<br>
-      <strong>6. DEPOSIT:</strong> Refunded upon safe return. Card refunds processed as EGP cash.<br>
-      <strong>7. LIABILITY:</strong> Lessee bears full legal and criminal liability during rental period.<br>
-      <a href="https://brothersegy.com/terms-conditions/" style="color:#1e40af;">View Full Terms Online →</a>
-    </div>
-    <div style="text-align:center;font-size:11px;color:#475569;margin-bottom:13px;">
-      We look forward to serving you. Best Regards, <strong>Brothers EGY Team</strong>
-    </div>
-    ${a4FooterHTML(ref,'PRICE PROPOSAL',false)}`;
-  const a4=document.getElementById('pr-a4');if(a4)a4.innerHTML=html;
-  const prOutputEl=document.getElementById('pr-output');if(prOutputEl)prOutputEl.style.display='block';
-  attachQRAndBarcode(ref);
-}
-
-function renderProposalsList(){
-  const filter=document.getElementById('pr-filter')?.value||'all';
-  const tbody=document.getElementById('proposals-tbody');if(!tbody)return;
-  const list=filter==='all'?G.proposals:G.proposals.filter(p=>p.status===filter);
-  const isPriv=['Admin','Executive'].includes(G.user?.role);
-  if(!list.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state" style="padding:18px;"><p>No proposals found</p></div></td></tr>`;return;}
-  tbody.innerHTML=list.map(p=>`<tr>
-    <td><span style="color:var(--accent);font-weight:700;">${p.proposal_ref||p.id}</span></td>
-    <td>${p.client_name||'-'}</td>
-    <td style="font-size:11px;">${p.car_label||'-'}</td>
-    <td style="font-size:10px;">${p.pickup_date?new Date(p.pickup_date).toLocaleDateString('en-GB'):'-'} → ${p.dropoff_date?new Date(p.dropoff_date).toLocaleDateString('en-GB'):'-'}</td>
-    <td><strong>${fmtMoney(p.total_estimate)}</strong></td>
-    <td><span class="pill pill-${(p.status||'draft').toLowerCase()}">${p.status||'Draft'}</span></td>
-    <td>
-      <div style="display:flex;gap:3px;flex-wrap:wrap;">
-        <button class="btn btn-ghost btn-xs" onclick="editProposal('${p.id}')">✏️ Edit</button>
-        ${p.status==='Draft'?`
-          <button class="btn btn-success btn-xs" onclick="convertProposalToContract('${p.id}')">→ Contract</button>
-          ${isPriv?`<button class="btn btn-warning btn-xs" onclick="updateProposalStatus('${p.id}','Accepted')">✓</button>
-          <button class="btn btn-danger btn-xs" onclick="updateProposalStatus('${p.id}','Cancelled')">✕</button>`:''}
-        `:''}
-        ${p.status==='Accepted'?`<button class="btn btn-primary btn-xs" onclick="convertProposalToContract('${p.id}')">→ Contract</button>`:''}
-      </div>
-    </td>
-  </tr>`).join('');
-}
-
-async function updateProposalStatus(id,status){
-  try{
-    await db.collection('proposals').doc(id).update({status});
-    const idx=G.proposals.findIndex(p=>p.id===id);
-    if(idx>-1)G.proposals[idx].status=status;
-    renderProposalsList();
-    await logAction('EDIT','Proposals',`Proposal ${id} → ${status}`);
-    toast(`Proposal marked as ${status}`,status==='Cancelled'?'warning':'success');
-  }catch(e){toast('Update failed: '+e.message,'error');}
-}
-
-async function convertProposalToContract(proposalId){
-  const p=G.proposals.find(x=>x.id===proposalId);if(!p)return;
-  // Check if contract already exists for this proposal
-  try{
-    const existSnap=await db.collection('bookings').where('proposal_ref','==',p.proposal_ref||proposalId).limit(1).get();
-    if(!existSnap.empty){
-      const existing={id:existSnap.docs[0].id,...existSnap.docs[0].data()};
-      if(confirm(`A contract already exists for this proposal (#${existing['No.']||existing.id}).\n\nClick OK to view the existing contract.`)){
-        openOrderDetail(existing.id);
-      }
-      return;
-    }
-  }catch(e){}
-  const choice=confirm('Convert to English Contract?\n\nClick OK for English Contract.\nClick Cancel for Arabic Contract.');
-  const prefix=choice?'en':'ar';
-  const targetPage=choice?'en-contract':'ar-contract';
-  showPage(targetPage);
-  setTimeout(()=>{fillContractFromProposal(prefix,p);updateProposalStatus(proposalId,'Accepted');},300);
-}
-
-function fillContractFromProposal(prefix,p){
-  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
-  set(`${prefix}-client-search`,p.client_name||'');
-  set(`${prefix}-pickup`,p.pickup_date||'');
-  set(`${prefix}-dropoff`,p.dropoff_date||'');
-  set(`${prefix}-daily`,p.daily_rate||'');
-  set(`${prefix}-ins-fee`,p.insurance_fee||'');
-  set(`${prefix}-km-cost`,p.km_cost||'');
-  set(`${prefix}-pick-fee`,p.pickup_fee||'');
-  set(`${prefix}-del-fee`,p.delivery_fee||'');
-  set(`${prefix}-req-dep`,p.deposit_amount||'');
-  const carSel=document.getElementById(`${prefix}-car`);
-  if(carSel&&p.car_id){carSel.value=p.car_id;showCarInfoBadge(p.car_id,`${prefix}-car-badge`);}
-  const propRefEl=document.getElementById(`${prefix}-proposal-ref`);
-  if(propRefEl)propRefEl.value=p.proposal_ref||p.id;
-  // Fill client CRM fields if available
-  if(p.client_crm_id){
-    const c=G.customers.find(x=>x.id===p.client_crm_id);
-    if(c)fillCrmFields(prefix,c.id);
-  }
-  if(prefix==='en')enCalc();else arCalc();
-  toast('Proposal data loaded into contract form!','success');
-}
-
-function clearProposalForm(){
-  ['pr-client-search','pr-fname','pr-lname','pr-phone','pr-email','pr-pickup','pr-dropoff','prop-pickup-detail','prop-dropoff-detail','pr-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ['prop-pickup-type','prop-dropoff-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='Office';});
-  ['pr-daily','pr-km-cost','pr-ins-fee','pr-pfee','pr-dfee','pr-deposit','pr-seat-days','pr-driver-days'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
-  document.getElementById('pr-car').value='';
-  document.getElementById('pr-overlap-warn').style.display='none';
-  document.getElementById('pr-output').style.display='none';
-  document.getElementById('pr-ref-preview').textContent='';
-  document.getElementById('pr-crm-id').style.display='none';
-  window['_crm_pr_id']=null;
-  const badge=document.getElementById('pr-car-badge');if(badge)badge.className='car-info-badge';
-  prCalc();
-}
-
-/* ============================================================
-   PART 4: ENGLISH CONTRACT
-   ============================================================ */
-async function loadENContract(){
-  const el=document.getElementById('page-en-contract');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>📄 English Contract</h2><p>Generate official English rental agreements</p></div>
-      <div style="display:flex;gap:7px;">
-        <div style="padding:4px 9px;background:var(--glass);border:1px solid var(--border);border-radius:7px;font-size:11px;text-align:center;">
-          <div style="font-size:9px;color:var(--text3);">USD</div>
-          <div id="en-usd-rate" style="font-weight:800;color:var(--success);">${G.ratesUSD.toFixed(2)}</div>
-        </div>
-        <div style="padding:4px 9px;background:var(--glass);border:1px solid var(--border);border-radius:7px;font-size:11px;text-align:center;">
-          <div style="font-size:9px;color:var(--text3);">EUR</div>
-          <div id="en-eur-rate" style="font-weight:800;color:var(--success);">${G.ratesEUR.toFixed(2)}</div>
-        </div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:400px 1fr;gap:14px;align-items:start;">
-      <!-- Control Panel -->
-      <div class="panel sticky-panel">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
           <h3 style="font-size:13px;font-weight:800;">📄 New Contract</h3>
           <span id="en-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
         </div>
@@ -7220,33 +6459,6 @@ async function generateENContract(){
   const dropoff=document.getElementById('en-dropoff')?.value;
   const daily=parseFloat(document.getElementById('en-daily')?.value)||0;
   const passport=document.getElementById('en-passport')?.value.trim();
-  const license=document.getElementById('en-license')?.value.trim();
-  if(!fname||!lname){toast('Client full name is required. Search and select a client first.','error');return;}
-  if(!pickup||!dropoff){toast('Pickup and dropoff dates are required.','error');return;}
-  if(daily<=0){toast('Daily rent must be greater than 0.','error');return;}
-  if(!passport)toast('Warning: Passport/ID not filled. Required for valid contract.','warning');
-  if(!license)toast('Warning: Driver license not filled. Required for valid contract.','warning');
-  const branchCode=document.getElementById('en-branch')?.value||G.user?.branch||'GEN';
-  const ref=await generateDocRef('CN',branchCode);
-  document.getElementById('en-ref-preview').textContent=ref;
-  const car=getCarById(carId);
-  const carLabel=car?getCarLabel(car,'en'):(document.getElementById('en-car-manual')?.value||carId||'-');
-  const pickupD=new Date(pickup),dropoffD=new Date(dropoff);
-  const days=Math.max(0,Math.ceil((dropoffD-pickupD)/86400000));
-  const insFee=parseFloat(document.getElementById('en-ins-fee')?.value)||0;
-  const kmCost=parseFloat(document.getElementById('en-km-cost')?.value)||0;
-  const delFee=parseFloat(document.getElementById('en-del-fee')?.value)||0;
-  const pickFee=parseFloat(document.getElementById('en-pick-fee')?.value)||0;
-  const addDr=document.getElementById('en-add-driver')?.checked;
-  const drRate=parseFloat(document.getElementById('en-dr-rate')?.value)||500;
-  const addSt=document.getElementById('en-add-seat')?.checked;
-  const stRate=parseFloat(document.getElementById('en-seat-rate')?.value)||250;
-  const insPkg=document.getElementById('en-ins-pkg')?.value||'basic';
-  const kmPkg=document.getElementById('en-km-pkg')?.value||'standard';
-  const pEGP=parseFloat(document.getElementById('en-paid-egp')?.value)||0;
-  const pUSD=parseFloat(document.getElementById('en-paid-usd')?.value)||0;
-  const pEUR=parseFloat(document.getElementById('en-paid-eur')?.value)||0;
-  const pCard=parseFloat(document.getElementById('en-paid-card')?.value)||0;
   const dEGP=parseFloat(document.getElementById('en-dep-egp')?.value)||0;
   const dUSD=parseFloat(document.getElementById('en-dep-usd')?.value)||0;
   const dEUR=parseFloat(document.getElementById('en-dep-eur')?.value)||0;
@@ -8406,12 +7618,9 @@ async function loadVehicle360Details(){
       String(parseInt(car.ID||0)||'').trim()
     ].filter(x=>x&&x!=='0'));
 
-    const[ordersSnap,carExpSnap]=await Promise.all([
-      db.collection('bookings').get(),
-      db.collection('car_expenses').get()
-    ]);
-
-    const orders=ordersSnap.docs.map(d=>({id:d.id,...d.data()})).filter(o=>{
+    // Use cached bookings — avoid full Firestore read
+    const orders_all=allOrders.length>0?allOrders:(G.bookings||[]);
+    const orders=orders_all.filter(o=>{
       const bId=String(o['كود السيارة']||'').trim();
       if(!bId)return false;
       if(possibleIds.has(bId))return true;
@@ -8422,8 +7631,15 @@ async function loadVehicle360Details(){
       }
       return false;
     });
-
-    const carExps=carExpSnap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>{
+    // Cache car expenses per car (60s TTL)
+    const cacheKey='_carExpCache_'+carId;
+    if(!window[cacheKey]||Date.now()-window[cacheKey+'_t']>60000){
+      const carExpSnap=await db.collection('car_expenses').get();
+      window[cacheKey]=carExpSnap.docs.map(d=>({id:d.id,...d.data()}));
+      window[cacheKey+'_t']=Date.now();
+    }
+    const carExps_all=window[cacheKey];
+    const carExps=carExps_all.filter(e=>{
       const eCarId=String(e['كود السيارة']||'').trim();
       if(possibleIds.has(eCarId))return true;
       return orders.some(o=>String(o['No.'])===String(e['كود الاوردر']));
@@ -9088,7 +8304,7 @@ async function loadCRM(){
           placeholder="Name, passport, phone, national ID, email, nationality..."
           style="width:100%;padding:8px 13px;background:var(--surface2);border:1px solid var(--border);
           border-radius:8px;color:var(--text);"
-          oninput="filterCRM()"/>
+          oninput="clearTimeout(window._crmTimer);window._crmTimer=setTimeout(filterCRM,300)"/>
       </div>
       <div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">NATIONALITY</div>
@@ -9111,83 +8327,6 @@ async function loadCRM(){
   </div>`;
 
   filterCRM();
-}
-
-function filterCRM(){
-  const q=(document.getElementById('crm-search')?.value||'').toLowerCase();
-  const nat=document.getElementById('crm-nat-filter')?.value||'all';
-  const wrap=document.getElementById('crm-table-wrap');if(!wrap)return;
-
-  let customers=G.customers;
-
-  if(q){
-    customers=customers.filter(c=>[
-      c['الاسم الأول']||c.col_C,c['الاسم الأخير']||c.col_D,
-      c['رقم جواز السفر'],c['الرقم القومي'],
-      c['رقم التليفون'],c['عنوان البريد الإلكتروني'],
-      c['رمز الدولة']||c.col_H,c['No.']||c.col_A,c['العنوان']
-    ].join(' ').toLowerCase().includes(q));
-  }
-
-  if(nat!=='all')customers=customers.filter(c=>(c['رمز الدولة']||c.col_H)===nat);
-
-  // Update count
-  const countEl=document.getElementById('crm-showing-count');
-  if(countEl)countEl.textContent=Math.min(200,customers.length);
-
-  if(!customers.length){
-    wrap.innerHTML=`<div class="empty-state"><div class="es-icon">👥</div><p>No customers match your search</p></div>`;
-    return;
-  }
-
-  wrap.innerHTML=`
-  <table class="data-table">
-    <thead><tr>
-      <th>CRM ID</th><th>Name</th><th>Passport / ID</th>
-      <th>Phone</th><th>Email</th><th>Nationality</th>
-      <th>License</th><th>Registered</th><th>Actions</th>
-    </tr></thead>
-    <tbody>
-      ${customers.slice(0,200).map(c=>{
-        const firstName=c['الاسم الأول']||c.col_C||'';
-        const lastName=c['الاسم الأخير']||c.col_D||'';
-        const name=(firstName+' '+lastName).trim();
-        const clientCode=c['No.']||c.col_A||c.id;
-        const nationality=c['رمز الدولة']||c.col_H||'';
-        const hasLicense=!!(c['رقم رخصة القيادة']||'');
-        return`<tr>
-          <td><span style="color:var(--accent);font-weight:700;">#${clientCode}</span></td>
-          <td>
-            <div style="font-weight:700;">${name||'—'}</div>
-            ${c['العنوان']?`<div style="font-size:10px;color:var(--text3);margin-top:1px;">📍 ${c['العنوان']}</div>`:''}
-          </td>
-          <td style="font-size:11px;">
-            ${c['رقم جواز السفر']?`<div>🛂 ${c['رقم جواز السفر']}</div>`:''}
-            ${c['الرقم القومي']?`<div>🪪 ${c['الرقم القومي']}</div>`:''}
-          </td>
-          <td style="font-size:11px;">${c['رقم التليفون']||'—'}</td>
-          <td style="font-size:11px;">${c['عنوان البريد الإلكتروني']||'—'}</td>
-          <td style="font-size:11px;">${nationality||'—'}</td>
-          <td style="font-size:11px;">
-            ${hasLicense?
-              `<span class="pill pill-active">✓ ${c['رقم رخصة القيادة']}</span>`:
-              `<span style="color:var(--text3);">—</span>`}
-          </td>
-          <td style="font-size:10px;color:var(--text3);">${c['تاريخ التسجيل']||'—'}</td>
-          <td>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;">
-              <button class="btn btn-ghost btn-xs" onclick="openCRMProfile('${c.id}')">👁 Profile</button>
-              <button class="btn btn-ghost btn-xs" onclick="openEditCustomerModal('${c.id}')">✏️</button>
-              <button class="btn btn-primary btn-xs" onclick="viewCustomerOrders('${clientCode}','${name}')">📋</button>
-            </div>
-          </td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>
-  <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">
-    Showing ${Math.min(200,customers.length)} of ${customers.length} customers
-  </div>`;
 }
 
 async function openCRMProfile_v1(customerId){
@@ -16049,8 +15188,9 @@ function filterCRM(){
     const nb=parseInt(b['No.']||b.col_A||0);
     return nb-na;
   });
+  const limit=window._crmLimit||500;
   const countEl=document.getElementById('crm-showing-count');
-  if(countEl)countEl.textContent=Math.min(200,customers.length);
+  if(countEl)countEl.textContent=customers.length;
   if(!customers.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">👥</div><p>No customers match your search</p></div>`;return;}
   wrap.innerHTML=`
   <table class="data-table">
@@ -16060,7 +15200,7 @@ function filterCRM(){
       <th>License</th><th>Registered</th><th>Actions</th>
     </tr></thead>
     <tbody>
-      ${customers.slice(0,200).map(c=>{
+      ${customers.slice(0,limit).map(c=>{
         const firstName=c['الاسم الأول']||c.col_C||'';
         const lastName=c['الاسم الأخير']||c.col_D||'';
         const name=(firstName+' '+lastName).trim();
@@ -16096,8 +15236,9 @@ function filterCRM(){
       }).join('')}
     </tbody>
   </table>
-  <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);">
-    Showing ${Math.min(200,customers.length)} of ${customers.length} customers — click any row to open profile
+  <div style="padding:9px 11px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+    <span>Showing ${Math.min(limit,customers.length)} of ${customers.length} customers — click any row to open profile</span>
+    ${customers.length>limit?`<button class="btn btn-ghost btn-xs" onclick="window._crmLimit=(window._crmLimit||500)+500;filterCRM()">Load more</button>`:''}
   </div>`;
 }
 
