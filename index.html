@@ -4112,9 +4112,16 @@ async function loadFleetRadar(){
         ${l.label}
       </div>`).join('')}
     </div>
+    <div id="gantt-summary-bar" style="display:flex;gap:12px;padding:6px 12px;background:var(--surface2);border-radius:8px;margin-bottom:8px;font-size:11px;flex-wrap:wrap;">
+      <span>🚗 <strong id="gsb-total">--</strong> cars shown</span>
+      <span style="color:var(--success);">🟢 Available: <strong id="gsb-avail">--</strong></span>
+      <span style="color:#3b82f6;">🔵 Rented: <strong id="gsb-rented">--</strong></span>
+      <span style="color:#ef4444;">🔴 Accident: <strong id="gsb-accident">--</strong></span>
+      <span style="color:#f59e0b;">🟡 Maintenance: <strong id="gsb-maint">--</strong></span>
+    </div>
     <!-- Gantt container - drag to scroll -->
     <div id="gantt-wrap"
-         style="overflow:hidden;max-height:calc(100vh - 320px);
+         style="overflow:hidden;max-height:calc(100vh - 240px);
                 border:1px solid var(--border);border-radius:var(--radius);
                 background:var(--surface);cursor:grab;user-select:none;"
          onmousedown="ganttDragStart(event)"
@@ -4131,6 +4138,7 @@ async function loadFleetRadar(){
   buildLocationFilterBar();
   await triggerGlobalRender();
   initGanttDrag();
+  setTimeout(()=>ganttScrollToToday(),500);
 }
 
 /* ---- Gantt timeline range ---- */
@@ -4184,10 +4192,10 @@ function ganttDragEnd(e){
 }
 function ganttScrollToToday(){
   const wrap=document.getElementById('gantt-wrap');if(!wrap)return;
-  const DAY_PX=14;
+  const DAY_PX=window.GANTT_PX_PER_DAY||14;
   const rangeEl=document.getElementById('gantt-range');
   const totalDays=parseInt(rangeEl?.value||90);
-  const pastDays=Math.floor(totalDays/2);
+  const pastDays=Math.floor((_ganttDays||90)*0.4);
   const CAR_COL=240;
   const todayPx=CAR_COL+(pastDays*DAY_PX)-(wrap.clientWidth/2)+100;
   wrap.scrollTo({left:Math.max(0,todayPx),behavior:'smooth'});
@@ -4238,8 +4246,8 @@ async function renderGantt(){
     });
 
     const today=new Date();today.setHours(0,0,0,0);
-    const totalDays=365;
-    const pastDays=182;
+    const totalDays=_ganttDays||90;
+    const pastDays=Math.floor(totalDays*0.4);
     const ganttStart=new Date(today);
     ganttStart.setDate(ganttStart.getDate()-pastDays);
 
@@ -4264,9 +4272,10 @@ async function renderGantt(){
         (isMaint&&FLEET_FILTER.status.maintenance)||
         (isActive&&FLEET_FILTER.status.active);
       if(!statusPass)return false;
-      const allOff=!Object.values(FLEET_FILTER.branches).some(v=>v);
       const allOn=Object.values(FLEET_FILTER.branches).every(v=>v);
-      const branchPass=allOff||allOn||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
+      const noneOn=!Object.values(FLEET_FILTER.branches).some(v=>v);
+      if(noneOn) return false;
+      const branchPass=allOn||Object.entries(FLEET_FILTER.branches).some(([code,on])=>{
         if(!on)return false;
         const carLoc=(car.current_location||'').toUpperCase();
         const carBranch=(car.Branch||car.City||car['المحافظة']||'').toLowerCase();
@@ -4384,6 +4393,7 @@ async function renderGantt(){
       });
 
       const numRows=Math.max(1,rows.length);
+      const rowHeight=Math.max(ROW_H, numRows*ROW_H);
       const rowBg=ci%2===0?'var(--surface)':'rgba(255,255,255,0.015)';
       const catStatus=getCarStatusCategory(car);
       const dotColor=statusColors[catStatus]||'var(--text3)';
@@ -4397,7 +4407,7 @@ async function renderGantt(){
           <div style="position:sticky;left:0;z-index:15;
                       background:${ci%2===0?'var(--surface)':'var(--surface2)'};
                       width:${CAR_COL}px;min-width:${CAR_COL}px;
-                      height:${Math.max(52,numRows*ROW_H)}px;padding:0 10px;
+                      height:${rowHeight}px;padding:0 10px;
                       border-right:1px solid var(--border2);
                       display:flex;align-items:center;cursor:pointer;"
                onclick="openCarDetailModal('${carIdStr}')"
@@ -4591,7 +4601,7 @@ async function renderGantt(){
             const lac=lst==='Accident';
             const lcl=lst==='Closed'||lastOrd.closed===true;
             const lov=!lcl&&le&&today>le&&(lst==='Active'||lst==='Overdue');
-            if(lcl||(lp>=lt&&lt>0&&!lac)){
+            if(lcl){
               aHTML='<span style="font-size:10px;color:var(--text3);">Idle / No Assignment</span>';
             }else if(lac){
               const ld=le?Math.max(0,Math.ceil((today-le)/86400000)):0;
@@ -4709,6 +4719,19 @@ async function renderGantt(){
         console.log(`GANTT: ${matchCount} active orders matched across ${cars.length} cars`);
       }
     }
+
+    // Update summary bar
+    const gsbTotal=activeCars.length;
+    const gsbAvail=activeCars.filter(c=>getCarStatusCategory(c)==='available').length;
+    const gsbRented=activeCars.filter(c=>getCarStatusCategory(c)==='rented').length;
+    const gsbAccident=activeCars.filter(c=>getCarStatusCategory(c)==='accident').length;
+    const gsbMaint=activeCars.filter(c=>getCarStatusCategory(c)==='maintenance').length;
+    const setGSB=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+    setGSB('gsb-total',gsbTotal);
+    setGSB('gsb-avail',gsbAvail);
+    setGSB('gsb-rented',gsbRented);
+    setGSB('gsb-accident',gsbAccident);
+    setGSB('gsb-maint',gsbMaint);
 
   }catch(e){
     if(wrap)wrap.innerHTML=`<div class="empty-state">
