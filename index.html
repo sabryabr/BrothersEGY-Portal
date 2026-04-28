@@ -560,6 +560,74 @@ html{scroll-padding-top:70px!important;}
   }
 }
 
+/* ============ COMMAND PALETTE (Ctrl+K) ============ */
+#cmd-palette-overlay{
+  display:none;position:fixed;inset:0;z-index:9998;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(12px);
+  align-items:flex-start;justify-content:center;padding-top:min(18vh,160px);
+}
+#cmd-palette-overlay.open{display:flex;animation:fadeIn 0.15s ease;}
+#cmd-palette{
+  width:100%;max-width:580px;
+  background:rgba(13,19,33,0.97);border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px;box-shadow:0 40px 120px rgba(0,0,0,0.8),0 0 60px rgba(59,130,246,0.15);
+  overflow:hidden;animation:modalIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+#cmd-input-wrap{
+  display:flex;align-items:center;gap:10px;padding:14px 18px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+}
+#cmd-input-wrap .cmd-icon{font-size:18px;color:var(--accent);flex-shrink:0;}
+#cmd-input{
+  flex:1;background:transparent;border:none;outline:none;
+  color:var(--text);font-size:15px;font-weight:500;
+  caret-color:var(--accent);
+}
+#cmd-input::placeholder{color:var(--text3);}
+#cmd-kbd{font-size:9px;color:var(--text3);background:var(--surface3);
+  padding:3px 7px;border-radius:5px;font-weight:700;flex-shrink:0;}
+#cmd-results{
+  max-height:380px;overflow-y:auto;padding:6px 0;
+}
+#cmd-results:empty::after{
+  content:'Start typing to search...';display:block;
+  text-align:center;padding:30px 20px;color:var(--text3);font-size:13px;
+}
+.cmd-group{padding:4px 14px;font-size:9px;font-weight:800;
+  color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;}
+.cmd-item{
+  display:flex;align-items:center;gap:11px;padding:9px 18px;
+  cursor:pointer;transition:background 0.1s;
+}
+.cmd-item:hover,.cmd-item.active{
+  background:rgba(59,130,246,0.12);
+}
+.cmd-item.active{border-left:2px solid var(--accent);}
+.cmd-item .ci-icon{font-size:16px;flex-shrink:0;width:24px;text-align:center;}
+.cmd-item .ci-body{flex:1;overflow:hidden;}
+.cmd-item .ci-title{font-size:13px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmd-item .ci-sub{font-size:10px;color:var(--text3);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmd-item .ci-badge{font-size:9px;background:var(--surface3);color:var(--text2);
+  padding:2px 7px;border-radius:5px;flex-shrink:0;}
+#cmd-footer{
+  display:flex;gap:14px;align-items:center;justify-content:center;
+  padding:8px 18px;border-top:1px solid rgba(255,255,255,0.05);
+  font-size:9px;color:var(--text3);
+}
+#cmd-footer kbd{background:var(--surface3);padding:1px 5px;border-radius:3px;
+  font-weight:700;font-size:9px;color:var(--text2);}
+.topbar-cmd-btn{
+  display:flex;align-items:center;gap:7px;padding:6px 14px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:9px;color:var(--text3);font-size:12px;cursor:pointer;
+  transition:all 0.2s;
+}
+.topbar-cmd-btn:hover{border-color:var(--accent);color:var(--text);background:var(--surface3);}
+.topbar-cmd-btn kbd{font-size:9px;background:var(--surface3);padding:2px 6px;
+  border-radius:4px;color:var(--text3);font-weight:700;}
+
 </style>
 </head>
 <body>
@@ -567,6 +635,23 @@ html{scroll-padding-top:70px!important;}
   <source src="background.mp4" type="video/mp4">
 </video>
 <div id="bg-overlay"></div>
+
+<!-- COMMAND PALETTE -->
+<div id="cmd-palette-overlay" onclick="if(event.target===this)closeCmdPalette()">
+  <div id="cmd-palette">
+    <div id="cmd-input-wrap">
+      <span class="cmd-icon">⚡</span>
+      <input type="text" id="cmd-input" placeholder="Search pages, orders, customers, cars…" autocomplete="off" spellcheck="false"/>
+      <span id="cmd-kbd">ESC</span>
+    </div>
+    <div id="cmd-results"></div>
+    <div id="cmd-footer">
+      <span><kbd>↑</kbd> <kbd>↓</kbd> Navigate</span>
+      <span><kbd>↵</kbd> Open</span>
+      <span><kbd>Esc</kbd> Close</span>
+    </div>
+  </div>
+</div>
 <div id="inactivity-bar">
   ⚠️ Session expires in 5 minutes.
   <button onclick="resetInactivity()">Stay Logged In</button>
@@ -621,6 +706,9 @@ html{scroll-padding-top:70px!important;}
       <button class="topbar-action-btn" onclick="showPage('receipts')">🧾 Receipt</button>
     </div>
     <div class="topbar-spacer"></div>
+    <button class="topbar-cmd-btn" onclick="toggleCmdPalette()">
+      🔍 Search anything… <kbd>Ctrl K</kbd>
+    </button>
     <!-- USD -->
     <div class="rate-pill-wrap" id="usd-pill-wrap">
       <div class="rate-pill-full" onclick="openRateEdit('usd')">
@@ -1627,7 +1715,7 @@ async function loadProposalsList(){
 let _lastBookingsHash='';
 function initRealtimeListeners(){
   // Bookings live listener
-  db.collection('bookings').onSnapshot(snap=>{
+  const _bookingUnsub=db.collection('bookings').onSnapshot(snap=>{
     const newHash=snap.docChanges().map(c=>c.doc.id+c.type).join(',');
     if(newHash&&newHash===_lastBookingsHash)return;
     _lastBookingsHash=newHash;
@@ -1656,11 +1744,13 @@ function initRealtimeListeners(){
       if(pid==='page-fleet-radar'&&typeof renderGantt==='function')renderGantt();
       if(pid==='page-dashboard'&&typeof loadDashboard==='function')loadDashboard();
       if(pid==='page-vehicle-360'&&typeof loadVehicle360Details==='function')loadVehicle360Details();
-    },3000);
+      if(pid==='page-risk-radar'&&typeof loadRiskRadar==='function')loadRiskRadar();
+    },1000);
   });
+  G.unsubscribers.push(_bookingUnsub);
 
   // Fleet live listener
-  db.collection('fleet').onSnapshot(snap=>{
+  const _fleetUnsub=db.collection('fleet').onSnapshot(snap=>{
     snap.docChanges().forEach(change=>{
       const doc={id:change.doc.id,...change.doc.data()};
       if(change.type==='added'||change.type==='modified'){
@@ -1671,10 +1761,21 @@ function initRealtimeListeners(){
         G.fleet=G.fleet.filter(c=>c.id!==doc.id);
       }
     });
+    // Refresh fleet-dependent views
+    clearTimeout(window._fleetRefreshTimer);
+    window._fleetRefreshTimer=setTimeout(()=>{
+      const active=document.querySelector('.page-section.active');
+      if(!active)return;
+      const pid=active.id;
+      if(pid==='page-fleet-radar'&&typeof renderFleetRadar==='function')renderFleetRadar();
+      if(pid==='page-vehicle-360'&&typeof loadVehicle360Details==='function')loadVehicle360Details();
+      if(pid==='page-risk-radar'&&typeof loadRiskRadar==='function')loadRiskRadar();
+    },1500);
   });
+  G.unsubscribers.push(_fleetUnsub);
 
   // Proposals live listener
-  db.collection('proposals').onSnapshot(snap=>{
+  const _proposalUnsub=db.collection('proposals').onSnapshot(snap=>{
     if(!G.proposals)G.proposals=[];
     snap.docChanges().forEach(change=>{
       const doc={id:change.doc.id,...change.doc.data()};
@@ -1686,9 +1787,72 @@ function initRealtimeListeners(){
         G.proposals=G.proposals.filter(p=>p.id!==doc.id);
       }
     });
+    // Update badge
+    const draftCount=G.proposals.filter(p=>p.status==='Draft').length;
+    const badge=document.getElementById('badge-proposals');
+    if(badge){if(draftCount>0){badge.textContent=draftCount;badge.classList.remove('hidden');}else{badge.classList.add('hidden');}}
+    // Refresh proposals page if active
     const activeSection=document.querySelector('.page-section.active');
     if(activeSection?.id==='page-proposals'&&typeof renderProposalsList==='function')renderProposalsList();
   });
+  G.unsubscribers.push(_proposalUnsub);
+
+  // Customers live listener
+  const _customerUnsub=db.collection('customers').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      const doc={id:change.doc.id,...change.doc.data()};
+      if(change.type==='added'||change.type==='modified'){
+        const idx=G.customers.findIndex(c=>c.id===doc.id);
+        if(idx>=0)G.customers[idx]=doc;else G.customers.push(doc);
+      }
+      if(change.type==='removed'){
+        G.customers=G.customers.filter(c=>c.id!==doc.id);
+      }
+    });
+    const activeSection=document.querySelector('.page-section.active');
+    if(activeSection?.id==='page-crm'&&typeof filterCRM==='function'){
+      clearTimeout(window._crmRefreshTimer);
+      window._crmRefreshTimer=setTimeout(filterCRM,1000);
+    }
+  });
+  G.unsubscribers.push(_customerUnsub);
+
+  // Tasks live listener
+  const _taskUnsub=db.collection('tasks').onSnapshot(snap=>{
+    // Update badge with pending count for current user
+    let myPending=0;
+    snap.docs.forEach(d=>{
+      const t=d.data();
+      if(t.assigned_to===G.user?.username&&(t.status==='pending'||t.status==='inprogress'))myPending++;
+    });
+    const tb=document.getElementById('badge-tasks');
+    if(tb){if(myPending>0){tb.textContent=myPending;tb.classList.remove('hidden');}else{tb.classList.add('hidden');}}
+    // Auto-refresh tasks page
+    const activeSection=document.querySelector('.page-section.active');
+    if(activeSection?.id==='page-tasks'&&typeof switchTaskTab==='function'){
+      clearTimeout(window._taskRefreshTimer);
+      window._taskRefreshTimer=setTimeout(()=>{
+        const activeBtn=document.querySelector('[id^="task-tab-"].active,[id^="task-tab-"][style*="accent"]');
+        const tab=activeBtn?.id?.replace('task-tab-','')||'mine';
+        switchTaskTab(tab,document.getElementById(`task-tab-${tab}`));
+      },1500);
+    }
+  });
+  G.unsubscribers.push(_taskUnsub);
+
+  // Approvals live listener
+  const _approvalUnsub=db.collection('approvals').where('status','==','pending').onSnapshot(snap=>{
+    const count=snap.size;
+    const ab=document.getElementById('badge-approvals');
+    if(ab){if(count>0){ab.textContent=count;ab.classList.remove('hidden');}else{ab.classList.add('hidden');}}
+    // Auto-refresh approvals page
+    const activeSection=document.querySelector('.page-section.active');
+    if(activeSection?.id==='page-approvals'&&typeof loadApprovalsList==='function'){
+      clearTimeout(window._approvalRefreshTimer);
+      window._approvalRefreshTimer=setTimeout(()=>loadApprovalsList('pending'),1500);
+    }
+  });
+  G.unsubscribers.push(_approvalUnsub);
 }
 
 async function loadSettings(){
@@ -1803,6 +1967,234 @@ function toggleSidebar(){
   G.sidebarCollapsed=!G.sidebarCollapsed;sb.classList.toggle('collapsed',G.sidebarCollapsed);
   btn.textContent=G.sidebarCollapsed?'▶':'◀';
 }
+
+/* ============================================================
+   COMMAND PALETTE (Ctrl+K) — Premium SaaS-grade fuzzy search
+   ============================================================ */
+let _cmdOpen=false,_cmdIdx=-1,_cmdItems=[];
+
+const CMD_PAGES=[
+  {id:'dashboard',icon:'📊',title:'Dashboard',sub:'Overview & KPIs'},
+  {id:'fleet-radar',icon:'📡',title:'Fleet Radar',sub:'Car availability & Gantt'},
+  {id:'order-book',icon:'📋',title:'Order Book',sub:'All rental contracts'},
+  {id:'vehicle-360',icon:'🔭',title:'Vehicle 360',sub:'Full car profile & history'},
+  {id:'risk-radar',icon:'⚠️',title:'Risk Radar',sub:'Expiry alerts & risks'},
+  {id:'proposals',icon:'📋',title:'Proposals',sub:'Create & manage quotes'},
+  {id:'en-contract',icon:'📄',title:'EN Contract',sub:'English rental agreement'},
+  {id:'ar-contract',icon:'📝',title:'AR Contract',sub:'Arabic rental agreement'},
+  {id:'receipts',icon:'🧾',title:'Receipts',sub:'Generate payment receipts'},
+  {id:'income-expenses',icon:'💰',title:'Income & Expenses',sub:'Financial ledger'},
+  {id:'crm',icon:'👥',title:'CRM Hub',sub:'Customer database'},
+  {id:'tasks',icon:'✅',title:'Task Manager',sub:'Tasks & deadlines'},
+  {id:'approvals',icon:'🔔',title:'Approvals',sub:'Pending requests'},
+  {id:'system-logs',icon:'📜',title:'System Logs',sub:'Audit trail'},
+  {id:'settings',icon:'⚙️',title:'Settings',sub:'System configuration'},
+];
+
+function toggleCmdPalette(){_cmdOpen?closeCmdPalette():openCmdPalette();}
+
+function openCmdPalette(){
+  _cmdOpen=true;_cmdIdx=-1;
+  const overlay=document.getElementById('cmd-palette-overlay');
+  overlay.classList.add('open');
+  const input=document.getElementById('cmd-input');
+  input.value='';input.focus();
+  renderCmdResults('');
+}
+
+function closeCmdPalette(){
+  _cmdOpen=false;
+  document.getElementById('cmd-palette-overlay').classList.remove('open');
+}
+
+function renderCmdResults(query){
+  const results=document.getElementById('cmd-results');
+  const q=query.toLowerCase().trim();
+  let html='';
+  _cmdItems=[];
+
+  // Recently visited pages
+  const recent=JSON.parse(localStorage.getItem('cmdRecent')||'[]').slice(0,3);
+
+  if(!q){
+    // Show recent + all pages
+    if(recent.length){
+      html+=`<div class="cmd-group">Recent</div>`;
+      recent.forEach(r=>{
+        const p=CMD_PAGES.find(x=>x.id===r);
+        if(p){
+          _cmdItems.push({type:'page',id:p.id});
+          html+=cmdItemHTML(p.icon,p.title,p.sub,'Page');
+        }
+      });
+    }
+    html+=`<div class="cmd-group">Pages</div>`;
+    CMD_PAGES.forEach(p=>{
+      if(!recent.includes(p.id)){
+        _cmdItems.push({type:'page',id:p.id});
+        html+=cmdItemHTML(p.icon,p.title,p.sub,'Page');
+      }
+    });
+    results.innerHTML=html;
+    highlightCmdItem(0);
+    return;
+  }
+
+  // Search pages
+  const matchedPages=CMD_PAGES.filter(p=>
+    p.title.toLowerCase().includes(q)||p.sub.toLowerCase().includes(q)||p.id.includes(q)
+  );
+  if(matchedPages.length){
+    html+=`<div class="cmd-group">Pages</div>`;
+    matchedPages.forEach(p=>{
+      _cmdItems.push({type:'page',id:p.id});
+      html+=cmdItemHTML(p.icon,highlightMatch(p.title,q),p.sub,'Page');
+    });
+  }
+
+  // Search orders (top 6)
+  if(q.length>=2&&Array.isArray(allOrders)){
+    const matchedOrders=allOrders.filter(o=>{
+      const hay=[o['No.'],o['اسم العميل'],o['كود العميل'],o['اسم السيارة'],o.id].join(' ').toLowerCase();
+      return hay.includes(q);
+    }).slice(0,6);
+    if(matchedOrders.length){
+      html+=`<div class="cmd-group">Orders</div>`;
+      matchedOrders.forEach(o=>{
+        _cmdItems.push({type:'order',id:o.id});
+        const no=o['No.']||o.id;
+        const client=o['اسم العميل']||'—';
+        const car=o['اسم السيارة']||'—';
+        const st=typeof getOrderStatus==='function'?getOrderStatus(o):'';
+        html+=cmdItemHTML('📋',highlightMatch(`#${no} — ${client}`,q),car,st);
+      });
+    }
+  }
+
+  // Search customers (top 6)
+  if(q.length>=2&&G.customers){
+    const matchedCust=G.customers.filter(c=>{
+      const name=((c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')).toLowerCase();
+      const phone=String(c['رقم التليفون']||'').toLowerCase();
+      const passport=String(c['رقم جواز السفر']||'').toLowerCase();
+      return name.includes(q)||phone.includes(q)||passport.includes(q);
+    }).slice(0,6);
+    if(matchedCust.length){
+      html+=`<div class="cmd-group">Customers</div>`;
+      matchedCust.forEach(c=>{
+        _cmdItems.push({type:'customer',id:c.id});
+        const name=((c['الاسم الأول']||'')+' '+(c['الاسم الأخير']||'')).trim();
+        const phone=c['رقم التليفون']||'';
+        html+=cmdItemHTML('👤',highlightMatch(name,q),`#${c['No.']||c.id} · ${phone}`,'CRM');
+      });
+    }
+  }
+
+  // Search fleet (top 6)
+  if(q.length>=2&&G.fleet){
+    const matchedCars=G.fleet.filter(c=>{
+      const label=typeof getCarLabel==='function'?getCarLabel(c,'en'):'';
+      const plate=c.plate||'';
+      const id=String(c.ID||c.id||'');
+      return label.toLowerCase().includes(q)||plate.toLowerCase().includes(q)||id.includes(q);
+    }).slice(0,6);
+    if(matchedCars.length){
+      html+=`<div class="cmd-group">Fleet</div>`;
+      matchedCars.forEach(c=>{
+        _cmdItems.push({type:'car',id:c.ID||c.id});
+        const label=typeof getCarLabel==='function'?getCarLabel(c,'en'):(c.ID||c.id);
+        const status=c.status||c.Contract||'';
+        html+=cmdItemHTML('🚗',highlightMatch(label,q),c.plate||'',status);
+      });
+    }
+  }
+
+  if(!html)html=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px;">No results for "${query}"</div>`;
+  results.innerHTML=html;
+  highlightCmdItem(0);
+}
+
+function cmdItemHTML(icon,title,sub,badge){
+  return`<div class="cmd-item" onmouseenter="highlightCmdItem(${_cmdItems.length-1})" onclick="executeCmdItem(${_cmdItems.length-1})">
+    <span class="ci-icon">${icon}</span>
+    <div class="ci-body"><div class="ci-title">${title}</div>${sub?`<div class="ci-sub">${sub}</div>`:''}</div>
+    ${badge?`<span class="ci-badge">${badge}</span>`:''}
+  </div>`;
+}
+
+function highlightMatch(text,q){
+  if(!q)return text;
+  const idx=text.toLowerCase().indexOf(q);
+  if(idx===-1)return text;
+  return text.slice(0,idx)+`<span style="color:var(--accent);font-weight:800;">`+text.slice(idx,idx+q.length)+`</span>`+text.slice(idx+q.length);
+}
+
+function highlightCmdItem(idx){
+  _cmdIdx=idx;
+  document.querySelectorAll('.cmd-item').forEach((el,i)=>{
+    el.classList.toggle('active',i===idx);
+    if(i===idx)el.scrollIntoView({block:'nearest'});
+  });
+}
+
+function executeCmdItem(idx){
+  const item=_cmdItems[idx];if(!item)return;
+  closeCmdPalette();
+  if(item.type==='page'){
+    showPage(item.id);
+    // Save to recent
+    let recent=JSON.parse(localStorage.getItem('cmdRecent')||'[]');
+    recent=recent.filter(r=>r!==item.id);
+    recent.unshift(item.id);
+    localStorage.setItem('cmdRecent',JSON.stringify(recent.slice(0,8)));
+  }else if(item.type==='order'){
+    if(typeof openOrderDetail==='function')openOrderDetail(item.id);
+  }else if(item.type==='customer'){
+    if(typeof openEditCustomerModal==='function')openEditCustomerModal(item.id);
+  }else if(item.type==='car'){
+    if(typeof openCarDetailModal==='function')openCarDetailModal(item.id);
+  }
+}
+
+// Keyboard handler
+document.addEventListener('keydown',e=>{
+  // Ctrl+K or Cmd+K — open palette
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){
+    e.preventDefault();
+    toggleCmdPalette();
+    return;
+  }
+  if(!_cmdOpen)return;
+
+  if(e.key==='Escape'){closeCmdPalette();e.preventDefault();return;}
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    highlightCmdItem(Math.min(_cmdIdx+1,_cmdItems.length-1));
+    return;
+  }
+  if(e.key==='ArrowUp'){
+    e.preventDefault();
+    highlightCmdItem(Math.max(_cmdIdx-1,0));
+    return;
+  }
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(_cmdIdx>=0)executeCmdItem(_cmdIdx);
+    return;
+  }
+});
+
+// Live search as you type
+document.addEventListener('DOMContentLoaded',()=>{
+  const input=document.getElementById('cmd-input');
+  if(input){
+    let _cmdTimer=null;
+    input.addEventListener('input',()=>{
+      clearTimeout(_cmdTimer);
+      _cmdTimer=setTimeout(()=>renderCmdResults(input.value),120);
+    });
+  }
+});
 
 /* ============================================================
    MODAL + MODAL HISTORY STACK
@@ -3889,8 +4281,13 @@ async function saveOrderEdit(orderId){
       const ci=G.fleet.findIndex(c=>c.id===String(order['كود السيارة']));if(ci>=0)Object.assign(G.fleet[ci],carLocUpd);
     }
     await db.collection('bookings').doc(orderId).update(upd);
+    // Update local caches immediately
+    const idx=allOrders.findIndex(o=>o.id===orderId);if(idx>-1)allOrders[idx]={...allOrders[idx],...upd};
+    const idx2=G.bookings.findIndex(b=>b.id===orderId);if(idx2>-1)G.bookings[idx2]={...G.bookings[idx2],...upd};
     await logAction('EDIT','Order Book',`Updated Order #${order?.['No.']||orderId} → ${newStatus}`);
     toast('Order updated!','success');closeModal();
+    filterOrders();
+    triggerGlobalRender();
     // Auto-update contract snapshots so QR always shows latest order data
     try{
       const _contractUpd={_sys_updated:firebase.firestore.FieldValue.serverTimestamp(),last_order_update:new Date().toISOString(),order_status:newStatus,order_total:newTotal,order_paid:newPaid};
@@ -4022,8 +4419,15 @@ async function requestCloseOrder(orderId){
     try{
       await db.collection('bookings').doc(orderId).update({'حالة الطلب':'Closed','closed':true,'_sys_updated':Date.now()});
       if(order?.['كود السيارة'])await db.collection('fleet').doc(String(order['كود السيارة'])).update({status:'available',_sys_updated:Date.now()}).catch(()=>{});
+      // Update local caches immediately
+      const upd={'حالة الطلب':'Closed','closed':true,'_sys_updated':Date.now()};
+      const idx=allOrders.findIndex(o=>o.id===orderId);if(idx>-1)allOrders[idx]={...allOrders[idx],...upd};
+      const idx2=G.bookings.findIndex(b=>b.id===orderId);if(idx2>-1)G.bookings[idx2]={...G.bookings[idx2],...upd};
       await logAction('EDIT','Order Book',`Closed Order #${order?.['No.']||orderId}`);
       toast('Order closed!','success');
+      closeModal();
+      filterOrders();
+      triggerGlobalRender();
     }catch(e){toast('Close failed: '+e.message,'error');}
   }else{
     try{
@@ -8087,11 +8491,12 @@ function renderRiskTable(risks){
     <tbody>
       ${risks.map(r=>{
         const riskColor=r.risk==='expired'||r.risk==='high'?'var(--danger)':r.risk==='medium'?'var(--warning)':'var(--success)';
+        const borderColor=r.risk==='expired'?'#ef4444':r.risk==='high'?'#f97316':r.risk==='medium'?'#eab308':'#22c55e';
         const isDepositRisk=r.label==='Deposit Return Due'||r.label==='Deposit Due Soon';
         const carId=isDepositRisk?null:(r.car?.ID||r.car?.id);
-        return`<tr>
+        return`<tr style="border-left:3px solid ${borderColor};">
           <td style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${r.carLabel}
+            ${carId?`<span style="cursor:pointer;color:var(--accent);" onclick="openCarDetailModal('${carId}')">${r.carLabel}</span>`:r.carLabel}
           </td>
           <td style="font-size:11px;">${isDepositRisk?(r.orderNo||r.plate):r.plate}</td>
           <td>${r.icon} ${r.label}</td>
@@ -8314,7 +8719,10 @@ async function loadTasks(){
       <h2>✅ Task Manager</h2>
       <p>${isPriv?'Create, assign and monitor all branch tasks':'My assigned tasks and deadlines'}</p>
     </div>
-    ${isPriv?`<button class="btn btn-primary btn-sm" onclick="openCreateTaskModal()">➕ Create Task</button>`:''}
+    <div style="display:flex;gap:7px;">
+      ${isPriv?`<button class="btn btn-primary btn-sm" onclick="openCreateTaskModal()">➕ Create Task</button>`:''}
+      ${isPriv?`<button class="btn btn-ghost btn-sm" onclick="clearCompletedTasks()" style="color:var(--text3);">🗑️ Clear Completed</button>`:''}
+    </div>
   </div>
 
   <!-- Filter Tabs -->
@@ -8425,6 +8833,7 @@ async function switchTaskTab(tab,btn){
               <span style="font-size:13px;font-weight:700;">${t.title||'Task'}</span>
               <span class="pill pill-${t.status}">${t.status}</span>
               <span class="pill pill-${t.priority||'low'}">${(t.priority||'low').toUpperCase()}</span>
+              ${isOD?'<span class="pill pill-high" style="font-size:9px;animation:dashPulse 2s infinite;">⚠️ OVERDUE</span>':''}
               ${t.type?`<span style="font-size:9px;color:var(--text3);background:var(--surface3);padding:2px 6px;border-radius:5px;">${t.type}</span>`:''}
             </div>
 
@@ -8710,6 +9119,23 @@ async function deleteTask(taskId){
     toast('Task deleted','success');
     loadTasks();
   }catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+async function clearCompletedTasks(){
+  if(!confirm('Delete all completed tasks? This cannot be undone.'))return;
+  try{
+    const snap=await db.collection('tasks').where('status','==','done').get();
+    if(!snap.size){toast('No completed tasks to clear','info');return;}
+    const BATCH_SIZE=400;
+    for(let i=0;i<snap.docs.length;i+=BATCH_SIZE){
+      const batch=db.batch();
+      snap.docs.slice(i,i+BATCH_SIZE).forEach(d=>batch.delete(d.ref));
+      await batch.commit();
+    }
+    await logAction('DELETE','Task Manager',`Cleared ${snap.size} completed tasks`);
+    toast(`✅ Cleared ${snap.size} completed tasks`,'success');
+    loadTasks();
+  }catch(e){toast('Failed: '+e.message,'error');}
 }
 
 
@@ -9626,6 +10052,7 @@ function showSettingsTab(tab,btn){
 }
 
 async function saveSettings(){
+  if(!confirm('Save all settings? This will affect the entire system.'))return;
   try{
     const phones={},keys={};
     (window._settingsUsers||[]).forEach(u=>{
@@ -10253,6 +10680,11 @@ function onIEPeriodChange(){
 async function computeIEKPIs(){
   const isPriv=['Admin','Executive'].includes(G.user?.role);
   const period=getIEPeriod();
+  const cacheKey=`${period.month}_${period.year}_${isPriv}`;
+  if(window._ieKPICache&&window._ieKPICacheKey===cacheKey&&Date.now()-window._ieKPICacheTime<120000){
+    const kpiRow=document.getElementById('ie-kpi-row');
+    if(kpiRow){kpiRow.innerHTML=window._ieKPICache;return;}
+  }
 
   try{
     const[cSnap,ceSnap,geSnap]=await Promise.all([
@@ -10367,6 +10799,10 @@ async function computeIEKPIs(){
         <div class="kpi-sub">Of ${fmtMoney(depositHeld)} held</div>
         <div class="kpi-icon">↩️</div>
       </div>`;
+      // Cache the rendered KPI HTML
+      window._ieKPICache=kpiRow.innerHTML;
+      window._ieKPICacheKey=cacheKey;
+      window._ieKPICacheTime=Date.now();
     }
 
   }catch(e){console.warn('IE KPIs error:',e.message);}
@@ -10610,6 +11046,7 @@ async function loadIEIncome(){
             style="padding:5px 10px;background:var(--surface2);border:1px solid var(--border);
             border-radius:7px;color:var(--text);font-size:11px;width:160px;"
             oninput="filterIETable('income',this.value)"/>
+          <button class="btn btn-ghost btn-sm" onclick="exportIncomeCSV()" style="font-size:10px;">📥 Export CSV</button>
           <span style="font-size:11px;color:var(--success);font-weight:800;">${fmtMoney(totalIncome)}</span>
           <span style="font-size:10px;color:var(--text3);">${rows.length} records</span>
         </div>
@@ -10692,6 +11129,34 @@ function filterIETable(type,q){
     const table=document.getElementById('ie-gen-table');
     if(table)table.innerHTML=renderIEGenTable(filtered);
   }
+}
+
+function exportIncomeCSV(){
+  try{
+    const rows=window._ieIncomeRows||[];
+    if(!rows.length){toast('No income data to export','error');return;}
+    const headers=['No','Date','Statement','Order Ref','Branch','Type','Collected By','Amount'];
+    const csv=[headers.join(','),...rows.map(r=>{
+      const day=r['\u064a\u0648\u0645']||'',month=r['\u0634\u0647\u0631']||'',year=r['\u0633\u0646\u0629']||'';
+      const dateStr=day?`${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`:'';
+      return[
+        r['No.']||'',
+        dateStr,
+        '"'+(r['\u0628\u064a\u0627\u0646 \u0627\u0644\u062a\u062d\u0635\u064a\u0644']||r['Expense Statement']||'').replace(/"/g,'""')+'"',
+        r['\u0643\u0648\u062f \u0627\u0644\u0627\u0648\u0631\u062f\u0631']||'',
+        r['\u0645\u0648\u0642\u0639 \u0627\u0644\u0641\u0631\u0639']||r.Branch||'',
+        r['\u0646\u0648\u0639 \u0627\u0644\u062a\u062d\u0635\u064a\u0644']||'',
+        '"'+(r['\u062a\u0645 \u062a\u062d\u0635\u064a\u0644 \u0645\u0646 \u0637\u0631\u0641']||'').replace(/"/g,'""')+'"',
+        parseAmount(r['\u0642\u064a\u0645\u0629 \u0627\u0644\u062a\u062d\u0635\u064a\u0644'])
+      ].join(',');
+    })].join('\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`BrothersEGY_Income_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    toast('\u2705 CSV exported!','success');
+  }catch(e){toast('Export failed: '+e.message,'error');}
 }
 
 /* Helper to open order from income table */
@@ -15370,10 +15835,14 @@ async function adminDeleteOrder(orderId){
   if(G.user?.role!=='Admin')return;
   try{
     await db.collection('bookings').doc(orderId).delete();
+    // Remove from local caches immediately
+    allOrders=allOrders.filter(o=>o.id!==orderId);
+    G.bookings=G.bookings.filter(b=>b.id!==orderId);
     closeModal();
-    toast('Order deleted');
+    toast('Order deleted','success');
     window._orderSubActive=false;
     filterOrders();
+    triggerGlobalRender();
   }catch(e){toast('Delete failed: '+e.message,'error');}
 }
 
