@@ -3366,6 +3366,23 @@ async function openOrderDetail(orderId){
         <div style="font-size:11px;color:var(--text2);">📍 Dropoff: ${o['مكان التسليم']||'-'}</div>
       </div>
       <div class="panel">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">📄 Documents</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;">
+          ${o.contract_generated ?
+            `<span class="pill pill-active">✅ EN Contract: ${o.contract_ref_en||'—'}</span>` :
+            `<span class="pill" style="background:var(--surface2);">📄 EN Contract: Not generated</span>`}
+          ${o.contract_ref_ar ?
+            `<span class="pill pill-active">✅ AR Contract: ${o.contract_ref_ar||'—'}</span>` :
+            `<span class="pill" style="background:var(--surface2);">📋 AR Contract: Not generated</span>`}
+          ${o.contract_generated_at ?
+            `<div style="color:var(--text3);width:100%;margin-top:4px;">Last generated: ${new Date(o.contract_generated_at).toLocaleDateString('en-GB')}</div>` : ''}
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text3);">
+          QR Code: <strong style="color:var(--accent);">${o['No.']||o.id}</strong>
+          — scan always shows latest order data
+        </div>
+      </div>
+      <div class="panel">
         <div style="font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:9px;">📅 Period</div>
         <div style="font-size:11px;"><strong>Start:</strong> ${start?fmtDate(start):'Invalid Date'}</div>
         <div style="font-size:11px;margin-top:3px;"><strong>End:</strong> ${end?fmtDate(end):'Invalid Date'}</div>
@@ -3435,6 +3452,7 @@ async function openOrderDetail(orderId){
       <button class="btn btn-ghost" onclick="generateOrderContractDirect('` + o.id + `','en')">📄 Contract</button>
       <button class="btn btn-ghost" onclick="generateOrderContractDirect('` + o.id + `','ar')">📋 AR Contract</button>
       <button class="btn btn-ghost" onclick="generateOrderReceiptDirect('` + o.id + `')">🧾 Receipt</button>
+      <button class="btn btn-ghost" onclick="regenerateAllOrderDocs('` + o.id + `')" title="Regenerate all documents with latest order data">🔄 Sync Docs</button>
       <button class="btn btn-ghost" onclick="viewOrderPayments('` + o.id + `','` + (o['No.']||o.id) + `')">💳 Payments</button>
       <button class="btn btn-ghost" onclick="viewOrderDocuments('` + o.id + `','` + (o['No.']||o.id) + `')">📁 Docs</button>
       <button class="btn btn-ghost" onclick="openReminderForm('` + o.id + `')">🔔 Set Reminder</button>
@@ -3537,14 +3555,34 @@ async function generateOrderContractDirect(orderId, lang) {
       pay_dep_egp: String(depEGP), pay_dep_usd: String(depUSD), pay_dep_eur:'0',
       req_deposit: String(depHeld),
     });
+    // Save/update permanent contract snapshot in Firestore
+    const contractDocRef = db.collection('contracts').doc(`${orderId}_${lang}`);
+    const contractData = {
+      order_id: orderId,
+      contract_no: contractNo,
+      lang,
+      client_name: clientName,
+      car_label: carLabel,
+      branch,
+      generated_at: new Date().toISOString(),
+      generated_by: G.user?.username||'system',
+      params: Object.fromEntries(params),
+      qr_ref: contractNo,
+      verify_url: `https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${contractNo}`,
+      _sys_updated: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await contractDocRef.set(contractData, {merge: true}).catch(()=>{});
+    // Update order record
+    await db.collection('bookings').doc(orderId).update({
+      contract_generated: true,
+      contract_generated_at: new Date().toISOString(),
+      [`contract_ref_${lang}`]: contractNo,
+      _sys_updated: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(()=>{});
+    // NOTE: verify.html queries bookings collection by 'No.' field to always show latest order data
     const file = lang==='ar'?'contract-ar.html':'contract-en.html';
     window.open(file+'?'+params.toString(),'_blank');
-    await db.collection('bookings').doc(orderId).update({
-      contract_generated:true,
-      contract_generated_at:new Date().toISOString(),
-      [`contract_ref_${lang}`]:contractNo,
-      _sys_updated:firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(()=>{});
+    toast(`✅ Contract generated — QR links to: ${contractNo}`, 'success');
   } catch(e) {
     console.error('Contract generation error:',e);
     toast('Contract error: '+e.message,'error');
@@ -3640,6 +3678,26 @@ async function generateOrderReceiptDirect(orderId) {
         <div style="text-align:center;border-top:1px dashed #999;color:#999;padding:8px 0;font-size:8pt;">- - - - - DETACH HERE - - - - -</div>
         ${singleRec('COMPANY COPY')}
       </div></body></html>`;
+    // Save receipt record with permanent ref (merge:true keeps it updatable)
+    const receiptDocRef = db.collection('receipts').doc(`${orderId}_receipt`);
+    await receiptDocRef.set({
+      order_id: orderId,
+      contract_no: contractNo,
+      receipt_ref: rcRef,
+      client_name: clientName,
+      car_label: carLabel+'| '+plate,
+      branch, branch_code: branchCode,
+      receipt_date: dateStr,
+      type: 'Rental Payment',
+      amount_egp: paidEGP, amount_usd: paidUSD,
+      total_egp_equiv: paid,
+      payment_details: paymentStr,
+      qr_ref: contractNo,
+      verify_url: `https://sabryabr.github.io/BrothersEGY-Portal/verify.html?ref=${contractNo}`,
+      collected_by: G.user?.username||'',
+      timestamp: Date.now(),
+      _sys_updated: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge: true}).catch(()=>{});
     const win = window.open('','_blank');
     win.document.write(html);
     win.document.close();
@@ -3656,6 +3714,21 @@ async function generateOrderReceiptDirect(orderId) {
   } catch(e) {
     console.error('Receipt error:',e);
     toast('Receipt error: '+e.message,'error');
+  }
+}
+
+async function regenerateAllOrderDocs(orderId) {
+  if(!confirm('Regenerate all documents for this order with the latest data?\nThe same QR codes will be preserved.')) return;
+  toast('⏳ Syncing all documents...', 'info');
+  try {
+    await generateOrderContractDirect(orderId, 'en');
+    await new Promise(r=>setTimeout(r,500));
+    await generateOrderContractDirect(orderId, 'ar');
+    await new Promise(r=>setTimeout(r,500));
+    await generateOrderReceiptDirect(orderId);
+    toast('✅ All documents synced with latest order data!', 'success');
+  } catch(e) {
+    toast('Sync failed: '+e.message, 'error');
   }
 }
 
@@ -3818,6 +3891,12 @@ async function saveOrderEdit(orderId){
     await db.collection('bookings').doc(orderId).update(upd);
     await logAction('EDIT','Order Book',`Updated Order #${order?.['No.']||orderId} → ${newStatus}`);
     toast('Order updated!','success');closeModal();
+    // Auto-update contract snapshots so QR always shows latest order data
+    try{
+      const _contractUpd={_sys_updated:firebase.firestore.FieldValue.serverTimestamp(),last_order_update:new Date().toISOString(),order_status:newStatus,order_total:newTotal,order_paid:newPaid};
+      await db.collection('contracts').doc(`${orderId}_en`).update(_contractUpd).catch(()=>{});
+      await db.collection('contracts').doc(`${orderId}_ar`).update(_contractUpd).catch(()=>{});
+    }catch(e){}
   }catch(e){console.error('OrderEdit error:',e);toast('Update failed: '+e.message,'error');}
 }
 
@@ -5021,72 +5100,6 @@ async function saveCarEdit(docId){
 /* ============================================================
    RISK RADAR
    ============================================================ */
-async function loadRiskRadar(){
-  const el=document.getElementById('page-risk-radar');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>⚠️ Risk Radar</h2><p>License, insurance and contract expiry monitoring</p></div>
-      <div style="display:flex;gap:7px;">
-        <select id="risk-range" onchange="loadRiskRadar()" style="padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;">
-          <option value="7">Next 7 Days</option>
-          <option value="30">Next 30 Days</option>
-          <option value="60" selected>Next 60 Days</option>
-          <option value="90">Next 90 Days</option>
-          <option value="180">Next 6 Months</option>
-          <option value="365">Next 1 Year</option>
-        </select>
-      </div>
-    </div>
-    <div id="risk-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
-    <div class="panel"><div id="risk-table-wrap" class="table-wrap"><div class="empty-state"><div class="spinner lg"></div></div></div></div>`;
-  const rangeEl=document.getElementById('risk-range');
-  const days=parseInt(rangeEl?.value||60);
-  const today=new Date();const futureDate=new Date(today.getTime()+days*86400000);
-  const risks=[];
-  G.fleet.forEach(car=>{
-    [{field:'نهاية الترخيص',label:'License',icon:'📋',statusField:'License'},{field:'نهاية التأمين',label:'Insurance',icon:'🛡',statusField:'Insurance'},{field:'نهاية التعاقد',label:'Contract',icon:'📄',statusField:'Contract'}].forEach(({field,label,icon,statusField})=>{
-      const d=parseDBDate(car[field]);if(!d)return;
-      const daysLeft=Math.ceil((d-today)/86400000);
-      if(daysLeft>days)return;
-      const risk=daysLeft<=0?'expired':daysLeft<=45?'high':daysLeft<=60?'medium':'low';
-      risks.push({car,label,icon,date:d,daysLeft,risk,carLabel:getCarLabel(car,'en'),statusField});
-    });
-  });
-  risks.sort((a,b)=>a.daysLeft-b.daysLeft);
-  // KPIs
-  const expired=risks.filter(r=>r.risk==='expired').length;
-  const high=risks.filter(r=>r.risk==='high').length;
-  const medium=risks.filter(r=>r.risk==='medium').length;
-  const low=risks.filter(r=>r.risk==='low').length;
-  const kpiEl=document.getElementById('risk-kpis');
-  if(kpiEl){
-    kpiEl.innerHTML=`
-      <div class="kpi-card"><div class="kpi-label">Expired</div><div class="kpi-value text-danger">${expired}</div><div class="kpi-sub">Immediate action</div></div>
-      <div class="kpi-card"><div class="kpi-label">High Risk</div><div class="kpi-value text-danger">${high}</div><div class="kpi-sub">Within 45 days</div></div>
-      <div class="kpi-card"><div class="kpi-label">Medium Risk</div><div class="kpi-value text-warning">${medium}</div><div class="kpi-sub">Within 60 days</div></div>
-      <div class="kpi-card"><div class="kpi-label">Low Risk</div><div class="kpi-value text-success">${low}</div><div class="kpi-sub">Within ${days} days</div></div>`;
-  }
-  const badge=document.getElementById('badge-risk');
-  if(badge){badge.textContent=expired+high;badge.classList.toggle('hidden',expired+high===0);}
-  const wrap=document.getElementById('risk-table-wrap');
-  if(!risks.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">✅</div><p>No risks in the next ${days} days</p></div>`;return;}
-  wrap.innerHTML=`<table class="data-table">
-    <thead><tr><th>Car</th><th>Risk Type</th><th>Expires</th><th>Days Left</th><th>Risk Level</th><th>Owner</th></tr></thead>
-    <tbody>
-      ${risks.map(r=>{
-        const riskColor=r.risk==='expired'||r.risk==='high'?'var(--danger)':r.risk==='medium'?'var(--warning)':'var(--success)';
-        const owner=((r.car['الاسم الأول']||'')+' '+(r.car['الاسم الأخير']||'')).trim()||'-';
-        return`<tr>
-          <td style="font-size:11px;">${r.carLabel}</td>
-          <td>${r.icon} ${r.label}</td>
-          <td>${fmtDateShort(r.date)}</td>
-          <td><strong style="color:${riskColor};">${r.daysLeft<=0?`EXPIRED ${Math.abs(r.daysLeft)}d ago`:r.daysLeft+' days'}</strong></td>
-          <td><span class="pill pill-${r.risk==='expired'?'high':r.risk}">${r.risk.toUpperCase()}</span></td>
-          <td style="font-size:11px;">${owner}</td>
-        </tr>`;
-      }).join('')}
-    </tbody></table>`;
-}
 
 /* ============================================================
    SYSTEM LOGS
@@ -5764,28 +5777,6 @@ function openOrdersListModal(orders,clientName){
 /* ============================================================
    INCOME & EXPENSES
    ============================================================ */
-async function loadIncomeExpenses(){
-  const el=document.getElementById('page-income-expenses');if(!el)return;
-  el.innerHTML=`
-    <div class="section-header">
-      <div><h2>💰 Income & Expenses</h2><p>Full financial ledger across all branches</p></div>
-    </div>
-    <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;" id="ie-kpi-row"></div>
-    <!-- Tabs -->
-    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn btn-ghost btn-sm" style="border-color:var(--accent);color:var(--accent);" id="ie-tab-income" onclick="showIETab('income',this)">📥 Income</button>
-      <button class="btn btn-ghost btn-sm" id="ie-tab-car" onclick="showIETab('car',this)">🚗 Car Expenses</button>
-      <button class="btn btn-ghost btn-sm" id="ie-tab-gen" onclick="showIETab('gen',this)">🏢 General Expenses</button>
-      <button class="btn btn-ghost btn-sm" id="ie-tab-add" onclick="showIETab('add',this)">➕ Add Entry</button>
-    </div>
-    <div id="ie-income-pane"></div>
-    <div id="ie-car-pane" style="display:none;"></div>
-    <div id="ie-gen-pane" style="display:none;"></div>
-    <div id="ie-add-pane" style="display:none;"></div>`;
-  await computeIEKPIs();
-  showIETab('income',document.getElementById('ie-tab-income'));
-}
 
 async function computeIEKPIs(){
   const isPriv=['Admin','Executive'].includes(G.user?.role);
