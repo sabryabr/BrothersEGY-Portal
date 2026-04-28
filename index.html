@@ -2954,7 +2954,7 @@ async function loadOrderBook(){
           <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">🔍 SEARCH</div>
           <input type="text" id="ob-search" placeholder="Client, order #, car..."
                  style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);"
-                 oninput="filterOrders()"/>
+                 oninput="clearTimeout(window._obSearchTimer);window._obSearchTimer=setTimeout(filterOrders,300)"/>
         </div>
         <div>
           <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;">STATUS</div>
@@ -2962,6 +2962,7 @@ async function loadOrderBook(){
             <option value="all">All</option>
             <option value="Active">Active</option>
             <option value="overdue">Overdue</option>
+            <option value="Future">Future</option>
             <option value="Accident">Accident</option>
             <option value="Closed">Closed</option>
             <option value="Cancelled">Cancelled</option>
@@ -3025,6 +3026,7 @@ async function loadOrderBook(){
 }
 
 function subscribeOrders(){
+  if(allOrders.length>0){filterOrders();updateOrderSummaryBar();return;}
   if(window._orderSubActive) return;
   window._orderSubActive=true;
   if(window._ordersUnsub){window._ordersUnsub();window._ordersUnsub=null;}
@@ -3076,6 +3078,7 @@ function filterOrders(){
       const st=getOrderStatus(o);
       if(status==='overdue'){const{end}=getOrderDates(o);if(!(end&&today>end&&!o.closed&&(st==='Active'||st==='Overdue')))return false;}
       else if(status==='Active'){if(st!=='Active')return false;}
+      else if(status==='Future'){if(st!=='Future')return false;}
       else{if(st!==status)return false;}
     }
     if(branch!=='all'&&o['فرع الإصدار']!==branch)return false;
@@ -3090,7 +3093,6 @@ function filterOrders(){
     if(!sa&&!sb)return 0;if(!sa)return 1;if(!sb)return -1;
     return sb-sa;
   });
-  console.log('[FilterOrders] allOrders:',allOrders?.length,'status filter:',status,'result:',filtered?.length);
   renderOrdersTable(filtered);
   updateFilterPills(search,status,branch,from,to);
 }
@@ -3117,7 +3119,8 @@ function clearOrderFilters(){
 }
 
 function updateOrderSummaryBar(){
-  const bar=document.getElementById('ob-summary-bar');if(!bar||!allOrders.length)return;
+  const bar=document.getElementById('ob-summary-bar');if(!bar)return;
+  if(!allOrders.length){bar.innerHTML='';return;}
   const today=new Date();
   const active=allOrders.filter(o=>getOrderStatus(o)==='Active').length;
   const overdue=allOrders.filter(o=>{const{end}=getOrderDates(o);const st=getOrderStatus(o);return end&&today>end&&!o.closed&&(st==='Active'||st==='Overdue');}).length;
@@ -3139,7 +3142,7 @@ function updateOrderSummaryBar(){
     <div class="kpi-card" style="${cardStyle('overdue')}" onclick="setOrderFilter('overdue')" title="Filter: Overdue"><div class="kpi-label">Overdue</div><div class="kpi-value text-danger" style="font-size:18px;">${overdue}</div></div>
     <div class="kpi-card" style="${cardStyle('Accident')}" onclick="setOrderFilter('Accident')" title="Filter: Accident"><div class="kpi-label">Accident</div><div class="kpi-value text-warning" style="font-size:18px;">${accident}</div></div>
     <div class="kpi-card" style="${cardStyle('Closed')}" onclick="setOrderFilter('Closed')" title="Filter: Closed"><div class="kpi-label">Closed</div><div class="kpi-value" style="font-size:18px;color:var(--text3);">${closed}</div></div>
-    <div class="kpi-card" style="padding:9px 13px;"><div class="kpi-label">Total Debt</div><div class="kpi-value text-danger" style="font-size:14px;">${fmtMoney(totalDebt)}</div></div>`;
+    <div class="kpi-card" style="${cardStyle('')}" title="Total outstanding debt"><div class="kpi-label">Total Debt</div><div class="kpi-value text-danger" style="font-size:16px;">${fmtMoney(totalDebt)}</div></div>`;
 }
 
 function renderOrdersTable(orders){
@@ -3148,11 +3151,16 @@ function renderOrdersTable(orders){
   if(!orders.length){wrap.innerHTML=`<div class="empty-state"><div class="es-icon">📋</div><p>No orders match your filters</p></div>`;return;}
   const today=new Date();
   wrap.innerHTML=`
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;padding:0 2px;">
+      Showing <strong style="color:var(--text);">${orders.length}</strong> of <strong>${allOrders.length}</strong> orders
+      ${orders.length<allOrders.length?`<span style="color:var(--accent);margin-left:6px;cursor:pointer;" onclick="clearOrderFilters()">Clear filters</span>`:''}
+    </div>
     <table class="data-table">
-      <thead><tr>${window._bulkMode?'<th style="width:32px;"></th>':''}<th>Order #</th><th>Client</th><th>Car</th><th>Start</th><th>End</th><th>Total</th><th>Paid</th><th>Debt</th><th>Status</th><th>Branch</th><th>Actions</th></tr></thead>
+      <thead><tr>${window._bulkMode?'<th style="width:32px;"></th>':''}<th>Order #</th><th>Client</th><th>Car</th><th>Period</th><th>Total</th><th>Paid</th><th>Debt</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
         ${orders.map(o=>{
           const{start,end}=getOrderDates(o);
+          const days=start&&end?Math.ceil((end-start)/86400000):parseInt(o.rental_days||0);
           const total=getOrderTotal(o);
           const paid=getOrderPaid(o);
           const daily=parseAmount(o['سعر السيارة اليومي بالجنيه المصري'])||(total/Math.max(1,parseFloat(o.rental_days||1)));
@@ -3176,8 +3184,12 @@ function renderOrdersTable(orders){
             <td><span style="color:var(--accent);font-weight:700;">#${getOrderNo(o)}</span></td>
             <td><div style="font-weight:600;">${getOrderClientName(o)||'-'}</div>${clientId?`<div style="font-size:10px;color:var(--text3);">ID: ${clientId}</div>`:''}</td>
             <td style="font-size:11px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${carLabel}</td>
-            <td style="font-size:11px;white-space:nowrap;">${start?fmtDate(start):'<span style="color:var(--danger);">No date</span>'}</td>
-            <td style="font-size:11px;white-space:nowrap;">${end?fmtDate(end):'<span style="color:var(--danger);">No date</span>'}${isOverdue?`<div style="font-size:9px;color:var(--danger);">${lateDays}d overdue</div>`:''}</td>
+            <td style="font-size:10px;white-space:nowrap;">
+              ${start?start.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'—'}
+              <span style="color:var(--text3);">→</span>
+              ${end?end.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'—'}
+              <br><span style="font-size:9px;color:var(--text3);">${days}d${isOverdue?` <span style="color:var(--danger);">+${lateDays}d late</span>`:''}</span>
+            </td>
             <td style="white-space:nowrap;">${fmtMoney(total)}</td>
             <td><div style="white-space:nowrap;">${fmtMoney(paid)}</div>
               <div style="background:var(--surface3);border-radius:99px;height:3px;width:55px;margin-top:3px;overflow:hidden;">
@@ -3188,11 +3200,10 @@ function renderOrdersTable(orders){
               ${latePenalty>0?`<div style="font-size:9px;color:var(--danger);">+${fmtMoney(latePenalty)}</div>`:''}
             </td>
             <td><span class="pill pill-${statusKey}">${statusLabel}</span></td>
-            <td style="font-size:11px;">${BRANCH_MAP[o['فرع الإصدار']]||o['فرع الإصدار']||'—'}</td>
             <td onclick="event.stopPropagation()"><div style="display:flex;gap:3px;">
-              <button class="btn btn-ghost btn-xs" onclick="openOrderDetail('${o.id}')">👁</button>
-              <button class="btn btn-warning btn-xs" onclick="openOrderEdit('${o.id}')">✏️</button>
-              <button class="btn btn-primary btn-xs" onclick="quickAddPayment('${o.id}')">💰</button>
+              <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openOrderDetail('${o.id}')">👁</button>
+              <button class="btn btn-warning btn-xs" onclick="event.stopPropagation();openOrderEdit('${o.id}')">✏️</button>
+              <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();quickAddPayment('${o.id}')">💰</button>
             </div></td>
           </tr>`;
         }).join('')}
