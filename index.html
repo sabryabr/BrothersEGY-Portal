@@ -5458,7 +5458,7 @@ function openAddCustomerModal(){
       <div class="field">
         <label>Client Source</label>
         <select id="nc-source">
-          ${srcOpts.map(s=>\`<option value="\${s}">\${s||'-- How did they find us? --'}</option>\`).join('')}
+          ${srcOpts.map(s=>`<option value="${s}">${s||'-- How did they find us? --'}</option>`).join('')}
         </select>
       </div>
       <div class="field"><label>Nationality</label><input type="text" id="nc-nat" placeholder="Country code"/></div>
