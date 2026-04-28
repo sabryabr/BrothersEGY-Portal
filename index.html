@@ -5447,6 +5447,47 @@ async function submitRejection(approvalId){
 /* ============================================================
    CRM HUB
    ============================================================ */
+
+function openAddCustomerModal(){
+  const srcOpts=['','Website','WhatsApp','Messenger','Instagram','Phone Call','Office Visit','Referral','Booking.com','Airbnb','Other'];
+  const html=`
+    <div class="form-grid">
+      <div class="field"><label>First Name *</label><input type="text" id="nc-fname" placeholder="First name"/></div>
+      <div class="field"><label>Last Name *</label><input type="text" id="nc-lname" placeholder="Last name"/></div>
+      <div class="field"><label>Phone *</label><input type="text" id="nc-phone" placeholder="Phone number"/></div>
+      <div class="field">
+        <label>Client Source</label>
+        <select id="nc-source">
+          ${srcOpts.map(s=>\`<option value="\${s}">\${s||'-- How did they find us? --'}</option>\`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Nationality</label><input type="text" id="nc-nat" placeholder="Country code"/></div>
+      <div class="field"><label>Email</label><input type="text" id="nc-email" placeholder="Email address"/></div>
+      <div class="field"><label>National ID</label><input type="text" id="nc-natid" placeholder="National ID"/></div>
+      <div class="field"><label>Passport No.</label><input type="text" id="nc-passport" placeholder="Passport number"/></div>
+      <div class="field"><label>Driver License</label><input type="text" id="nc-license" placeholder="License number"/></div>
+      <div class="field" style="grid-column:1/-1;"><label>Address</label><input type="text" id="nc-address" placeholder="Address"/></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:13px;">
+      <button class="btn btn-success" onclick="saveNewCustomer()">💾 Save Customer</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal('➕ Add New Customer',html);
+}
+
+async function saveNewCustomer(){
+  const fname=document.getElementById('nc-fname')?.value.trim();
+  const lname=document.getElementById('nc-lname')?.value.trim();
+  const phone=document.getElementById('nc-phone')?.value.trim();
+  if(!fname||!lname){toast('First and last name are required','error');return;}
+  if(!phone){toast('Phone number is required','error');return;}
+  const natid=document.getElementById('nc-natid')?.value.trim()||'';
+  const passport=document.getElementById('nc-passport')?.value.trim()||'';
+  const source=document.getElementById('nc-source')?.value||'';
+  const now=Date.now();
+  try{
+    const maxNo=G.customers.reduce((mx,c)=>Math.max(mx,parseInt(c['No.'])||0),0);
+    const nextNo=maxNo+1;
     const newCust={'No.':String(nextNo),'الاسم الأول':fname,'الاسم الأخير':lname,'رقم التليفون':phone,'رمز الدولة':document.getElementById('nc-nat')?.value.trim()||'','الرقم القومي':natid,'رقم جواز السفر':passport,'رقم رخصة القيادة':document.getElementById('nc-license')?.value.trim()||'','عنوان البريد الإلكتروني':document.getElementById('nc-email')?.value.trim()||'','العنوان':document.getElementById('nc-address')?.value.trim()||'','client_source':source,'تاريخ التسجيل':new Date().toLocaleDateString('en-GB',{month:'2-digit',year:'numeric'}),'_sys_updated':now};
     const ref=await db.collection('customers').add(newCust);
     newCust.id=ref.id;G.customers.unshift(newCust);
