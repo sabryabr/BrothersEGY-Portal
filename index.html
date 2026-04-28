@@ -5993,9 +5993,55 @@ function crmEditMode(prefix){
   ['fname','lname','phone','email','passport','license','address','nationality'].forEach(f=>{
     const el=document.getElementById(`${prefix}-${f}`);if(el)el.readOnly=false;
   });
-    {desc:'Base Rental',detail:`${d.duration_days} days × ${fmtMoney(d.daily_rate)}/day`,amount:fmtMoney(d.daily_rate*d.duration_days)},
-    d.km_cost>0?{desc:'KM Package',detail:kmMap[d.km_package]||d.km_package,amount:fmtMoney(d.km_cost)}:null,
-    d.insurance_fee>0?{desc:'Insurance Fee',detail:`${d.duration_days} days × ${fmtMoney(d.insurance_fee)}`,amount:fmtMoney(d.insurance_fee*d.duration_days)}:null,
+  const saveBtn=document.getElementById(`${prefix}-save-btn`);if(saveBtn)saveBtn.style.display='inline-flex';
+  const cancelBtn=document.getElementById(`${prefix}-cancel-btn`);if(cancelBtn)cancelBtn.style.display='inline-flex';
+  const editBtn=document.getElementById(`${prefix}-edit-btn`);if(editBtn)editBtn.style.display='none';
+}
+async function crmSaveEdit(prefix){
+  const customerId=window[`_crm_${prefix}_id`];if(!customerId)return;
+  try{
+    const upd={
+      'الاسم الأول':document.getElementById(`${prefix}-fname`)?.value.trim()||'',
+      'الاسم الأخير':document.getElementById(`${prefix}-lname`)?.value.trim()||'',
+      'رقم التليفون':document.getElementById(`${prefix}-phone`)?.value.trim()||'',
+      'عنوان البريد الإلكتروني':document.getElementById(`${prefix}-email`)?.value.trim()||'',
+      'رقم جواز السفر':document.getElementById(`${prefix}-passport`)?.value.trim()||'',
+      'رقم رخصة القيادة':document.getElementById(`${prefix}-license`)?.value.trim()||'',
+      'العنوان':document.getElementById(`${prefix}-address`)?.value.trim()||'',
+      'رمز الدولة':document.getElementById(`${prefix}-nationality`)?.value.trim()||'',
+      '_sys_updated':Date.now()
+    };
+    await db.collection('customers').doc(customerId).update(upd);
+    const idx=G.customers.findIndex(c=>c.id===customerId);
+    if(idx>-1)G.customers[idx]={...G.customers[idx],...upd};
+    ['fname','lname','phone','email','passport','license','address','nationality'].forEach(f=>{
+      const el=document.getElementById(`${prefix}-${f}`);if(el)el.readOnly=true;
+    });
+    const saveBtn=document.getElementById(`${prefix}-save-btn`);if(saveBtn)saveBtn.style.display='none';
+    const cancelBtn=document.getElementById(`${prefix}-cancel-btn`);if(cancelBtn)cancelBtn.style.display='none';
+    const editBtn=document.getElementById(`${prefix}-edit-btn`);if(editBtn)editBtn.style.display='inline-flex';
+    toast('Client details updated!','success');
+  }catch(e){toast('Update failed: '+e.message,'error');}
+}
+function crmCancelEdit(prefix){
+  const customerId=window[`_crm_${prefix}_id`];
+  if(customerId)fillCrmFields(prefix,customerId);
+  const saveBtn=document.getElementById(`${prefix}-save-btn`);if(saveBtn)saveBtn.style.display='none';
+  const cancelBtn=document.getElementById(`${prefix}-cancel-btn`);if(cancelBtn)cancelBtn.style.display='none';
+  const editBtn=document.getElementById(`${prefix}-edit-btn`);if(editBtn)editBtn.style.display='inline-flex';
+}
+
+/* ============================================================
+   EN CONTRACT
+   ============================================================ */
+
+function loadENContract(){
+  const wrap=document.getElementById('page-en-contract');if(!wrap)return;
+  const branch=G.user?.branch||'HRG';
+  wrap.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px;">
           <h3 style="font-size:13px;font-weight:800;">📄 New Contract</h3>
           <span id="en-ref-preview" style="font-size:10px;color:var(--accent);font-weight:700;"></span>
         </div>
