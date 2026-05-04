@@ -908,6 +908,28 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
 const storage=firebase.storage();
+db.enableNetwork().catch(()=>{});
+
+// Offline/online state monitoring
+window.addEventListener('online',()=>{
+  const banner=document.getElementById('offline-banner');
+  if(banner)banner.style.display='none';
+  db.enableNetwork().catch(()=>{});
+  toast('🌐 Connection restored — syncing...','success');
+  if(typeof loadBookingsCache==='function')loadBookingsCache();
+});
+window.addEventListener('offline',()=>{
+  let banner=document.getElementById('offline-banner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='offline-banner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#ef4444;color:white;text-align:center;padding:8px;font-size:12px;font-weight:700;';
+    banner.textContent='⚠️ No internet connection — changes will sync when connection is restored';
+    document.body.prepend(banner);
+  }
+  banner.style.display='block';
+  db.disableNetwork().catch(()=>{});
+});
 
 /* ============================================================
    GLOBAL STATE
@@ -1735,17 +1757,28 @@ function initRealtimeListeners(){
         if(Array.isArray(allOrders))allOrders=allOrders.filter(b=>b.id!==doc.id);
       }
     });
-    clearTimeout(window._snapshotRefreshTimer);
-    window._snapshotRefreshTimer=setTimeout(()=>{
-      const active=document.querySelector('.page-section.active');
-      if(!active)return;
-      const pid=active.id;
-      if(pid==='page-order-book'&&typeof filterOrders==='function')filterOrders();
-      if(pid==='page-fleet-radar'&&typeof renderGantt==='function')renderGantt();
-      if(pid==='page-dashboard'&&typeof loadDashboard==='function')loadDashboard();
-      if(pid==='page-vehicle-360'&&typeof loadVehicle360Details==='function')loadVehicle360Details();
-      if(pid==='page-risk-radar'&&typeof loadRiskRadar==='function')loadRiskRadar();
-    },1000);
+    // Per-section responsive refresh (1s orders/gantt, 2s dashboard)
+    const active=document.querySelector('.page-section.active');
+    if(active?.id==='page-order-book'&&typeof filterOrders==='function'){
+      clearTimeout(window._snapshotRefreshTimer);
+      window._snapshotRefreshTimer=setTimeout(filterOrders,1000);
+    }
+    if(active?.id==='page-fleet-radar'&&typeof renderGantt==='function'){
+      clearTimeout(window._ganttRefreshTimer);
+      window._ganttRefreshTimer=setTimeout(renderGantt,1000);
+    }
+    if(active?.id==='page-dashboard'&&typeof loadDashKPIs==='function'){
+      clearTimeout(window._dashRefreshTimer);
+      window._dashRefreshTimer=setTimeout(()=>{window._kpiLoading=false;loadDashKPIs();},2000);
+    }
+    if(active?.id==='page-vehicle-360'&&typeof loadVehicle360Details==='function'){
+      clearTimeout(window._v360RefreshTimer);
+      window._v360RefreshTimer=setTimeout(loadVehicle360Details,1000);
+    }
+    if(active?.id==='page-risk-radar'&&typeof loadRiskRadar==='function'){
+      clearTimeout(window._riskRefreshTimer);
+      window._riskRefreshTimer=setTimeout(loadRiskRadar,1000);
+    }
   });
   G.unsubscribers.push(_bookingUnsub);
 
@@ -4288,6 +4321,12 @@ async function saveOrderEdit(orderId){
     toast('Order updated!','success');closeModal();
     filterOrders();
     triggerGlobalRender();
+    // Refresh Gantt if Fleet Radar is visible
+    const activeTab=document.querySelector('.page-section.active');
+    if(activeTab?.id==='page-fleet-radar'){
+      clearTimeout(window._ganttRefreshTimer);
+      window._ganttRefreshTimer=setTimeout(renderGantt,800);
+    }
     // Auto-update contract snapshots so QR always shows latest order data
     try{
       const _contractUpd={_sys_updated:firebase.firestore.FieldValue.serverTimestamp(),last_order_update:new Date().toISOString(),order_status:newStatus,order_total:newTotal,order_paid:newPaid};
@@ -4295,6 +4334,14 @@ async function saveOrderEdit(orderId){
       await db.collection('contracts').doc(`${orderId}_ar`).update(_contractUpd).catch(()=>{});
     }catch(e){}
   }catch(e){console.error('OrderEdit error:',e);toast('Update failed: '+e.message,'error');}
+}
+
+/* ---- Refresh single order in-place ---- */
+function refreshOrderInPlace(orderId){
+  const fresh=G.bookings.find(o=>o.id===orderId);
+  if(fresh){const idx=allOrders.findIndex(o=>o.id===orderId);if(idx>=0)allOrders[idx]=fresh;}
+  const active=document.querySelector('.page-section.active');
+  if(active?.id==='page-order-book'&&typeof filterOrders==='function')filterOrders();
 }
 
 /* ---- Quick Payment ---- */
@@ -4406,8 +4453,19 @@ async function saveQuickPayment(orderId,totalDue,prevPaid){
       created_at:Date.now()
     }).catch(()=>{});
     await logAction('EDIT','Order Book',`Payment on Order #${order?.['No.']||orderId}: ${fmtMoney(thisPayment)}`);
-    toast(`Payment of ${fmtMoney(thisPayment)} saved!`,'success');closeModal();
-    setTimeout(()=>{const rcInput=document.getElementById('rc-contract-no');if(rcInput)rcInput.value=order?.['No.']||orderId;showPage('receipts');},400);
+    // Update local cache immediately
+    const orderIdx=allOrders.findIndex(o=>o.id===orderId);
+    if(orderIdx>=0){
+      allOrders[orderIdx]['المدفوع EGP']=String(prevPaid+egp);
+      if(usd>0)allOrders[orderIdx]['المدفوع USD']=String(parseAmount(order?.['المدفوع USD']||'0')+usd);
+      if(eur>0)allOrders[orderIdx]['المدفوع EUR']=String(parseAmount(order?.['المدفوع EUR']||'0')+eur);
+      const gIdx=G.bookings.findIndex(o=>o.id===orderId);
+      if(gIdx>=0)Object.assign(G.bookings[gIdx],allOrders[orderIdx]);
+    }
+    if(typeof filterOrders==='function')filterOrders();
+    toast('✅ Payment saved! Generating receipt...','success');
+    closeModal();
+    setTimeout(()=>generateOrderReceiptDirect(orderId),500);
   }catch(e){toast('Payment failed: '+e.message,'error');}
 }
 
@@ -13572,6 +13630,17 @@ async function convertProposalToOrderWithCar(proposalId,carId,carLabel){
     if(G.proposals){const idx=G.proposals.findIndex(x=>x.id===proposalId);if(idx>=0){G.proposals[idx].status='Converted';G.proposals[idx].converted_to=orderRef;}}
     renderProposalsList&&renderProposalsList();
     toast('✅ Proposal converted to Order: '+orderRef,'success');
+    // Auto-generate contracts for new order
+    setTimeout(async ()=>{
+      try{
+        const newOrder=allOrders.find(o=>o['No.']==orderRef)||G.bookings.find(o=>o['No.']==orderRef);
+        if(newOrder){
+          toast('📄 Auto-generating contract...','info');
+          await generateOrderContractDirect(newOrder.id,'en');
+          await generateOrderContractDirect(newOrder.id,'ar');
+        }
+      }catch(e){console.warn('Auto-doc generation failed:',e.message);}
+    },2000);
   }catch(e){toast('Conversion failed: '+e.message,'error');}
 }
 
@@ -16136,10 +16205,23 @@ async function saveDepositPayment(orderId,type){
     });
     const logRef=await db.collection('payment_log').add({order_id:orderId,type:'deposit_'+type,...receiptPayload});
     await db.collection('receipts').add({...receiptPayload,receipt_type:'deposit_'+type,receipt_id:logRef.id});
+    // Update local cache immediately
+    const dIdx=allOrders.findIndex(o=>o.id===orderId);
+    if(dIdx>=0){
+      if(type==='collect'){
+        allOrders[dIdx].deposit_held=(parseFloat(cur.deposit_held||0))+totalEGP;
+        allOrders[dIdx].deposit_held_egp=(parseFloat(cur.deposit_held_egp||0))+egp;
+        allOrders[dIdx].deposit_held_usd=(parseFloat(cur.deposit_held_usd||0))+usd;
+      }else{
+        allOrders[dIdx].deposit_returned=(parseFloat(cur.deposit_returned||0))+totalEGP;
+      }
+      const dgIdx=G.bookings.findIndex(o=>o.id===orderId);
+      if(dgIdx>=0)Object.assign(G.bookings[dgIdx],allOrders[dIdx]);
+    }
+    if(typeof filterOrders==='function')filterOrders();
     closeModal();
     toast(`✅ Deposit ${type==='collect'?'collected':'returned'}: ${fmtMoney(totalEGP)}`,'success');
     printDepositReceipt({...receiptPayload,orderRef:orderId,receiptId:logRef.id});
-    openOrderDetail(orderId);
   }catch(e){toast('Failed: '+e.message,'error');}
 }
 
