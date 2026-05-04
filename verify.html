@@ -84,7 +84,7 @@ function statusPill(status, closed) {
   return `<span class="pill pill-closed">${status||'—'}</span>`;
 }
 
-async function runQuery(collection, fieldPath, value) {
+async function runQuery(collection, fieldPath, value, limit=1) {
   try {
     const body = {
       structuredQuery: {
@@ -96,7 +96,7 @@ async function runQuery(collection, fieldPath, value) {
             value: {stringValue: value}
           }
         },
-        limit: 1
+        limit: limit
       }
     };
     const res = await fetch(`${BASE}:runQuery`, {
@@ -104,11 +104,15 @@ async function runQuery(collection, fieldPath, value) {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body)
     });
-    if (!res.ok) return null;
+    if (!res.ok) return limit===1 ? null : [];
     const results = await res.json();
-    if (!results || !results[0] || !results[0].document) return null;
-    return results[0].document;
-  } catch(e) { return null; }
+    if(limit===1){
+      if(!results||!results[0]||!results[0].document)return null;
+      return results[0].document;
+    }else{
+      return results.filter(r=>r.document).map(r=>r.document);
+    }
+  } catch(e) { return limit===1 ? null : []; }
 }
 
 async function verify() {
@@ -138,23 +142,24 @@ function hide() {
   document.getElementById('content').style.display = 'block';
 }
 
-function showOrder(f, docType) {
+async function showOrder(f, docType) {
   hide();
-  const status = fv(f, 'حالة الطلب') || fv(f, 'order_status') || '—';
+  const status = fv(f, 'بلطلا ةلاح') || fv(f, 'order_status') || '—';
   const closed = fv(f, 'closed');
-  const total = parseFloat(fv(f,'إجمالي المستحق (Total)')||fv(f,'قحتسملا يلامجإ (Total)')||'0');
-  const paidEGP = parseFloat(fv(f,'المدفوع EGP')||fv(f,'عوفدملا EGP')||'0');
-  const paidUSD = parseFloat(fv(f,'المدفوع USD')||fv(f,'عوفدملا USD')||'0');
+  const total = parseFloat(fv(f,'قحتسملا يلامجإ (Total)')||fv(f,'إجمالي المستحق (Total)')||'0');
+  const paidEGP = parseFloat(fv(f,'عوفدملا EGP')||fv(f,'المدفوع EGP')||'0');
+  const paidUSD = parseFloat(fv(f,'عوفدملا USD')||fv(f,'المدفوع USD')||'0');
   const depHeld = parseFloat(fv(f,'deposit_held')||'0');
   const depReturned = parseFloat(fv(f,'deposit_returned')||'0');
   const debt = Math.max(0, total - paidEGP);
-  const pickup = fv(f,'مكان الاستلام')||fv(f,'مالتسالا ناكم')||'—';
-  const dropoff = fv(f,'مكان التسليم')||fv(f,'ميلستلا ناكم')||'—';
-  const branch = fv(f,'فرع الإصدار')||fv(f,'رادصإلا عرف')||fv(f,'branch')||'—';
+  const pickup = fv(f,'مالتسالا ناكم')||fv(f,'مكان الاستلام')||'—';
+  const dropoff = fv(f,'ميلستلا ناكم')||fv(f,'مكان التسليم')||'—';
+  const branch = fv(f,'رادصإلا عرف')||fv(f,'فرع الإصدار')||fv(f,'branch')||'—';
   const startDate = fv(f,'col_L')||fv(f,'pickup_date')||'—';
   const endDate = fv(f,'col_T')||fv(f,'dropoff_date')||'—';
-  const clientName = fv(f,'اسم العميل')||fv(f,'ليمعلا مسا')||fv(f,'client_name')||'—';
-  const carName = fv(f,'اسم السيارة')||fv(f,'ةرايسلا مسا')||fv(f,'car_label')||'—';
+  const clientName = fv(f,'ليمعلا مسا')||fv(f,'اسم العميل')||fv(f,'client_name')||'—';
+  const carName = fv(f,'ةرايسلا مسا')||fv(f,'اسم السيارة')||fv(f,'car_label')||'—';
+  const orderRef = fv(f,'No.')||ref;
   const nowStr = new Date().toLocaleString('en-GB');
 
   document.getElementById('content').innerHTML = `
@@ -163,38 +168,109 @@ function showOrder(f, docType) {
       <div class="badge-icon">✅</div>
       <div>
         <div class="badge-text">Verified — Brothers EGY</div>
-        <div class="badge-sub">${docType} #${ref}</div>
+        <div class="badge-sub">${docType} #${orderRef}</div>
       </div>
     </div>
 
     <div class="section-title">📋 Order Details</div>
     <table>
-      <tr><td>Reference</td><td>#${ref}</td></tr>
+      <tr><td>Reference</td><td>#${orderRef}</td></tr>
       <tr><td>Status</td><td>${statusPill(status, closed)}</td></tr>
       <tr><td>Client</td><td>${clientName}</td></tr>
       <tr><td>Vehicle</td><td>${carName}</td></tr>
       <tr><td>Branch</td><td>${branch}</td></tr>
-      <tr><td>Pickup</td><td>${fmtDate(startDate)}</td></tr>
-      <tr><td>Return</td><td>${fmtDate(endDate)}</td></tr>
+      <tr><td>Pickup Date</td><td>${fmtDate(startDate)}</td></tr>
+      <tr><td>Return Date</td><td>${fmtDate(endDate)}</td></tr>
       <tr><td>Pickup Location</td><td>${pickup}</td></tr>
       <tr><td>Dropoff Location</td><td>${dropoff}</td></tr>
     </table>
 
     <div class="section-title">💰 Financial Summary</div>
     <table>
-      <tr><td>Total Rental</td><td class="amount-paid">${fmtMoney(total)}</td></tr>
-      <tr><td>Paid (EGP)</td><td style="color:#16a34a;font-weight:700;">${fmtMoney(paidEGP)}</td></tr>
-      ${paidUSD > 0 ? `<tr><td>Paid (USD)</td><td>$${paidUSD}</td></tr>` : ''}
-      <tr><td>Outstanding</td><td class="${debt > 0 ? 'amount-debt' : ''}">${debt > 0 ? fmtMoney(debt) : '✅ Fully Paid'}</td></tr>
-      ${depHeld > 0 ? `<tr><td>Deposit Held</td><td>${fmtMoney(depHeld)}</td></tr>` : ''}
+      <tr><td>Contract Total</td><td class="amount-paid">${fmtMoney(total)}</td></tr>
+      <tr><td>Total Paid (EGP)</td><td style="color:#16a34a;font-weight:700;">${fmtMoney(paidEGP)}</td></tr>
+      ${paidUSD > 0 ? `<tr><td>Total Paid (USD)</td><td>$${paidUSD.toLocaleString()}</td></tr>` : ''}
+      <tr><td>Outstanding Balance</td><td class="${debt > 0 ? 'amount-debt' : ''}">${debt > 0 ? fmtMoney(debt) : '✅ Fully Paid'}</td></tr>
+      ${depHeld > 0 ? `<tr><td>Security Deposit</td><td>${fmtMoney(depHeld)}</td></tr>` : ''}
       ${depReturned > 0 ? `<tr><td>Deposit Returned</td><td style="color:#16a34a;">${fmtMoney(depReturned)}</td></tr>` : ''}
     </table>
+
+    <div class="section-title">📜 Payment History</div>
+    <div id="payment-history-wrap"><div style="color:#94a3b8;font-size:12px;text-align:center;padding:8px;">Loading payment history...</div></div>
 
     <div class="last-updated">🕐 Data fetched live at ${nowStr}</div>
     <div class="footer">
       Brothers EGY Car Rental · This document is verified and digitally issued.<br>
       Scan QR code anytime to view the latest status of this order.
     </div>`;
+
+  // Fetch payment history asynchronously
+  try {
+    const payments = await runQuery('payment_log', 'order_ref', orderRef, 50);
+    const histWrap = document.getElementById('payment-history-wrap');
+    if(!histWrap) return;
+    if(!payments || payments.length === 0){
+      histWrap.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px;">No individual payment records found.</div>';
+      return;
+    }
+    payments.sort((a,b)=>{
+      const da = new Date(fv(a.fields,'datetime')||fv(a.fields,'date')||0);
+      const db2 = new Date(fv(b.fields,'datetime')||fv(b.fields,'date')||0);
+      return da-db2;
+    });
+    let runningTotal = 0;
+    const rows = payments.map((p,i)=>{
+      const pf = p.fields;
+      const amt = parseFloat(fv(pf,'amount_egp')||'0');
+      const amtUSD = parseFloat(fv(pf,'amount_usd')||'0');
+      const amtEUR = parseFloat(fv(pf,'amount_eur')||'0');
+      runningTotal += amt;
+      const dt = new Date(fv(pf,'datetime')||fv(pf,'date')||'');
+      const dtStr = isNaN(dt) ? '—' : dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const method = fv(pf,'payment_method')||'Cash';
+      const collector = fv(pf,'collected_by')||'—';
+      const notes = fv(pf,'notes')||'';
+      const amtParts = [];
+      if(amt>0) amtParts.push(`£${amt.toLocaleString()} EGP`);
+      if(amtUSD>0) amtParts.push(`$${amtUSD} USD`);
+      if(amtEUR>0) amtParts.push(`€${amtEUR} EUR`);
+      return `<tr style="background:${i%2===0?'#f8fafc':'#fff'};">
+        <td style="font-size:11px;color:#64748b;padding:6px 4px;">${i+1}</td>
+        <td style="font-size:12px;font-weight:600;color:#16a34a;padding:6px 4px;">${amtParts.join(' + ')||'—'}</td>
+        <td style="font-size:11px;padding:6px 4px;">${dtStr}</td>
+        <td style="font-size:11px;padding:6px 4px;">${method}</td>
+        <td style="font-size:11px;padding:6px 4px;">${collector}</td>
+        <td style="font-size:11px;color:#64748b;font-style:italic;padding:6px 4px;">${notes}</td>
+        <td style="font-size:11px;color:#475569;padding:6px 4px;">£${runningTotal.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+    histWrap.innerHTML = `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#f1f5f9;">
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">#</th>
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">Amount</th>
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">Date &amp; Time</th>
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">Method</th>
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">Collected By</th>
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">Notes</th>
+          <th style="padding:6px 4px;text-align:left;color:#64748b;font-size:10px;">Running Total</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr style="background:#f0fdf4;font-weight:700;">
+          <td colspan="6" style="padding:8px 4px;font-size:12px;">Total Collected</td>
+          <td style="padding:8px 4px;font-size:14px;color:#16a34a;">£${runningTotal.toLocaleString()} EGP</td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>`;
+  } catch(e) {
+    const histWrap = document.getElementById('payment-history-wrap');
+    if(histWrap) histWrap.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px;">Payment history unavailable.</div>';
+  }
 }
 
 function showReceipt(f) {
